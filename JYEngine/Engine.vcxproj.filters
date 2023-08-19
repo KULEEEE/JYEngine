@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{62a5b076-fea6-447a-a76a-86192afbfb1c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\private">
+      <UniqueIdentifier>{b4eb0491-c8c9-4006-bd77-14e2ee5b2b23}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\engine\d3dx12.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\precompile.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JEngine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JCommandQueue.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JDevice.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JSwapChain.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JDescriptorHeap.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JEngineContext.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\engine\private\JEngine.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JCommandQueue.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JDevice.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JSwapChain.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JDescriptorHeap.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JEngineContext.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

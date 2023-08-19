@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Client">
+      <UniqueIdentifier>{6caeae12-5469-47c3-a7f2-d4d80d68a1be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Client\private">
+      <UniqueIdentifier>{26193efa-0183-4763-934b-63d4f79b7e80}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Client\resource">
+      <UniqueIdentifier>{ca776be2-eb7d-42eb-9fef-a4f82520c946}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{4e4805a8-3d98-445f-b3bb-fed844bc3631}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\private">
+      <UniqueIdentifier>{247404fc-0b8c-4911-879e-e70231de090c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Client\private\Client.cpp">
+      <Filter>Client\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\private\JPanel.cpp">
+      <Filter>Editor\private</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Client\Client.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Client\framework.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Client\Resource.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Client\targetver.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\JPanel.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Client.ico">
+      <Filter>Client\resource</Filter>
+    </Image>
+    <Image Include="small.ico">
+      <Filter>Client\resource</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Client.rc">
+      <Filter>Client\resource</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
