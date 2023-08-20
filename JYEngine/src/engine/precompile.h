@@ -38,9 +38,11 @@ using namespace Microsoft::WRL;
 #define J_EDITOR_BEGIN namespace J { namespace Editor {
 #define J_EDITOR_END }}
 
-#define J_ENGINE_BEGINE namespace J { namespace Engine {
+#define J_ENGINE_BEGIN namespace J { namespace Engine {
 #define J_ENGINE_END }}
 
+#define J_RENDER_BEGIN namespace J { namespace Render {
+#define J_RENDER_END }}
 
 //Typedef
 

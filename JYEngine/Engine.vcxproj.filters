@@ -33,6 +33,9 @@
     <ClInclude Include="src\engine\JEngineContext.h">
       <Filter>Engine</Filter>
     </ClInclude>
+    <ClInclude Include="src\engine\JRenderDefinition.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\private\JEngine.cpp">

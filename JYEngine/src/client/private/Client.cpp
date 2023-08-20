@@ -1,10 +1,16 @@
 ﻿// Client.cpp : 애플리케이션에 대한 진입점을 정의합니다.
 //
 
-#include "engine/precompile.h"
 #include "client/framework.h"
 #include "client/Client.h"
+
 #include "editor/JPanel.h"
+
+#include "engine/JRenderDefinition.h"
+#include "engine/JEngineContext.h"
+
+
+
 
 #define MAX_LOADSTRING 100
 
@@ -44,6 +50,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
 
+    //Engine Create
+    InitializeEngine();
+
     unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
     panel->Init();
 
@@ -64,6 +73,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         panel->Update();
     }
 
+    DestroyEngine();
     return (int) msg.wParam;
 }
 

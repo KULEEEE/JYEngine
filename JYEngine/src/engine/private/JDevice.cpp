@@ -1,6 +1,6 @@
 #include "engine/JDevice.h"
 
-J_ENGINE_BEGINE
+J_RENDER_BEGIN
 
 JDevice::JDevice()
 {
@@ -47,4 +47,4 @@ void JDevice::destroy()
 
 }
 
-J_ENGINE_END
+J_RENDER_END

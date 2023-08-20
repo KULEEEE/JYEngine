@@ -25,6 +25,7 @@
     <ClInclude Include="src\engine\JDevice.h" />
     <ClInclude Include="src\engine\JEngine.h" />
     <ClInclude Include="src\engine\JEngineContext.h" />
+    <ClInclude Include="src\engine\JRenderDefinition.h" />
     <ClInclude Include="src\engine\JSwapChain.h" />
     <ClInclude Include="src\engine\precompile.h" />
   </ItemGroup>

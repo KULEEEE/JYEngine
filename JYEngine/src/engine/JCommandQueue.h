@@ -4,25 +4,29 @@
 #define __J_COMMAND_QUEUE_H__
 #include "engine/precompile.h"
 
-/*#include "engine/JSwapChain.h"*/ namespace J { namespace Engine { class JSwapChain; } }
-/*#include "engine/JDescriptorHeap.h"*/ namespace J { namespace Engine { class JDescriptorHeap; } }
+/*#include "engine/JSwapChain.h"*/ namespace J { namespace Render { class JSwapChain; } }
+/*#include "engine/JDescriptorHeap.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
 
-J_ENGINE_BEGINE
+J_RENDER_BEGIN
 
 class JCommandQueue
 {
 public:
-	JCommandQueue(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap);
+	JCommandQueue();
 	~JCommandQueue();
 
-	
+	void Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap);
 
+	//TODO: Divide
+	
+	void RenderBegin(const D3D12_VIEWPORT* vp, const D3D12_RECT* rect);
+	void RenderEnd();
+
+	ComPtr<ID3D12CommandQueue> GetCmdQueue() { return _cmdQueue; }
 
 private:
 
-	void initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap);
 	void destroy();
-
 	void waitSync();
 
 	// CommandQueue : DX12ø° µÓ¿Â
@@ -38,11 +42,11 @@ private:
 	uint32								_fenceValue = 0;
 	HANDLE								_fenceEvent = INVALID_HANDLE_VALUE;
 
-	const JSwapChain*			_swapChain;
-	const JDescriptorHeap*	_descriptorHeap;
+	/*const*/ JSwapChain* _swapChain;
+	/*const*/ JDescriptorHeap* _descriptorHeap;
 	
 };
 
-J_ENGINE_END
+J_RENDER_END
 
 #endif

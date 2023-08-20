@@ -2,43 +2,41 @@
 #ifndef __J_ENGINE_H__
 #define __J_ENGINE_H__
 
-#include "engine/precompile.h"
+#include "engine/JRenderDefinition.h"
 
-/*#include "engine/JDevice.h"*/ namespace J { namespace Engine { class JDevice; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Engine { class JCommandQueue; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Engine { class JSwapChain; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Engine { class JDescriptorHeap; } }
+/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JDevice; } }
+/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JCommandQueue; } }
+/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JSwapChain; } }
+/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
 
-J_ENGINE_BEGINE
+J_ENGINE_BEGIN
 
 class JEngine
 {
 public:
 
-	struct JWindowInfo
-	{
-		HWND hwnd;  // output Window
-		int32 width;
-		int32 height;
-		bool windowed; // true: Windowed Mode, false: Fullscreen Mode
-	};
-
-	JEngine(const JWindowInfo& window);
+	JEngine();
 	~JEngine();
 	void ResizeWindow(int32 width, int32 height);
 
+	//TODO: Delete
+	void RenderBegin();
+	void RenderEnd();
+
+	//TODO: 나중에는 이걸로 Command Queue를 직접 작성하는게 맞다.
+
 private:
-	void initialize(const JWindowInfo& window);
+	void initialize();
 	void destroy();
 
-	JWindowInfo		_window;
+	Render::JWindowInfo		_window;
 	D3D12_VIEWPORT	_viewport = {};
 	D3D12_RECT		_scissorRect = {};
 
-	JDevice* _device;
-	JCommandQueue* _cmdQueue;
-	JSwapChain* _swapChain;
-	JDescriptorHeap* _descriptorHeap;
+	Render::JDevice* _device;
+	Render::JCommandQueue* _cmdQueue;
+	Render::JSwapChain* _swapChain;
+	Render::JDescriptorHeap* _descriptorHeap;
 
 };
 

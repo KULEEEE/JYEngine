@@ -11,6 +11,9 @@ class JPanel
 public:
 	void Init();
 	void Update();
+
+private:
+	
 };
 
 J_EDITOR_END

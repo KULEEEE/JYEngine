@@ -2,21 +2,17 @@
 #include "engine/JSwapChain.h"
 #include "engine/JDescriptorHeap.h"
 
-J_ENGINE_BEGINE
+J_RENDER_BEGIN
 
-JCommandQueue::JCommandQueue(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap)
+JCommandQueue::JCommandQueue()
 {
-	initialize(device, swapChain, descriptorHeap);
 }
 
 JCommandQueue::~JCommandQueue()
 {
-	destroy();
 }
 
-
-
-void JCommandQueue::initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap)
+void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap)
 {
 	_swapChain = swapChain;
 	_descriptorHeap = descriptorHeap;
@@ -45,6 +41,53 @@ void JCommandQueue::initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
 	_fenceEvent = ::CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
+
+void JCommandQueue::RenderBegin(const D3D12_VIEWPORT* vp, const D3D12_RECT* rect)
+{
+	_cmdAlloc->Reset();
+	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
+
+	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		_swapChain->GetCurrentBackBufferResource().Get(),
+		D3D12_RESOURCE_STATE_PRESENT, // 화면 출력
+		D3D12_RESOURCE_STATE_RENDER_TARGET); // 외주 결과물
+
+	_cmdList->ResourceBarrier(1, &barrier);
+
+	// Set the viewport and scissor rect.  This needs to be reset whenever the command list is reset.
+	_cmdList->RSSetViewports(1, vp);
+	_cmdList->RSSetScissorRects(1, rect);
+
+	// Specify the buffers we are going to render to.
+	D3D12_CPU_DESCRIPTOR_HANDLE backBufferView = _descriptorHeap->GetBackBufferView();
+	_cmdList->ClearRenderTargetView(backBufferView, Colors::LightSteelBlue, 0, nullptr);
+	_cmdList->OMSetRenderTargets(1, &backBufferView, FALSE, nullptr);
+}
+
+void JCommandQueue::RenderEnd()
+{
+	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		_swapChain->GetCurrentBackBufferResource().Get(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, // 외주 결과물
+		D3D12_RESOURCE_STATE_PRESENT); // 화면 출력
+
+	_cmdList->ResourceBarrier(1, &barrier);
+	_cmdList->Close();
+
+	// 커맨드 리스트 수행
+	ID3D12CommandList* cmdListArr[] = { _cmdList.Get() };
+	_cmdQueue->ExecuteCommandLists(_countof(cmdListArr), cmdListArr);
+
+	_swapChain->Present();
+
+	// Wait until frame commands are complete.  This waiting is inefficient and is
+	// done for simplicity.  Later we will show how to organize our rendering code
+	// so we do not have to wait per frame.
+	waitSync();
+
+	_swapChain->SwapIndex();
+}
+
 void JCommandQueue::destroy()
 {
 
@@ -71,4 +114,4 @@ void JCommandQueue::waitSync()
 	}
 }
 
-J_ENGINE_END
+J_RENDER_END

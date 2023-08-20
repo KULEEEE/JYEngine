@@ -4,7 +4,7 @@
 
 #include "precompile.h"
 
-J_ENGINE_BEGINE
+J_RENDER_BEGIN
 
 class JDevice
 {
@@ -26,6 +26,6 @@ private:
 	ComPtr<ID3D12Device>	_device; // 각종 객체 생성
 };
 
-J_ENGINE_END
+J_RENDER_END
 
 #endif
