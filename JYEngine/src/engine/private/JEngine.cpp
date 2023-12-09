@@ -8,9 +8,9 @@ J_ENGINE_BEGIN
 
 using namespace J::Render;
 
-JEngine::JEngine()
+JEngine::JEngine(const Render::JWindowInfo& info)
 {
-	initialize();
+	initialize(info);
 }
 
 JEngine::~JEngine()
@@ -38,15 +38,11 @@ void JEngine::RenderEnd()
 	_cmdQueue->RenderEnd();
 }
 
-void JEngine::initialize()
+void JEngine::initialize(const Render::JWindowInfo& info)
 {
-	int32 width = 800;
-	int32 height = 600;
-	_window.width = width;
-	_window.height = height;
-	_window.windowed = true;
+	_window = info;
 
-	ResizeWindow(_window.width, _window.height);
+	ResizeWindow(info.width, info.height);
 
 	_viewport = { 0,0, static_cast<FLOAT>(_window.width), static_cast<FLOAT>(_window.height), 0.0f, 1.0f };
 	_scissorRect = CD3DX12_RECT(0, 0, _window.width, _window.height);

@@ -5,6 +5,10 @@ J_RENDER_BEGIN
 JSwapChain::JSwapChain()
 {
 }
+JSwapChain::~JSwapChain()
+{
+
+}
 
 void JSwapChain::Present()
 {

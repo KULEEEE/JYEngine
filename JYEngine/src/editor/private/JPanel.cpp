@@ -8,10 +8,10 @@ void JPanel::Init()
 {
 }
 
-void JPanel::Update()
+void JPanel::Update(Engine::JEngine* engine)
 {
-	s_Engine->RenderBegin();
-	s_Engine->RenderEnd();
+	engine->RenderBegin();
+	engine->RenderEnd();
 }
 
 J_EDITOR_END

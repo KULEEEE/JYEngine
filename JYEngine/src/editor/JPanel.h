@@ -4,13 +4,15 @@
 
 #include "engine/precompile.h"
 
+/*#include "engine/JEngine.h"*/ namespace J { namespace Engine { class JEngine; } }
+
 J_EDITOR_BEGIN
 
 class JPanel
 {
 public:
 	void Init();
-	void Update();
+	void Update(Engine::JEngine* engine);
 
 private:
 	

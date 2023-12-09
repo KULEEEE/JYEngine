@@ -15,7 +15,7 @@ class JEngine
 {
 public:
 
-	JEngine();
+	JEngine(const Render::JWindowInfo& info);
 	~JEngine();
 	void ResizeWindow(int32 width, int32 height);
 
@@ -26,7 +26,7 @@ public:
 	//TODO: 나중에는 이걸로 Command Queue를 직접 작성하는게 맞다.
 
 private:
-	void initialize();
+	void initialize(const Render::JWindowInfo& info);
 	void destroy();
 
 	Render::JWindowInfo		_window;

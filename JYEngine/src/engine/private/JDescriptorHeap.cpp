@@ -3,6 +3,11 @@
 
 J_RENDER_BEGIN
 
+JDescriptorHeap::JDescriptorHeap()
+{
+
+}
+
 void JDescriptorHeap::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain)
 {
 	_swapChain = swapChain;

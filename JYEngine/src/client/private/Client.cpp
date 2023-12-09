@@ -10,7 +10,7 @@
 #include "engine/JEngineContext.h"
 
 
-
+J::Render::JWindowInfo s_WindowInfo;
 
 #define MAX_LOADSTRING 100
 
@@ -51,10 +51,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MSG msg;
 
     //Engine Create
-    InitializeEngine();
+    s_WindowInfo.width = 800;
+    s_WindowInfo.height = 600;
+    s_WindowInfo.windowed = true;
+
+    InitializeEngine(s_WindowInfo);
 
     unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
     panel->Init();
+
+    J::Engine::JEngine* engine = GetEngine();
 
 	while (true)
     {
@@ -70,7 +76,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
 
-        panel->Update();
+        panel->Update(engine);
     }
 
     DestroyEngine();
@@ -129,6 +135,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
+
+   s_WindowInfo.hwnd = hWnd;
 
    return TRUE;
 }

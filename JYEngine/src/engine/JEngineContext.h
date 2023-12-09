@@ -6,11 +6,16 @@
 #include "engine/JRenderDefinition.h"
 #include "engine/JEngine.h"
 
-extern J::Engine::JEngine* s_Engine;
+static J::Engine::JEngine* s_Engine = nullptr;
 
-static void InitializeEngine()
+static void InitializeEngine(const J::Render::JWindowInfo& info)
 {
-	s_Engine = new J::Engine::JEngine();
+	s_Engine = new J::Engine::JEngine(info);
+}
+
+static J::Engine::JEngine* GetEngine()
+{
+	return s_Engine;
 }
 
 static void DestroyEngine()
