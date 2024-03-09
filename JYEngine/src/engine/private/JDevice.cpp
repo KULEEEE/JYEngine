@@ -26,6 +26,8 @@ void JDevice::initialize()
 #ifdef _DEBUG
 	::D3D12GetDebugInterface(IID_PPV_ARGS(&_debugController));
 	_debugController->EnableDebugLayer();
+	if (_debugController) _debugController->Release();
+
 #endif
 
 	// DXGI(DirectX Graphics Infrastructure)

@@ -53,7 +53,9 @@ void JSwapChain::createSwapChain(const JWindowInfo& info, ComPtr<IDXGIFactory> d
 
 	for (int32 i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
 	{
-		_renderTargets[i] = new Engine::JRenderTarget();
+		ID3D12Resource* rtvResource = nullptr;
+		_swapChain->GetBuffer(i, IID_PPV_ARGS(&rtvResource));
+		_renderTargets[i] = new Engine::JRenderTarget(rtvResource);
 	}
 }
 

@@ -6,11 +6,23 @@ J_ENGINE_BEGIN
 JRenderTarget::JRenderTarget()
 	: _rtvCount(1) 
 {
-
 	_rtvHandles.resize(_rtvCount);
 	_rtvResources.resize(_rtvCount);
 
-	GetEngine()->GetDx12Helper()->CreateRenderTargetView(_rtvResources[0], _rtvHandles[0]);
+	// create RTVResources
+
+	_rtvHandles[0] = GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(_rtvResources[0]);
+}
+
+//SwapChain인 경우만
+JRenderTarget::JRenderTarget(ID3D12Resource* resource)
+{
+	_rtvResources.push_back(resource);
+
+	const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle = GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource);
+	_rtvHandles.push_back(rtvHandle);
+	
+	isSwapChainTarget = true;
 }
 
 JRenderTarget::~JRenderTarget()

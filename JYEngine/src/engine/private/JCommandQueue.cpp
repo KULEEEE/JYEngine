@@ -52,7 +52,7 @@ void JCommandQueue::ClearRenderTargetView(Engine::JRenderTarget* renderTarget, c
 	vector<D3D12_CPU_DESCRIPTOR_HANDLE>& rtvHandles = renderTarget->GetRTVHandle();
 	for (auto& rtvHandle : rtvHandles)
 	{
-		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
+		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	}
 }
 

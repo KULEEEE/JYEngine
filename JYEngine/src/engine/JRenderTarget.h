@@ -10,6 +10,7 @@ class JRenderTarget
 {
 public:
 	JRenderTarget();
+	JRenderTarget(ID3D12Resource* resource);
 	~JRenderTarget();
 
 	vector<D3D12_CPU_DESCRIPTOR_HANDLE>& GetRTVHandle();
@@ -21,6 +22,8 @@ private:
 	vector<ID3D12Resource*> _rtvResources;
 
 	uint8 _rtvCount;
+
+	bool isSwapChainTarget = false;
 };
 
 J_ENGINE_END
