@@ -2,20 +2,24 @@
 #ifndef __JPANEL_H__
 #define __JPANEL_H__
 
-#include "engine/precompile.h"
-
-/*#include "engine/JEngine.h"*/ namespace J { namespace Engine { class JEngine; } }
+#include "Engine/precompile.h"
+#include "Engine/JEngineContext.h"
+#include "Engine/JCommandQueue.h"
 
 J_EDITOR_BEGIN
 
 class JPanel
 {
 public:
+
+	JPanel() = default;
+	~JPanel();
 	void Init();
-	void Update(Engine::JEngine* engine);
+	void Update();
 
 private:
-	
+	Render::JCommandQueue* _commandQueue;
+
 };
 
 J_EDITOR_END

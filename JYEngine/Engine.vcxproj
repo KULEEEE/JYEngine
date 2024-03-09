@@ -20,21 +20,25 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\engine\d3dx12.h" />
+    <ClInclude Include="src\engine\dx12\JDx12Helper.h" />
     <ClInclude Include="src\engine\JCommandQueue.h" />
-    <ClInclude Include="src\engine\JDescriptorHeap.h" />
     <ClInclude Include="src\engine\JDevice.h" />
     <ClInclude Include="src\engine\JEngine.h" />
     <ClInclude Include="src\engine\JEngineContext.h" />
     <ClInclude Include="src\engine\JRenderDefinition.h" />
+    <ClInclude Include="src\engine\JRenderTarget.h" />
+    <ClInclude Include="src\engine\JRootSignature.h" />
     <ClInclude Include="src\engine\JSwapChain.h" />
     <ClInclude Include="src\engine\precompile.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\engine\dx12\private\JDx12Helper.cpp" />
     <ClCompile Include="src\engine\private\JCommandQueue.cpp" />
-    <ClCompile Include="src\engine\private\JDescriptorHeap.cpp" />
     <ClCompile Include="src\engine\private\JDevice.cpp" />
     <ClCompile Include="src\engine\private\JEngine.cpp" />
     <ClCompile Include="src\engine\private\JEngineContext.cpp" />
+    <ClCompile Include="src\engine\private\JRenderTarget.cpp" />
+    <ClCompile Include="src\engine\private\JRootSignature.cpp" />
     <ClCompile Include="src\engine\private\JSwapChain.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

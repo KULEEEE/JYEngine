@@ -5,6 +5,7 @@
 #include "engine/precompile.h"
 
 #define SWAP_CHAIN_BUFFER_COUNT 2
+#define MAX_DESCRIPTOR_COUNT 1215
 
 J_RENDER_BEGIN
 struct JWindowInfo
@@ -14,5 +15,8 @@ struct JWindowInfo
 	int32 height;
 	bool windowed; // true: Windowed Mode, false: Fullscreen Mode
 };
+
+using JViewport = D3D12_VIEWPORT;
+
 J_RENDER_END
 #endif

@@ -1,8 +1,10 @@
 #include "engine/JCommandQueue.h"
 #include "engine/JSwapChain.h"
-#include "engine/JDescriptorHeap.h"
+#include "engine/JRenderTarget.h"
 
 J_RENDER_BEGIN
+
+using namespace J::Engine;
 
 JCommandQueue::JCommandQueue()
 {
@@ -12,11 +14,8 @@ JCommandQueue::~JCommandQueue()
 {
 }
 
-void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap)
+void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain)
 {
-	_swapChain = swapChain;
-	_descriptorHeap = descriptorHeap;
-
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -42,58 +41,76 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 	_fenceEvent = ::CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
-void JCommandQueue::RenderBegin(const D3D12_VIEWPORT* vp, const D3D12_RECT* rect)
+void JCommandQueue::RenderBegin()
 {
 	_cmdAlloc->Reset();
 	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
+}
 
-	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		_swapChain->GetCurrentBackBufferResource().Get(),
-		D3D12_RESOURCE_STATE_PRESENT, // 화면 출력
-		D3D12_RESOURCE_STATE_RENDER_TARGET); // 외주 결과물
+void JCommandQueue::ClearRenderTargetView(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount)
+{
+	vector<D3D12_CPU_DESCRIPTOR_HANDLE>& rtvHandles = renderTarget->GetRTVHandle();
+	for (auto& rtvHandle : rtvHandles)
+	{
+		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
+	}
+}
 
-	_cmdList->ResourceBarrier(1, &barrier);
+void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget)
+{
+	_currentRenderTarget = renderTarget;
 
-	// Set the viewport and scissor rect.  This needs to be reset whenever the command list is reset.
-	_cmdList->RSSetViewports(1, vp);
-	_cmdList->RSSetScissorRects(1, rect);
+	vector<D3D12_RESOURCE_BARRIER> barriers;
+	vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles = renderTarget->GetRTVHandle();
 
-	// Specify the buffers we are going to render to.
-	D3D12_CPU_DESCRIPTOR_HANDLE backBufferView = _descriptorHeap->GetBackBufferView();
-	_cmdList->ClearRenderTargetView(backBufferView, Colors::LightSteelBlue, 0, nullptr);
-	_cmdList->OMSetRenderTargets(1, &backBufferView, FALSE, nullptr);
+	for (auto& rtvResource : renderTarget->GetRTVResource())
+	{
+		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+			rtvResource,
+			D3D12_RESOURCE_STATE_PRESENT, // 화면 출력
+			D3D12_RESOURCE_STATE_RENDER_TARGET)); // 외주 결과물
+	}
+	
+	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
+	_cmdList->OMSetRenderTargets(rtvHandles.size(), rtvHandles.data(), FALSE, nullptr);
+}
+
+void JCommandQueue::SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport)
+{
+	_cmdList->RSSetViewports(viewPortCount, viewport);
+}
+
+void JCommandQueue::SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect)
+{
+	_cmdList->RSSetScissorRects(rectCount, rect);
+}
+
+void JCommandQueue::EndRenderPass()
+{
+	vector<D3D12_RESOURCE_BARRIER> barriers;
+
+
+	for (auto& rtvResource : _currentRenderTarget->GetRTVResource())
+	{
+		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+			rtvResource,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PRESENT));
+	}
+
+	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
 }
 
 void JCommandQueue::RenderEnd()
 {
-	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		_swapChain->GetCurrentBackBufferResource().Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, // 외주 결과물
-		D3D12_RESOURCE_STATE_PRESENT); // 화면 출력
-
-	_cmdList->ResourceBarrier(1, &barrier);
 	_cmdList->Close();
 
 	// 커맨드 리스트 수행
 	ID3D12CommandList* cmdListArr[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(_countof(cmdListArr), cmdListArr);
-
-	_swapChain->Present();
-
-	// Wait until frame commands are complete.  This waiting is inefficient and is
-	// done for simplicity.  Later we will show how to organize our rendering code
-	// so we do not have to wait per frame.
-	waitSync();
-
-	_swapChain->SwapIndex();
 }
 
-void JCommandQueue::destroy()
-{
-
-}
-
-void JCommandQueue::waitSync()
+void JCommandQueue::WaitSync()
 {
 	// Advance the fence value to mark commands up to this fence point.
 	_fenceValue++;
@@ -113,5 +130,14 @@ void JCommandQueue::waitSync()
 		::WaitForSingleObject(_fenceEvent, INFINITE);
 	}
 }
+
+void JCommandQueue::destroy()
+{
+
+}
+
+
+
+
 
 J_RENDER_END

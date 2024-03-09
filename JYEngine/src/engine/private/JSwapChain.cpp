@@ -1,4 +1,5 @@
 #include "engine/JSwapChain.h"
+#include "engine/JDevice.h"
 
 J_RENDER_BEGIN
 
@@ -21,7 +22,12 @@ void JSwapChain::SwapIndex()
 	_backBufferIndex = (_backBufferIndex + 1) % SWAP_CHAIN_BUFFER_COUNT;
 }
 
-void JSwapChain::Initialize(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue)
+void JSwapChain::Initialize(const JWindowInfo& info, const JDevice* device, ComPtr<ID3D12CommandQueue> cmdQueue)
+{
+	createSwapChain(info, device->GetDXGI(), cmdQueue);
+}
+
+void JSwapChain::createSwapChain(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue)
 {
 	// 이전에 만든 정보 날린다
 	_swapChain.Reset();
@@ -46,7 +52,9 @@ void JSwapChain::Initialize(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, 
 	dxgi->CreateSwapChain(cmdQueue.Get(), &sd, &_swapChain);
 
 	for (int32 i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
-		_swapChain->GetBuffer(i, IID_PPV_ARGS(&_renderTargets[i]));
+	{
+		_renderTargets[i] = new Engine::JRenderTarget();
+	}
 }
 
 J_RENDER_END

@@ -1,13 +1,14 @@
 ﻿// Client.cpp : 애플리케이션에 대한 진입점을 정의합니다.
 //
 
+
 #include "client/framework.h"
 #include "client/Client.h"
 
 #include "editor/JPanel.h"
 
-#include "engine/JRenderDefinition.h"
-#include "engine/JEngineContext.h"
+#include "Engine/JRenderDefinition.h"
+#include "Engine/JEngineContext.h"
 
 
 J::Render::JWindowInfo s_WindowInfo;
@@ -33,7 +34,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: 여기에 코드를 입력합니다.
+	// 콘솔 창 생성
+	AllocConsole();
+
+	// 표준 입출력, 에러 스트림을 콘솔에 연결
+	freopen("CONIN$", "r", stdin);
+	freopen("CONOUT$", "w", stdout);
+	freopen("CONOUT$", "w", stderr);
 
     // 전역 문자열을 초기화합니다.
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -50,17 +57,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
 
-    //Engine Create
+    //SetSize
     s_WindowInfo.width = 800;
     s_WindowInfo.height = 600;
     s_WindowInfo.windowed = true;
 
-    InitializeEngine(s_WindowInfo);
+    //SwapChain Create
+
+    J::Render::JSwapChain* swapChain = new J::Render::JSwapChain();
+    J::Render::JCommandQueue* cmdQueue = new J::Render::JCommandQueue();
+
+    InitializeEngine(cmdQueue, swapChain);
+
+    cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain);
+    swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(),cmdQueue->GetCmdQueue());
 
     unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
     panel->Init();
-
-    J::Engine::JEngine* engine = GetEngine();
 
 	while (true)
     {
@@ -76,7 +89,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
 
-        panel->Update(engine);
+        cmdQueue->RenderBegin();
+        panel->Update();
+        cmdQueue->RenderEnd();
+        swapChain->Present();
+		// Wait until frame commands are complete.  This waiting is inefficient and is
+	    // done for simplicity.  Later we will show how to organize our rendering code
+	    // so we do not have to wait per frame.
+		cmdQueue->WaitSync();
+        swapChain->SwapIndex();
     }
 
     DestroyEngine();

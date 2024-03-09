@@ -3,6 +3,9 @@
 #define	__J_SWAPCHAIN_H__
 
 #include "engine/JRenderDefinition.h"
+#include "engine/JRenderTarget.h"
+
+/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JDevice; } }
 
 // 교환 사슬
 // [외주 과정]
@@ -33,21 +36,21 @@ public:
 	JSwapChain();
 	~JSwapChain();
 
-	void Initialize(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue);
+	void Initialize(const JWindowInfo& info, const JDevice* device, ComPtr<ID3D12CommandQueue> cmdQueue);
 	
 	void Present();
 	void SwapIndex();
 
 	ComPtr<IDXGISwapChain> GetSwapChain() { return _swapChain; }
-	ComPtr<ID3D12Resource> GetRenderTarget(int32 index) { return _renderTargets[index]; }
-
-	const uint32 GetCurrentBackBufferIndex() const { return _backBufferIndex; }
-	ComPtr<ID3D12Resource> GetCurrentBackBufferResource() { return _renderTargets[_backBufferIndex]; }
+	Engine::JRenderTarget* GetRenderTarget() { return _renderTargets[_backBufferIndex]; }
 
 private:
+	void createSwapChain(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue);
 
 	ComPtr<IDXGISwapChain>	_swapChain;
-	ComPtr<ID3D12Resource>	_renderTargets[SWAP_CHAIN_BUFFER_COUNT];
+
+	Engine::JRenderTarget*			_renderTargets[SWAP_CHAIN_BUFFER_COUNT];
+
 	uint32					_backBufferIndex = 0;
 };
 

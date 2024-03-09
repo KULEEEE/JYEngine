@@ -3,11 +3,10 @@
 #define __J_ENGINE_H__
 
 #include "engine/JRenderDefinition.h"
-
-/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JDevice; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JCommandQueue; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JSwapChain; } }
-/*#include "engine/JDevice.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
+#include "engine/JDevice.h"
+#include "engine/JCommandQueue.h"
+#include "engine/JSwapChain.h"
+#include "engine/dx12/JDx12Helper.h"
 
 J_ENGINE_BEGIN
 
@@ -15,28 +14,23 @@ class JEngine
 {
 public:
 
-	JEngine(const Render::JWindowInfo& info);
+	JEngine() = default;
+	JEngine(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
 	~JEngine();
-	void ResizeWindow(int32 width, int32 height);
 
-	//TODO: Delete
-	void RenderBegin();
-	void RenderEnd();
-
-	//TODO: 나중에는 이걸로 Command Queue를 직접 작성하는게 맞다.
+	Render::JDevice* GetDevice() { return _device; }
+	Render::JCommandQueue* GetCmdQueue() { return _cmdQueue; }
+	Render::JSwapChain* GetSwapChain() { return _swapChain; }
+	Render::JDx12Helper* GetDx12Helper() { return _dx12Helper; }
 
 private:
-	void initialize(const Render::JWindowInfo& info);
+	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
 	void destroy();
-
-	Render::JWindowInfo		_window;
-	D3D12_VIEWPORT	_viewport = {};
-	D3D12_RECT		_scissorRect = {};
 
 	Render::JDevice* _device;
 	Render::JCommandQueue* _cmdQueue;
 	Render::JSwapChain* _swapChain;
-	Render::JDescriptorHeap* _descriptorHeap;
+	Render::JDx12Helper* _dx12Helper;
 
 };
 

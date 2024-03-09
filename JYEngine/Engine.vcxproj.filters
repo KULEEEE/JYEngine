@@ -7,6 +7,12 @@
     <Filter Include="Engine\private">
       <UniqueIdentifier>{b4eb0491-c8c9-4006-bd77-14e2ee5b2b23}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\dx12">
+      <UniqueIdentifier>{ae744d6e-68e0-4576-92f9-21cc9da0fea1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\dx12\private">
+      <UniqueIdentifier>{ec2e95fe-3a7b-4b64-8f30-a47f1e7e9cdd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\engine\d3dx12.h">
@@ -27,14 +33,20 @@
     <ClInclude Include="src\engine\JSwapChain.h">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="src\engine\JDescriptorHeap.h">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="src\engine\JEngineContext.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="src\engine\JRenderDefinition.h">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JRootSignature.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JRenderTarget.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\dx12\JDx12Helper.h">
+      <Filter>Engine\dx12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -50,11 +62,17 @@
     <ClCompile Include="src\engine\private\JSwapChain.cpp">
       <Filter>Engine\private</Filter>
     </ClCompile>
-    <ClCompile Include="src\engine\private\JDescriptorHeap.cpp">
-      <Filter>Engine\private</Filter>
-    </ClCompile>
     <ClCompile Include="src\engine\private\JEngineContext.cpp">
       <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JRootSignature.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JRenderTarget.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\dx12\private\JDx12Helper.cpp">
+      <Filter>Engine\dx12\private</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

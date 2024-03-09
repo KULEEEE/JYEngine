@@ -6,6 +6,7 @@
 
 /*#include "engine/JSwapChain.h"*/ namespace J { namespace Render { class JSwapChain; } }
 /*#include "engine/JDescriptorHeap.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
+/*#include "engine/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 
 J_RENDER_BEGIN
 
@@ -15,19 +16,29 @@ public:
 	JCommandQueue();
 	~JCommandQueue();
 
-	void Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain, JDescriptorHeap* descriptorHeap);
+	void Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain);
 
 	//TODO: Divide
 	
-	void RenderBegin(const D3D12_VIEWPORT* vp, const D3D12_RECT* rect);
+	void RenderBegin();
+
+	void ClearRenderTargetView(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount);
+	void BeginRenderPass(Engine::JRenderTarget* renderTarget);
+	void SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport);
+	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);
+	void EndRenderPass();
+	
 	void RenderEnd();
 
+	void WaitSync();
+
 	ComPtr<ID3D12CommandQueue> GetCmdQueue() { return _cmdQueue; }
+	ComPtr<ID3D12GraphicsCommandList> GetCmdList() { return	_cmdList; }
 
 private:
 
 	void destroy();
-	void waitSync();
+	
 
 	// CommandQueue : DX12에 등장
 	// 외주를 요청할 때, 하나씩 요청하면 비효율적
@@ -42,9 +53,7 @@ private:
 	uint32								_fenceValue = 0;
 	HANDLE								_fenceEvent = INVALID_HANDLE_VALUE;
 
-	/*const*/ JSwapChain* _swapChain;
-	/*const*/ JDescriptorHeap* _descriptorHeap;
-	
+	Engine::JRenderTarget* _currentRenderTarget = nullptr;
 };
 
 J_RENDER_END
