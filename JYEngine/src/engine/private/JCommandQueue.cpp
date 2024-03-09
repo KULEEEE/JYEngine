@@ -47,16 +47,7 @@ void JCommandQueue::RenderBegin()
 	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
 }
 
-void JCommandQueue::ClearRenderTargetView(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount)
-{
-	vector<D3D12_CPU_DESCRIPTOR_HANDLE>& rtvHandles = renderTarget->GetRTVHandle();
-	for (auto& rtvHandle : rtvHandles)
-	{
-		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	}
-}
-
-void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget)
+void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount)
 {
 	_currentRenderTarget = renderTarget;
 
@@ -72,6 +63,12 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget)
 	}
 	
 	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
+	// ClearColors
+	for (auto& rtvHandle : rtvHandles)
+	{
+		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
+	}
+
 	_cmdList->OMSetRenderTargets(rtvHandles.size(), rtvHandles.data(), FALSE, nullptr);
 }
 

@@ -22,8 +22,7 @@ public:
 	
 	void RenderBegin();
 
-	void ClearRenderTargetView(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount);
-	void BeginRenderPass(Engine::JRenderTarget* renderTarget);
+	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount);
 	void SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport);
 	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);
 	void EndRenderPass();

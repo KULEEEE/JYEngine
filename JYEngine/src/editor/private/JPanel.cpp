@@ -17,8 +17,8 @@ void JPanel::Update()
 {
 	Render::JSwapChain* swapChain = GetEngine()->GetSwapChain();
 	
-	_commandQueue->ClearRenderTargetView(swapChain->GetRenderTarget(), JColors::DarkGray, 1);
-	_commandQueue->BeginRenderPass(swapChain->GetRenderTarget());
+	_commandQueue->BeginRenderPass(swapChain->GetRenderTarget(), JColors::DarkGray, 0);
+
 	Render::JViewport viewport = { 0, 0, 800, 600, 0, 1 };
 
 	D3D12_RECT rect = CD3DX12_RECT(0, 0, 800, 600);
