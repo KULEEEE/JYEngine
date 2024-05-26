@@ -66,11 +66,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     J::Render::JSwapChain* swapChain = new J::Render::JSwapChain();
     J::Render::JCommandQueue* cmdQueue = new J::Render::JCommandQueue();
+    J::Render::JRootSignature* rootSignature = new J::Render::JRootSignature();
 
-    InitializeEngine(cmdQueue, swapChain);
+    InitializeEngine(cmdQueue, swapChain, rootSignature);
 
     cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain);
     swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(),cmdQueue->GetCmdQueue());
+    rootSignature->Initialize(s_Engine->GetDevice());
 
     unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
     panel->Init();

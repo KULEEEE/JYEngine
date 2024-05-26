@@ -2,9 +2,9 @@
 
 J::Engine::JEngine* s_Engine = nullptr;
 
-void InitializeEngine(J::Render::JCommandQueue* cmdQueue, J::Render::JSwapChain* swapChain)
+void InitializeEngine(J::Render::JCommandQueue* cmdQueue, J::Render::JSwapChain* swapChain, J::Render::JRootSignature* rootSignature)
 {
-	s_Engine = new J::Engine::JEngine(cmdQueue, swapChain);
+	s_Engine = new J::Engine::JEngine(cmdQueue, swapChain, rootSignature);
 }
 
 J::Engine::JEngine* GetEngine()

@@ -8,7 +8,7 @@
 
 extern J::Engine::JEngine * s_Engine;
 
-void InitializeEngine(J::Render::JCommandQueue* cmdQueue, J::Render::JSwapChain* swapChain);
+void InitializeEngine(J::Render::JCommandQueue* cmdQueue, J::Render::JSwapChain* swapChain, J::Render::JRootSignature* rootSignature);
 
 J::Engine::JEngine* GetEngine();
 

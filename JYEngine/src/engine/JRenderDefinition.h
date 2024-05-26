@@ -18,5 +18,15 @@ struct JWindowInfo
 
 using JViewport = D3D12_VIEWPORT;
 
+struct JVertexBuffer
+{
+	ID3D12Resource* buffer;
+	D3D12_VERTEX_BUFFER_VIEW* view;
+
+	void Destroy()
+	{
+
+	}
+};
 J_RENDER_END
 #endif

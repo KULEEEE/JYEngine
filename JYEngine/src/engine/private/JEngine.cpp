@@ -7,9 +7,9 @@ J_ENGINE_BEGIN
 
 using namespace J::Render;
 
-JEngine::JEngine(JCommandQueue* cmdQueue, JSwapChain* swapChain)
+JEngine::JEngine(JCommandQueue* cmdQueue, JSwapChain* swapChain, JRootSignature* rootSignature)
 {
-	initialize(cmdQueue, swapChain);
+	initialize(cmdQueue, swapChain, rootSignature);
 }
 
 JEngine::~JEngine()
@@ -18,12 +18,13 @@ JEngine::~JEngine()
 }
 
 
-void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
+void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain, JRootSignature* rootSignature)
 {
 	_device = new JDevice();
 	_dx12Helper = new JDx12Helper(_device->GetDevice());
 	_cmdQueue = cmdQueue;
 	_swapChain = swapChain;
+	_rootSignature = rootSignature;
 }
 
 void JEngine::destroy()

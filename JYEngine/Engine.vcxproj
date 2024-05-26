@@ -25,7 +25,9 @@
     <ClInclude Include="src\engine\JDevice.h" />
     <ClInclude Include="src\engine\JEngine.h" />
     <ClInclude Include="src\engine\JEngineContext.h" />
+    <ClInclude Include="src\engine\JRenderContext.h" />
     <ClInclude Include="src\engine\JRenderDefinition.h" />
+    <ClInclude Include="src\engine\JRenderResource.h" />
     <ClInclude Include="src\engine\JRenderTarget.h" />
     <ClInclude Include="src\engine\JRootSignature.h" />
     <ClInclude Include="src\engine\JSwapChain.h" />
@@ -33,10 +35,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\dx12\private\JDx12Helper.cpp" />
+    <ClCompile Include="src\engine\private\asset\JMesh.cpp" />
+    <ClCompile Include="src\engine\private\asset\JShader.cpp" />
     <ClCompile Include="src\engine\private\JCommandQueue.cpp" />
     <ClCompile Include="src\engine\private\JDevice.cpp" />
     <ClCompile Include="src\engine\private\JEngine.cpp" />
     <ClCompile Include="src\engine\private\JEngineContext.cpp" />
+    <ClCompile Include="src\engine\private\JRenderContext.cpp" />
+    <ClCompile Include="src\engine\private\JRenderResource.cpp" />
     <ClCompile Include="src\engine\private\JRenderTarget.cpp" />
     <ClCompile Include="src\engine\private\JRootSignature.cpp" />
     <ClCompile Include="src\engine\private\JSwapChain.cpp" />

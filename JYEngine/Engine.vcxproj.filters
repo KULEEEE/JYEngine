@@ -13,6 +13,12 @@
     <Filter Include="Engine\dx12\private">
       <UniqueIdentifier>{ec2e95fe-3a7b-4b64-8f30-a47f1e7e9cdd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\private\asset">
+      <UniqueIdentifier>{84db2176-9693-43e6-a068-c107a87bf18e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\asset">
+      <UniqueIdentifier>{484b2056-43e0-454f-9162-a67ee0c83952}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\engine\d3dx12.h">
@@ -48,6 +54,12 @@
     <ClInclude Include="src\engine\dx12\JDx12Helper.h">
       <Filter>Engine\dx12</Filter>
     </ClInclude>
+    <ClInclude Include="src\engine\JRenderContext.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JRenderResource.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\private\JEngine.cpp">
@@ -73,6 +85,18 @@
     </ClCompile>
     <ClCompile Include="src\engine\dx12\private\JDx12Helper.cpp">
       <Filter>Engine\dx12\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\asset\JMesh.cpp">
+      <Filter>Engine\private\asset</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\asset\JShader.cpp">
+      <Filter>Engine\private\asset</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JRenderContext.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JRenderResource.cpp">
+      <Filter>Engine\private</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -152,7 +152,6 @@ struct JColor {
 using JMatrix = XMMATRIX;
 
 // Colors
-
 namespace JColors
 {
 	// Standard colors (Red/Green/Blue/Alpha)

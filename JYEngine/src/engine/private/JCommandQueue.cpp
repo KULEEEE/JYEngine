@@ -4,7 +4,7 @@
 
 J_RENDER_BEGIN
 
-using namespace J::Engine; 
+using namespace J::Engine;
 
 JCommandQueue::JCommandQueue()
 {
