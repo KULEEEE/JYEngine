@@ -16,8 +16,8 @@ JVertexBuffer* JRenderContext::CreateVertexBuffer(const void* data, size_t size,
 	ComPtr<ID3D12Device> device = _device->GetDevice();
 
 	JVertexBuffer* vBuffer = new JVertexBuffer();
-	ID3D12Resource* buffer = vBuffer->buffer;
-	D3D12_VERTEX_BUFFER_VIEW* view = vBuffer->view;
+	ID3D12Resource*& buffer = vBuffer->buffer;
+	D3D12_VERTEX_BUFFER_VIEW& view = vBuffer->view;
 
 	CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
 	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -35,11 +35,20 @@ JVertexBuffer* JRenderContext::CreateVertexBuffer(const void* data, size_t size,
 	memcpy(pData, data, size);
 	(buffer)->Unmap(0, nullptr);
 
-	view->BufferLocation = (buffer)->GetGPUVirtualAddress();
-	view->StrideInBytes = size / vertexCount;
-	view->SizeInBytes = size;
+	view.BufferLocation = (buffer)->GetGPUVirtualAddress();
+	view.StrideInBytes = static_cast<uint32>(size / vertexCount);
+	view.SizeInBytes = static_cast<uint32>(size);
 
 	return vBuffer;
+}
+
+JShader* JRenderContext::CreateShader(const std::wstring& path)
+{
+	JShader* shader = new JShader(path);
+
+	shader->CompileShader();
+
+	return shader;
 }
 
 J_RENDER_END

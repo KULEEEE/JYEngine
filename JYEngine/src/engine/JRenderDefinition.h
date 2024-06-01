@@ -21,11 +21,11 @@ using JViewport = D3D12_VIEWPORT;
 struct JVertexBuffer
 {
 	ID3D12Resource* buffer;
-	D3D12_VERTEX_BUFFER_VIEW* view;
+	D3D12_VERTEX_BUFFER_VIEW view;
 
 	void Destroy()
 	{
-
+		delete buffer;
 	}
 };
 J_RENDER_END

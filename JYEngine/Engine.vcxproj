@@ -19,6 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\engine\asset\JMesh.h" />
+    <ClInclude Include="src\engine\asset\JShader.h" />
     <ClInclude Include="src\engine\d3dx12.h" />
     <ClInclude Include="src\engine\dx12\JDx12Helper.h" />
     <ClInclude Include="src\engine\JCommandQueue.h" />

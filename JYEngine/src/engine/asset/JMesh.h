@@ -60,7 +60,7 @@ public:
 	const vector<JVec4>& GetBoneWeights() { return _boneWeights; }
 	const vector<uint32>& GetIndices() { return _indices; }
 
-	const uint32 GetVertexCount() { return _positions.size(); }
+	const size_t GetVertexCount() { return _positions.size(); }
 private:
 
 	vector<JVec4> _positions;

@@ -60,6 +60,12 @@
     <ClInclude Include="src\engine\JRenderResource.h">
       <Filter>Engine</Filter>
     </ClInclude>
+    <ClInclude Include="src\engine\asset\JMesh.h">
+      <Filter>Engine\asset</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\asset\JShader.h">
+      <Filter>Engine\asset</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\private\JEngine.cpp">
