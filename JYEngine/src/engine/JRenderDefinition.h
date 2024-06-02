@@ -28,5 +28,11 @@ struct JVertexBuffer
 		delete buffer;
 	}
 };
+
+struct JPipeline
+{
+	ComPtr<ID3D12PipelineState>			pipelineState;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC  pipelineDesc = {};
+};
 J_RENDER_END
 #endif

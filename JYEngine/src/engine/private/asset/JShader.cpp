@@ -2,9 +2,12 @@
 
 J_RENDER_BEGIN
 
-JShader::JShader(const std::wstring& path)
-	: _path(path)
+JShader::JShader(const std::string& path)
 {
+	size_t size_needed = std::mbstowcs(NULL, path.c_str(), 0) + 1;
+	std::vector<wchar_t> wstr(size_needed);
+	std::mbstowcs(&wstr[0], path.c_str(), size_needed);
+	_path = std::wstring(wstr.begin(), wstr.end() - 1);
 }
 
 JShader::~JShader()
@@ -25,7 +28,8 @@ void JShader::CompileShader()
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
 		, name.c_str(), version.c_str(), compileFlag, 0, &_vsBlob, &_errBlob)))
 	{
-		::MessageBoxA(nullptr, "Shader Create Failed !", nullptr, MB_OK);
+		std::string errorMessage = static_cast<const char*>(_errBlob->GetBufferPointer());
+		::MessageBoxA(nullptr, errorMessage.c_str(), nullptr, MB_OK);
 	}
 
 	// pixel shader
@@ -35,7 +39,8 @@ void JShader::CompileShader()
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
 		, name.c_str(), version.c_str(), compileFlag, 0, &_psBlob, &_errBlob)))
 	{
-		::MessageBoxA(nullptr, "Shader Create Failed !", nullptr, MB_OK);
+		std::string errorMessage = static_cast<const char*>(_errBlob->GetBufferPointer());
+		::MessageBoxA(nullptr, errorMessage.c_str(), nullptr, MB_OK);
 	}
 
 	_byteCodes[0] = {_vsBlob->GetBufferPointer(), _vsBlob->GetBufferSize()};

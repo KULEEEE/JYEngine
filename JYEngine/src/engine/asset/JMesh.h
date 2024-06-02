@@ -40,42 +40,39 @@ public:
 	JMesh& operator=(const JMesh& o);
 	~JMesh();
 
-	void SetPositions(vector<JVec4>&& data) { _positions = std::move(data); }
-	void SetTexcoords(vector<JVec2>&& data, int index) { index ? (_texcoords0 = std::move(data)) : (_texcoords1 = std::move(data)); }
-	void SetNormals(vector<JVec3>&& data) { _normals = std::move(data); }
-	void SetColors(vector<JVec4>&& data) { _colors = std::move(data); }
-	void SetTangents(vector<JVec3>&& data) { _tangents = std::move(data); }
-	void SetBitangents(vector<JVec3>&& data) { _bitangents = std::move(data); }
-	void SetBoneIndices(vector<JVec4>&& data) { _boneIndices = std::move(data); }
-	void SetBoneWeights(vector<JVec4>&& data) { _boneWeights = std::move(data); }
+	void SetPositions(vector<float>&& data) { _positions = std::move(data); }
+	void SetTexcoords(vector<float>&& data, int index) { index ? (_texcoords0 = std::move(data)) : (_texcoords1 = std::move(data)); }
+	void SetNormals(vector<float>&& data) { _normals = std::move(data); }
+	void SetColors(vector<float>&& data) { _colors = std::move(data); }
+	void SetTangents(vector<float>&& data) { _tangents = std::move(data); }
+	void SetBitangents(vector<float>&& data) { _bitangents = std::move(data); }
+	void SetBoneIndices(vector<float>&& data) { _boneIndices = std::move(data); }
+	void SetBoneWeights(vector<float>&& data) { _boneWeights = std::move(data); }
 	void SetIndices(vector<uint32>&& data) { _indices = std::move(data); }
 
-	const vector<JVec4>& GetPositions() { return _positions; }
-	const vector<JVec2>& GetTexcoords(int index) { return index ? _texcoords0 : _texcoords1; }
-	const vector<JVec3>& GetNormals() { return _normals; }
-	const vector<JVec4>& GetColors() { return _colors; }
-	const vector<JVec3>& GetTangents() { return _tangents; }
-	const vector<JVec3>& GetBitangents() { return _bitangents; }
-	const vector<JVec4>& GetBoneIndices() { return _boneIndices; }
-	const vector<JVec4>& GetBoneWeights() { return _boneWeights; }
+	const vector<float>& GetPositions() { return _positions; }
+	const vector<float>& GetTexcoords(int index) { return index ? _texcoords0 : _texcoords1; }
+	const vector<float>& GetNormals() { return _normals; }
+	const vector<float>& GetColors() { return _colors; }
+	const vector<float>& GetTangents() { return _tangents; }
+	const vector<float>& GetBitangents() { return _bitangents; }
+	const vector<float>& GetBoneIndices() { return _boneIndices; }
+	const vector<float>& GetBoneWeights() { return _boneWeights; }
 	const vector<uint32>& GetIndices() { return _indices; }
 
 	const size_t GetVertexCount() { return _positions.size(); }
 private:
 
-	vector<JVec4> _positions;
-	vector<JVec2> _texcoords0;
-	vector<JVec2> _texcoords1;
-	vector<JVec3> _normals;
-	vector<JVec4> _colors;
-	vector<JVec3> _tangents;
-	vector<JVec3> _bitangents;
-	vector<JVec4> _boneIndices;
-	vector<JVec4> _boneWeights;
+	vector<float> _positions;
+	vector<float> _texcoords0;
+	vector<float> _texcoords1;
+	vector<float> _normals;
+	vector<float> _colors;
+	vector<float> _tangents;
+	vector<float> _bitangents;
+	vector<float> _boneIndices;
+	vector<float> _boneWeights;
 	vector<uint32> _indices;
-
-	ComPtr<ID3D12Resource> _vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW _vertexBufferView = {};
 };
 
 J_ENGINE_END

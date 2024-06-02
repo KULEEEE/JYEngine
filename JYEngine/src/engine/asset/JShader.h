@@ -10,7 +10,7 @@ class JShader
 {
 public:
 	JShader() = delete;
-	JShader(const std::wstring& path);
+	JShader(const std::string& path);
 	~JShader();
 
 	enum class ShaderType : uint8
@@ -29,7 +29,7 @@ private:
 
 	D3D12_SHADER_BYTECODE				_byteCodes[2];
 
-	const std::wstring					_path;
+	std::wstring					_path;
 };
 
 J_RENDER_END

@@ -25,10 +25,13 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain, JRootSi
 	_cmdQueue = cmdQueue;
 	_swapChain = swapChain;
 	_rootSignature = rootSignature;
+
+	_renderContext = new JRenderContext(_device, _rootSignature);
 }
 
 void JEngine::destroy()
 {
 	delete _device;
+	delete _renderContext;
 }
 J_ENGINE_END

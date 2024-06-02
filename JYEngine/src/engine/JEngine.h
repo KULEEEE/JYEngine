@@ -8,6 +8,7 @@
 #include "engine/JSwapChain.h"
 #include "engine/dx12/JDx12Helper.h"
 #include "engine/JRootSignature.h"
+#include "engine/JRenderContext.h"
 
 J_ENGINE_BEGIN
 
@@ -24,6 +25,7 @@ public:
 	Render::JSwapChain* GetSwapChain() { return _swapChain; }
 	Render::JDx12Helper* GetDx12Helper() { return _dx12Helper; }
 	Render::JRootSignature* GetRootSignature() { return _rootSignature; }
+	Render::JRenderContext* GetRenderContext() { return _renderContext; }
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain, Render::JRootSignature* rootSignature);
@@ -35,6 +37,7 @@ private:
 	Render::JDx12Helper* _dx12Helper;
 	Render::JRootSignature* _rootSignature;
 
+	Render::JRenderContext* _renderContext;
 };
 
 J_ENGINE_END

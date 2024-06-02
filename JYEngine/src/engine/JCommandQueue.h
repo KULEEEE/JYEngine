@@ -7,6 +7,8 @@
 /*#include "engine/JSwapChain.h"*/ namespace J { namespace Render { class JSwapChain; } }
 /*#include "engine/JDescriptorHeap.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
 /*#include "engine/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
+/*#inlcude "enigne/JRenderDefinition.h*/ namespace J { namespace Render { struct JPipeline; } }
+/*#include "engine/JRenderResource.h"*/ namespace J { namespace Engine { struct JMeshResource; } }
 
 J_RENDER_BEGIN
 
@@ -25,6 +27,8 @@ public:
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount);
 	void SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport);
 	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);
+	void SetPipeline(const JPipeline* pipeline);
+	void BindVertexBuffer(const Engine::JMeshResource* meshResource);
 	void EndRenderPass();
 	
 	void RenderEnd();
