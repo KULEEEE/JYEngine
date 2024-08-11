@@ -45,9 +45,6 @@
     <ClInclude Include="src\engine\JRenderDefinition.h">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="src\engine\JRootSignature.h">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="src\engine\JRenderTarget.h">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -90,9 +87,6 @@
       <Filter>Engine\private</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\private\JEngineContext.cpp">
-      <Filter>Engine\private</Filter>
-    </ClCompile>
-    <ClCompile Include="src\engine\private\JRootSignature.cpp">
       <Filter>Engine\private</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\private\JRenderTarget.cpp">
