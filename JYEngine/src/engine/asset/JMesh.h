@@ -11,6 +11,13 @@ class JMesh
 
 public:
 
+	struct SubMeshInfo
+	{
+		uint32 materialIndex;
+		uint32 startIndex;
+		uint32 endIndex;
+	};
+
 	enum class AttributeIndex : uint8
 	{
 		POSITION = 0,
@@ -41,7 +48,7 @@ public:
 	~JMesh();
 
 	void SetPositions(vector<float>&& data) { _positions = std::move(data); }
-	void SetTexcoords(vector<float>&& data, int index) { index ? (_texcoords0 = std::move(data)) : (_texcoords1 = std::move(data)); }
+	void SetTexcoords(vector<float>&& data, int index) { (!index) ? (_texcoords0 = std::move(data)) : (_texcoords1 = std::move(data)); }
 	void SetNormals(vector<float>&& data) { _normals = std::move(data); }
 	void SetColors(vector<float>&& data) { _colors = std::move(data); }
 	void SetTangents(vector<float>&& data) { _tangents = std::move(data); }
@@ -49,9 +56,10 @@ public:
 	void SetBoneIndices(vector<float>&& data) { _boneIndices = std::move(data); }
 	void SetBoneWeights(vector<float>&& data) { _boneWeights = std::move(data); }
 	void SetIndices(vector<uint32>&& data) { _indices = std::move(data); }
+	void SetSubMeshes(vector<SubMeshInfo>&& data) { _subMeshes = std::move(data); }
 
 	const vector<float>& GetPositions() { return _positions; }
-	const vector<float>& GetTexcoords(int index) { return index ? _texcoords0 : _texcoords1; }
+	const vector<float>& GetTexcoords(int index) { return (!index) ? _texcoords0 : _texcoords1; }
 	const vector<float>& GetNormals() { return _normals; }
 	const vector<float>& GetColors() { return _colors; }
 	const vector<float>& GetTangents() { return _tangents; }
@@ -59,8 +67,9 @@ public:
 	const vector<float>& GetBoneIndices() { return _boneIndices; }
 	const vector<float>& GetBoneWeights() { return _boneWeights; }
 	const vector<uint32>& GetIndices() { return _indices; }
+	const vector<SubMeshInfo>& GetSubMeshInfos() { return _subMeshes; }
 
-	const size_t GetVertexCount() { return _positions.size(); }
+	const size_t GetVertexCount() { return _positions.size() / 4; }
 private:
 
 	vector<float> _positions;
@@ -73,6 +82,8 @@ private:
 	vector<float> _boneIndices;
 	vector<float> _boneWeights;
 	vector<uint32> _indices;
+
+	vector<SubMeshInfo> _subMeshes;
 };
 
 J_ENGINE_END

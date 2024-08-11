@@ -24,8 +24,6 @@ using namespace std;
 #include <DirectXPackedVector.h>
 #include <DirectXColors.h>
 
-
-
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 using namespace Microsoft::WRL;
@@ -37,7 +35,6 @@ using namespace Microsoft::WRL;
 #pragma comment(lib, "d3dcompiler")
 
 // Namespace
-
 #define J_EDITOR_BEGIN namespace J { namespace Editor {
 #define J_EDITOR_END }}
 
@@ -46,6 +43,7 @@ using namespace Microsoft::WRL;
 
 #define J_RENDER_BEGIN namespace J { namespace Render {
 #define J_RENDER_END }}
+
 
 // Typedef
 
@@ -301,4 +299,5 @@ namespace JColors
 	const JColor YellowGreen = { 0.603921592f, 0.803921640f, 0.196078449f, 1.000000000f };
 
 } // namespace Colors
+
 #endif

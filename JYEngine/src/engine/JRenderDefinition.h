@@ -8,6 +8,7 @@
 #define MAX_DESCRIPTOR_COUNT 1215
 
 J_RENDER_BEGIN
+
 struct JWindowInfo
 {
 	HWND hwnd;  // output Window
@@ -18,14 +19,60 @@ struct JWindowInfo
 
 using JViewport = D3D12_VIEWPORT;
 
-struct JVertexBuffer
+class JInstantiable
 {
-	ID3D12Resource* buffer;
+public:
+	const uint32  instanceID;
+
+	JInstantiable();
+	JInstantiable(const JInstantiable& o);
+	JInstantiable(uint32 o);
+	~JInstantiable();
+
+	static uint32 MakeID();
+	bool operator==(const JInstantiable& o) const;
+	bool operator!=(const JInstantiable& o) const;
+};
+
+struct JVertexBuffer : public JInstantiable
+{
+	ID3D12Resource* buffer = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW view;
 
 	void Destroy()
 	{
-		delete buffer;
+		if(nullptr != buffer)	delete buffer;
+	}
+};
+
+struct JIndexBuffer : public JInstantiable
+{
+	ID3D12Resource* buffer;
+	D3D12_INDEX_BUFFER_VIEW view;
+
+	void Destroy()
+	{
+		if (nullptr != buffer)	delete buffer;
+	}
+};
+
+struct JContantBuffer : public JInstantiable
+{
+	ID3D12Resource* buffer;
+
+	void Destroy()
+	{
+		if (nullptr != buffer)	delete buffer;
+	}
+};
+
+struct JTexture : public JInstantiable// TODO: Refactoring
+{
+	ID3D12Resource* texture;
+
+	void Destroy()
+	{
+		if (nullptr != texture)	delete texture;
 	}
 };
 
@@ -33,6 +80,11 @@ struct JPipeline
 {
 	ComPtr<ID3D12PipelineState>			pipelineState;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC  pipelineDesc = {};
+};
+
+struct JRootSignature
+{
+	ComPtr<ID3D12RootSignature> signature;
 };
 J_RENDER_END
 #endif

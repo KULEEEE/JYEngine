@@ -2,9 +2,8 @@
 
 J_RENDER_BEGIN
 
-JRenderContext::JRenderContext(JDevice* device, JRootSignature* rootSignature)
+JRenderContext::JRenderContext(JDevice* device)
 	: _device(device)
-	, _rootSignature(rootSignature)
 {
 }
 

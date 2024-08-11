@@ -29,6 +29,9 @@ public:
 	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);
 	void SetPipeline(const JPipeline* pipeline);
 	void BindVertexBuffer(const Engine::JMeshResource* meshResource);
+	void Draw(const uint32& vertexCount, const uint32& instanceCount);
+	void DrawIndexed(const uint32& indexCount, const uint32& instanceCount, const uint32& startIndex, const uint32& baseVertex, const uint32& startInstance);
+	
 	void EndRenderPass();
 	
 	void RenderEnd();

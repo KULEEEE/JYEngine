@@ -4,6 +4,8 @@
 
 #include "engine/precompile.h"
 
+/*#include "engine/JRenderContext.h"*/	namespace J { namespace Render { struct JRootSignature; } }
+
 J_RENDER_BEGIN
 
 class JShader
@@ -19,7 +21,23 @@ public:
 		PIXEL = 1,
 	};
 
+	struct BindingInfo
+	{
+		struct Resource
+		{
+			std::string name;
+			uint32		nameHash;
+			uint32		slot;
+		};
+
+		std::vector<Resource> cBuffers;
+		std::vector<Resource> textures;
+		std::vector<Resource> samplers;
+	}bindingInfo;
+
 	D3D12_SHADER_BYTECODE* GetByteCode() { return  _byteCodes; }
+
+	const JRootSignature* GetRootSignature() { return _rootSignature; }
 
 	void CompileShader();
 private:
@@ -30,7 +48,10 @@ private:
 	D3D12_SHADER_BYTECODE				_byteCodes[2];
 
 	std::wstring					_path;
+
+	JRootSignature* 				_rootSignature;
 };
 
 J_RENDER_END
+
 #endif

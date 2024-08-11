@@ -24,6 +24,9 @@
     <ClCompile Include="src\editor\private\JPanel.cpp">
       <Filter>Editor\private</Filter>
     </ClCompile>
+    <ClCompile Include="src\editor\private\JFBXLoader.cpp">
+      <Filter>Editor\private</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Client\Client.h">
@@ -39,6 +42,9 @@
       <Filter>Client</Filter>
     </ClInclude>
     <ClInclude Include="src\editor\JPanel.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\JFBXLoader.h">
       <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>

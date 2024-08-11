@@ -17,6 +17,7 @@ JMesh::JMesh(const JMesh& o)
 	, _boneIndices(o._boneIndices)
 	, _boneWeights(o._boneWeights)
 	, _indices(o._indices)
+	, _subMeshes(o._subMeshes)
 {
 }
 
@@ -31,6 +32,7 @@ JMesh::JMesh(JMesh&& o) noexcept
 	, _boneIndices(std::move(o._boneIndices))
 	, _boneWeights(std::move(o._boneWeights))
 	, _indices(std::move(o._indices))
+	, _subMeshes(std::move(o._subMeshes))
 {
 }
 
@@ -46,6 +48,7 @@ JMesh& JMesh::operator=(const JMesh& o)
 	_boneIndices = o._boneIndices;
 	_boneWeights = o._boneWeights;
 	_indices = o._indices;
+	_subMeshes = o._subMeshes;
 
 	return *this;
 }

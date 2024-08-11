@@ -48,7 +48,6 @@ void JCommandQueue::RenderBegin()
 {
 	_cmdAlloc->Reset();
 	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
-	_cmdList->SetGraphicsRootSignature(GetEngine()->GetRootSignature()->GetSignature().Get());
 }
 
 void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount)
@@ -89,14 +88,23 @@ void JCommandQueue::SetScissorRects(const uint32& rectCount, const D3D12_RECT* r
 void JCommandQueue::SetPipeline(const JPipeline* pipeline)
 {
 	_cmdList->SetPipelineState(pipeline->pipelineState.Get());
-
 }
 
 void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
 {
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	_cmdList->IASetVertexBuffers(0, meshResource->soaBuffers.size(), meshResource->soaBuffers.data());
-	_cmdList->DrawInstanced(meshResource->vertexCount, 1, 0, 0);
+	_cmdList->IASetIndexBuffer(&meshResource->indexBuffer);
+}
+
+void JCommandQueue::Draw(const uint32& vertexCount, const uint32& instanceCount)
+{
+	_cmdList->DrawInstanced(vertexCount, instanceCount, 0, 0);
+}
+
+void JCommandQueue::DrawIndexed(const uint32& indexCount, const uint32& instanceCount, const uint32& startIndex, const uint32& baseVertex, const uint32& startInstance)
+{
+	_cmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
 void JCommandQueue::EndRenderPass()

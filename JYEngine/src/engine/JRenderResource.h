@@ -10,7 +10,8 @@ J_ENGINE_BEGIN
 struct JMeshResource
 {
 	vector<D3D12_VERTEX_BUFFER_VIEW> soaBuffers;
-	size_t vertexCount;
+	D3D12_INDEX_BUFFER_VIEW indexBuffer;
+	size_t indexSize;
 };
 J_ENGINE_END
 

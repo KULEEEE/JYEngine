@@ -6,10 +6,10 @@
 #include "client/Client.h"
 
 #include "editor/JPanel.h"
+#include "editor/JFBXLoader.h"
 
 #include "Engine/JRenderDefinition.h"
 #include "Engine/JEngineContext.h"
-
 
 J::Render::JWindowInfo s_WindowInfo;
 
@@ -63,16 +63,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     s_WindowInfo.windowed = true;
 
     //SwapChain Create
-
     J::Render::JSwapChain* swapChain = new J::Render::JSwapChain();
     J::Render::JCommandQueue* cmdQueue = new J::Render::JCommandQueue();
-    J::Render::JRootSignature* rootSignature = new J::Render::JRootSignature();
 
-    InitializeEngine(cmdQueue, swapChain, rootSignature);
+    InitializeEngine(cmdQueue, swapChain);
 
     cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain);
     swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(),cmdQueue->GetCmdQueue());
-    rootSignature->Initialize(s_Engine->GetDevice());
 
     unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
     panel->Init();

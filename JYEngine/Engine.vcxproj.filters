@@ -66,6 +66,15 @@
     <ClInclude Include="src\engine\asset\JShader.h">
       <Filter>Engine\asset</Filter>
     </ClInclude>
+    <ClInclude Include="src\engine\JHashFunction.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JDescriptorHeapManager.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="src\engine\JDescriptorHeap.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\private\JEngine.cpp">
@@ -102,6 +111,18 @@
       <Filter>Engine\private</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\private\JRenderResource.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JHashFunction.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JDescriptorHeapManager.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JDescriptorHeap.cpp">
+      <Filter>Engine\private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\private\JRenderDefinition.cpp">
       <Filter>Engine\private</Filter>
     </ClCompile>
   </ItemGroup>
