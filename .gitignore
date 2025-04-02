@@ -1,0 +1,71 @@
+# ========================
+# Build output
+# ========================
+/build/
+/deps/
+/out/
+/bin/
+/x64/
+/x86/
+/Debug/
+/Release/
+/Client/x64/
+/Engine/x64/
+
+# ========================
+# CMake generated files
+# ========================
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+install_manifest.txt
+
+# ========================
+# Visual Studio auto-generated files
+# ========================
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Visual Studio user-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+.vs/
+
+# ========================
+# Build artifacts
+# ========================
+*.obj
+*.pdb
+*.idb
+*.exp
+*.lib
+*.dll
+*.exe
+*.log
+*.tlog
+*.ilk
+*.bsc
+*.res
+*.sbr
+*.lastbuildstate
+*.unsuccessfulbuild
+*.cache
+
+# ========================
+#  Temporary / system files
+# ========================
+*.tmp
+*.bak
+*.swp
+*~
+*.ncb
+.DS_Store
+Thumbs.db
+desktop.ini
