@@ -11,6 +11,8 @@
 /Release/
 /Client/x64/
 /Engine/x64/
+*.recipe
+*.FileListAbsolute.txt
 
 # ========================
 # CMake generated files
@@ -57,6 +59,16 @@ install_manifest.txt
 *.lastbuildstate
 *.unsuccessfulbuild
 *.cache
+
+# ========================
+# Custom build files
+# ========================
+Client.dir/
+Engine.dir/
+Build.bat
+Client.exe.recipe
+Engine.lib.recipe
+*.FileListAbsolute.txt
 
 # ========================
 #  Temporary / system files
