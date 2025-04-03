@@ -22,7 +22,7 @@ JDx12Helper::JDx12Helper(ComPtr<ID3D12Device> device)
 	_rtvHeapBegin = _rtvHeap->GetCPUDescriptorHandleForHeapStart();
 }
 
-const D3D12_CPU_DESCRIPTOR_HANDLE& JDx12Helper::CreateCPUDescriptorHandle(ID3D12Resource* rtvResource)
+D3D12_CPU_DESCRIPTOR_HANDLE JDx12Helper::CreateCPUDescriptorHandle(ID3D12Resource* rtvResource)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 	rtvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(_rtvHeapBegin,  _rtvIndex*_rtvHeapSize);

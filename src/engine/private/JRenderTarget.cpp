@@ -19,7 +19,7 @@ JRenderTarget::JRenderTarget(ID3D12Resource* resource)
 {
 	_rtvResources.push_back(resource);
 
-	const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle = GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource);
+	const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle = GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource);	
 	_rtvHandles.push_back(rtvHandle);
 	
 	isSwapChainTarget = true;

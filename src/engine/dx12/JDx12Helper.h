@@ -13,7 +13,7 @@ public:
 	JDx12Helper(ComPtr<ID3D12Device> device);
 	~JDx12Helper();
 
-	const D3D12_CPU_DESCRIPTOR_HANDLE& CreateCPUDescriptorHandle(ID3D12Resource* rtvResource);
+	D3D12_CPU_DESCRIPTOR_HANDLE CreateCPUDescriptorHandle(ID3D12Resource* rtvResource);
 private:
 	ComPtr<ID3D12Device> _device;
 	ComPtr<ID3D12DescriptorHeap> _rtvHeap;
