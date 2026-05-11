@@ -9,6 +9,8 @@ J_ENGINE_BEGIN
 
 struct JMeshResource
 {
+	vector<Render::JVertexBuffer*> vertexBuffers;
+	Render::JIndexBuffer* indexBufferResource = nullptr;
 	vector<D3D12_VERTEX_BUFFER_VIEW> soaBuffers;
 	D3D12_INDEX_BUFFER_VIEW indexBuffer;
 	size_t indexSize;

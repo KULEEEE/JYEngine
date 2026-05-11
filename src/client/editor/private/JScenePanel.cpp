@@ -1,14 +1,13 @@
 #include "client/editor/JScenePanel.h"
 
 #include "engine/JSwapChain.h"
-#include "engine/JGraphicResource.h"
 #include "engine/JRenderDefinition.h"
 #include "engine/JRenderResource.h"
-#include "engine/JRenderContext.h"
 #include "engine/JRenderServer.h"
+#include "engine/JRenderer.h"
+#include "engine/JMaterialFactory.h"
 #include "engine/JCameraComponent.h"
 #include "engine/asset/JMaterial.h"
-#include "engine/asset/JShader.h"
 #include "engine/asset/JMesh.h"
 
 #include "client/editor/JFBXLoader.h"
@@ -70,6 +69,11 @@ JScenePanel::~JScenePanel()
 		renderServer->UnregisterMaterial(planeMaterial->instanceID);
 	}
 
+	if (renderServer != nullptr && camera != nullptr)
+	{
+		renderServer->UnregisterCamera(camera->instanceID);
+	}
+
 	if (_cameraInfoWindow != nullptr)
 	{
 		DestroyWindow(_cameraInfoWindow);
@@ -77,41 +81,23 @@ JScenePanel::~JScenePanel()
 		_cameraInfoText = nullptr;
 	}
 
-	delete shader;
-	delete pipeline;
-	delete planeShader;
-	delete planePipeline;
-	delete graphicResource;
-	delete planeGraphicResource;
 	delete material;
 	delete planeMaterial;
 	delete perFrameBuffer;
 	delete materialBuffer;
 	delete materialTexture;
 	delete camera;
-	delete vertexBuffer;
-	delete indexBuffer;
-	delete planeVertexBuffer;
-	delete planeIndexBuffer;
 	delete mesh;
 	delete planeMesh;
 
-	shader = nullptr;
-	pipeline = nullptr;
-	planeShader = nullptr;
-	planePipeline = nullptr;
-	graphicResource = nullptr;
-	planeGraphicResource = nullptr;
 	material = nullptr;
 	planeMaterial = nullptr;
 	perFrameBuffer = nullptr;
 	materialBuffer = nullptr;
 	materialTexture = nullptr;
 	camera = nullptr;
-	vertexBuffer = nullptr;
-	indexBuffer = nullptr;
-	planeVertexBuffer = nullptr;
-	planeIndexBuffer = nullptr;
+	meshResource = nullptr;
+	planeMeshResource = nullptr;
 	mesh = nullptr;
 	planeMesh = nullptr;
 }
@@ -125,52 +111,34 @@ void JScenePanel::Init()
 		_mainWindow = GetForegroundWindow();
 	}
 
-	Render::JRenderContext* renderContext = GetEngine()->GetRenderContext();
 	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
-	if (renderContext == nullptr || renderServer == nullptr)
+	Engine::JMaterialFactory* materialFactory = GetEngine()->GetMaterialFactory();
+	if (renderServer == nullptr || materialFactory == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: render context or render server is null." << std::endl;
+		std::cerr << "JScenePanel::Init failed: render server or material factory is null." << std::endl;
 		return;
 	}
 
 	std::string baseShaderPath = get_Engine_Shader_Path() + "\\base.hlsl";
-	shader = renderContext->CreateShader(baseShaderPath.c_str());
-	if (shader == nullptr)
+	material = materialFactory->CreateMaterial(baseShaderPath);
+	if (material == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: shader load failed." << std::endl;
+		std::cerr << "JScenePanel::Init failed: material creation failed." << std::endl;
 		return;
 	}
 
 	std::string gridShaderPath = get_Engine_Shader_Path() + "\\grid.hlsl";
-	planeShader = renderContext->CreateShader(gridShaderPath.c_str());
-	if (planeShader == nullptr)
+	planeMaterial = materialFactory->CreateMaterial(gridShaderPath, true);
+	if (planeMaterial == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: grid shader load failed." << std::endl;
+		std::cerr << "JScenePanel::Init failed: plane material creation failed." << std::endl;
 		return;
 	}
 
-	pipeline = renderContext->CreatePipeline(shader);
-	if (pipeline == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: pipeline creation failed." << std::endl;
-		return;
-	}
-
-	planePipeline = renderContext->CreatePipeline(planeShader, true);
-	if (planePipeline == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: grid pipeline creation failed." << std::endl;
-		return;
-	}
-
-	material = new Engine::JMaterial();
-	planeMaterial = new Engine::JMaterial();
 	camera = new Engine::JCameraComponent();
-	graphicResource = new Render::JGraphicResource(shader);
-	planeGraphicResource = new Render::JGraphicResource(planeShader);
-	if (material == nullptr || planeMaterial == nullptr || camera == nullptr || graphicResource == nullptr || planeGraphicResource == nullptr)
+	if (camera == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: material, camera, or graphic resource creation failed." << std::endl;
+		std::cerr << "JScenePanel::Init failed: camera creation failed." << std::endl;
 		return;
 	}
 
@@ -179,32 +147,30 @@ void JScenePanel::Init()
 
 	PerFrameConstants perFrameConstants{};
 	XMStoreFloat4x4(&perFrameConstants.viewProjection, XMMatrixIdentity());
-	perFrameBuffer = renderContext->CreateConstantBuffer(&perFrameConstants, sizeof(perFrameConstants));
+	perFrameBuffer = materialFactory->CreateConstantBuffer(&perFrameConstants, sizeof(perFrameConstants));
 	if (perFrameBuffer == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: per-frame buffer creation failed." << std::endl;
 		return;
 	}
 	material->SetConstantBuffer("PerFrame", perFrameBuffer);
+	renderServer->RegisterCamera(camera, perFrameBuffer, 800.0f / 600.0f);
 
 	MaterialConstants materialConstants{};
 	materialConstants.baseColor = JVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	materialBuffer = renderContext->CreateConstantBuffer(&materialConstants, sizeof(materialConstants));
+	materialBuffer = materialFactory->CreateAndSetConstantBuffer(material, "PerMaterial", &materialConstants, sizeof(materialConstants));
 	if (materialBuffer == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: material buffer creation failed." << std::endl;
 		return;
 	}
-	material->SetConstantBuffer("PerMaterial", materialBuffer);
 
-	materialTexture = renderContext->CreateSolidColorTexture(JColor(0.0f, 0.0f, 1.0f, 1.0f));
+	materialTexture = materialFactory->CreateAndSetSolidColorTexture(material, "BaseTexture", JColor(0.0f, 0.0f, 1.0f, 1.0f));
 	if (materialTexture == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: material texture creation failed." << std::endl;
 		return;
 	}
-	material->SetTexture("BaseTexture", materialTexture);
-
 	planeMaterial->SetConstantBuffer("PerFrame", perFrameBuffer);
 
 	std::vector<float> planePositions =
@@ -225,9 +191,8 @@ void JScenePanel::Init()
 	planeMesh->SetPositions(std::move(planePositions));
 	planeMesh->SetIndices(std::move(planeIndices));
 
-	planeVertexBuffer = renderContext->CreateVertexBuffer(planeMesh->GetPositions(), planeMesh->GetVertexCount());
-	planeIndexBuffer = renderContext->CreateIndexBuffer(planeMesh->GetIndices());
-	if (planeVertexBuffer == nullptr || planeIndexBuffer == nullptr)
+	planeMeshResource = renderServer->GetRenderDB().CreateOrUpdateMeshResource(planeMesh);
+	if (planeMeshResource == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: plane buffer creation failed." << std::endl;
 		return;
@@ -248,15 +213,13 @@ void JScenePanel::Init()
 		return;
 	}
 
-	vertexBuffer = renderContext->CreateVertexBuffer(mesh->GetPositions(), mesh->GetVertexCount());
-	indexBuffer = renderContext->CreateIndexBuffer(mesh->GetIndices());
-	if (vertexBuffer == nullptr || indexBuffer == nullptr)
+	meshResource = renderServer->GetRenderDB().CreateOrUpdateMeshResource(mesh);
+	if (meshResource == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: buffer creation failed." << std::endl;
 		return;
 	}
 
-	updatePerFrameBuffer();
 	createCameraInfoPanel();
 	updateCameraInfoPanel();
 	_isReady = true;
@@ -271,8 +234,8 @@ void JScenePanel::Update()
 
 	Render::JSwapChain* swapChain = GetEngine()->GetSwapChain();
 	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
-	Render::JRenderContext* renderContext = GetEngine()->GetRenderContext();
-	if (swapChain == nullptr || renderServer == nullptr || renderContext == nullptr || pipeline == nullptr || planePipeline == nullptr || shader == nullptr || planeShader == nullptr || material == nullptr || planeMaterial == nullptr || camera == nullptr || graphicResource == nullptr || planeGraphicResource == nullptr || mesh == nullptr || planeMesh == nullptr || vertexBuffer == nullptr || indexBuffer == nullptr || planeVertexBuffer == nullptr || planeIndexBuffer == nullptr)
+	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
+	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || material == nullptr || planeMaterial == nullptr || camera == nullptr || mesh == nullptr || planeMesh == nullptr || meshResource == nullptr || planeMeshResource == nullptr)
 	{
 		std::cerr << "JScenePanel::Update skipped: render resources are not ready." << std::endl;
 		_isReady = false;
@@ -280,50 +243,25 @@ void JScenePanel::Update()
 	}
 
 	updateCamera(FIXED_DELTA_TIME);
-	updatePerFrameBuffer();
+	renderServer->MarkCameraDirty(camera);
 	renderServer->MarkMaterialDirty(material);
 	renderServer->MarkMaterialDirty(planeMaterial);
 	renderServer->Sync();
 	updateCameraInfoPanel();
 
-	_commandQueue->BeginRenderPass(swapChain->GetRenderTarget(), JColors::DarkGray, 0);
-
 	Render::JViewport viewport = { 0, 0, 800, 600, 0, 1 };
 	D3D12_RECT rect = CD3DX12_RECT(0, 0, 800, 600);
 
-	Engine::JMeshResource meshResource;
-	meshResource.soaBuffers.push_back(vertexBuffer->view);
-	meshResource.indexBuffer = indexBuffer->view;
-	meshResource.indexSize = mesh->GetIndices().size();
+	Engine::JRenderer::FrameDesc frameDesc;
+	frameDesc.cameraID = camera->instanceID;
+	frameDesc.renderTarget = swapChain->GetRenderTarget();
+	frameDesc.clearColor = JColors::DarkGray;
+	frameDesc.viewport = viewport;
+	frameDesc.scissorRect = rect;
+	frameDesc.drawItems.push_back({ planeMaterial->instanceID, planeMeshResource });
+	frameDesc.drawItems.push_back({ material->instanceID, meshResource });
 
-	Engine::JMeshResource planeMeshResource;
-	planeMeshResource.soaBuffers.push_back(planeVertexBuffer->view);
-	planeMeshResource.indexBuffer = planeIndexBuffer->view;
-	planeMeshResource.indexSize = planeMesh->GetIndices().size();
-
-	if (!renderServer->BuildGraphicResource(material->instanceID, shader, *graphicResource))
-	{
-		std::cerr << "JScenePanel::Update skipped: failed to build graphic resource." << std::endl;
-		return;
-	}
-
-	if (!renderServer->BuildGraphicResource(planeMaterial->instanceID, planeShader, *planeGraphicResource))
-	{
-		std::cerr << "JScenePanel::Update skipped: failed to build plane graphic resource." << std::endl;
-		return;
-	}
-
-	_commandQueue->SetViewports(1, &viewport);
-	_commandQueue->SetScissorRects(1, &rect);
-	_commandQueue->SetPipeline(planePipeline);
-	_commandQueue->SetGraphicResources(planeGraphicResource);
-	_commandQueue->BindVertexBuffer(&planeMeshResource);
-	_commandQueue->DrawIndexed(static_cast<uint32>(planeMeshResource.indexSize), 1, 0, 0, 0);
-	_commandQueue->SetPipeline(pipeline);
-	_commandQueue->SetGraphicResources(graphicResource);
-	_commandQueue->BindVertexBuffer(&meshResource);
-	_commandQueue->DrawIndexed(static_cast<uint32>(meshResource.indexSize), 1, 0, 0, 0);
-	_commandQueue->EndRenderPass();
+	renderer->Render(frameDesc);
 }
 
 void JScenePanel::updateCamera(float deltaTime)
@@ -376,23 +314,6 @@ void JScenePanel::updateCamera(float deltaTime)
 
 	camera->Rotate(yawInput, pitchInput);
 	camera->MoveLocal(forwardInput, rightInput, upInput, deltaTime);
-}
-
-void JScenePanel::updatePerFrameBuffer()
-{
-	Render::JRenderContext* renderContext = GetEngine()->GetRenderContext();
-	if (renderContext == nullptr || perFrameBuffer == nullptr || camera == nullptr)
-	{
-		return;
-	}
-
-	const XMMATRIX view = camera->GetViewMatrix();
-	const XMMATRIX proj = camera->GetProjectionMatrix(800.0f / 600.0f);
-	const XMMATRIX viewProj = XMMatrixTranspose(view * proj);
-
-	PerFrameConstants perFrameConstants{};
-	XMStoreFloat4x4(&perFrameConstants.viewProjection, viewProj);
-	renderContext->UpdateConstantBuffer(perFrameBuffer, &perFrameConstants, sizeof(perFrameConstants));
 }
 
 void JScenePanel::createCameraInfoPanel()

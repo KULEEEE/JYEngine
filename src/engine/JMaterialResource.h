@@ -5,7 +5,8 @@
 #include "engine/precompile.h"
 #include "engine/JHashFunction.h"
 
-/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; struct JTexture; } }
+/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; struct JPipeline; struct JTexture; } }
+/*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
 
 J_ENGINE_BEGIN
 
@@ -35,6 +36,9 @@ public:
 
 	uint32 GetMaterialID() const { return _materialID; }
 
+	Render::JShader* GetShader() const { return _shader; }
+	Render::JPipeline* GetPipeline() const { return _pipeline; }
+
 	Render::JConstantBuffer* FindConstantBuffer(const std::string& name) const;
 	Render::JConstantBuffer* FindConstantBuffer(uint32 nameHash) const;
 	Render::JTexture* FindTexture(const std::string& name) const;
@@ -48,12 +52,16 @@ public:
 	bool IsDirty() const { return _dirty; }
 
 private:
+	void SetShader(Render::JShader* shader);
+	void SetPipeline(Render::JPipeline* pipeline);
 	void SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer);
 	void SetTexture(const std::string& name, Render::JTexture* texture);
 	void ClearBindings();
 
 	uint32 _materialID = 0;
 	bool _dirty = true;
+	Render::JShader* _shader = nullptr;
+	Render::JPipeline* _pipeline = nullptr;
 	std::vector<ConstantBufferEntry> _constantBuffers;
 	std::vector<TextureEntry> _textures;
 };

@@ -5,11 +5,16 @@
 #include "engine/JObject.h"
 #include "engine/JHashFunction.h"
 
+/*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
+/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JPipeline; } }
+
 J_ENGINE_BEGIN
 
 class JMaterial : public JObject
 {
 public:
+	~JMaterial() override;
+
 	struct ConstantBufferParam
 	{
 		std::string name;
@@ -24,6 +29,12 @@ public:
 		Render::JTexture* texture = nullptr;
 	};
 
+	void SetShader(Render::JShader* shader);
+	Render::JShader* GetShader() const { return _shader; }
+
+	void SetPipeline(Render::JPipeline* pipeline);
+	Render::JPipeline* GetPipeline() const { return _pipeline; }
+
 	void SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer);
 	void SetTexture(const std::string& name, Render::JTexture* texture);
 
@@ -35,6 +46,8 @@ public:
 	bool IsDirty() const { return _dirty; }
 
 private:
+	Render::JShader* _shader = nullptr;
+	Render::JPipeline* _pipeline = nullptr;
 	std::vector<ConstantBufferParam> _constantBuffers;
 	std::vector<TextureParam> _textures;
 	bool _dirty = true;

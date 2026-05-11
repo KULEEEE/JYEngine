@@ -25,10 +25,20 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 	_swapChain = swapChain;
 	_renderContext = new JRenderContext(_device);
 	_renderServer = new JRenderServer();
+	_renderServer->GetRenderDB().Initialize(_renderContext);
+	_renderer = new JRenderer();
+	_renderer->Initialize(_cmdQueue, _renderContext, &_renderServer->GetRenderDB());
+	_materialFactory = new JMaterialFactory(_renderContext);
 }
 
 void JEngine::destroy()
 {
+	delete _materialFactory;
+	_materialFactory = nullptr;
+
+	delete _renderer;
+	_renderer = nullptr;
+
 	delete _renderServer;
 	_renderServer = nullptr;
 

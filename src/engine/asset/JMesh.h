@@ -58,18 +58,18 @@ public:
 	void SetIndices(vector<uint32>&& data) { _indices = std::move(data); }
 	void SetSubMeshes(vector<SubMeshInfo>&& data) { _subMeshes = std::move(data); }
 
-	const vector<float>& GetPositions() { return _positions; }
-	const vector<float>& GetTexcoords(int index) { return (!index) ? _texcoords0 : _texcoords1; }
-	const vector<float>& GetNormals() { return _normals; }
-	const vector<float>& GetColors() { return _colors; }
-	const vector<float>& GetTangents() { return _tangents; }
-	const vector<float>& GetBitangents() { return _bitangents; }
-	const vector<float>& GetBoneIndices() { return _boneIndices; }
-	const vector<float>& GetBoneWeights() { return _boneWeights; }
-	const vector<uint32>& GetIndices() { return _indices; }
-	const vector<SubMeshInfo>& GetSubMeshInfos() { return _subMeshes; }
+	const vector<float>& GetPositions() const { return _positions; }
+	const vector<float>& GetTexcoords(int index) const { return (!index) ? _texcoords0 : _texcoords1; }
+	const vector<float>& GetNormals() const { return _normals; }
+	const vector<float>& GetColors() const { return _colors; }
+	const vector<float>& GetTangents() const { return _tangents; }
+	const vector<float>& GetBitangents() const { return _bitangents; }
+	const vector<float>& GetBoneIndices() const { return _boneIndices; }
+	const vector<float>& GetBoneWeights() const { return _boneWeights; }
+	const vector<uint32>& GetIndices() const { return _indices; }
+	const vector<SubMeshInfo>& GetSubMeshInfos() const { return _subMeshes; }
 
-	const size_t GetVertexCount() { return _positions.size() / 4; }
+	const size_t GetVertexCount() const { return _positions.size() / 4; }
 private:
 
 	vector<float> _positions;

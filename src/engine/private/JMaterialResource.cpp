@@ -4,6 +4,18 @@
 
 J_ENGINE_BEGIN
 
+void JMaterialResource::SetShader(Render::JShader* shader)
+{
+	_shader = shader;
+	MarkDirty();
+}
+
+void JMaterialResource::SetPipeline(Render::JPipeline* pipeline)
+{
+	_pipeline = pipeline;
+	MarkDirty();
+}
+
 void JMaterialResource::SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer)
 {
 	const uint32 nameHash = JHashFunction::StrCrc32(name.c_str());

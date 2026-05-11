@@ -9,6 +9,8 @@
 #include "engine/dx12/JDx12Helper.h"
 #include "engine/JRenderContext.h"
 #include "engine/JRenderServer.h"
+#include "engine/JRenderer.h"
+#include "engine/JMaterialFactory.h"
 
 J_ENGINE_BEGIN
 
@@ -25,6 +27,8 @@ public:
 	Render::JDx12Helper* GetDx12Helper() { return _dx12Helper; }
 	Render::JRenderContext* GetRenderContext() { return _renderContext; }
 	JRenderServer* GetRenderServer() { return _renderServer; }
+	JRenderer* GetRenderer() { return _renderer; }
+	JMaterialFactory* GetMaterialFactory() { return _materialFactory; }
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
@@ -36,6 +40,8 @@ private:
 	Render::JDx12Helper* _dx12Helper = nullptr;
 	Render::JRenderContext* _renderContext = nullptr;
 	JRenderServer* _renderServer = nullptr;
+	JRenderer* _renderer = nullptr;
+	JMaterialFactory* _materialFactory = nullptr;
 };
 
 J_ENGINE_END

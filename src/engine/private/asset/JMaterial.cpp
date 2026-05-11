@@ -1,6 +1,29 @@
 #include "engine/asset/JMaterial.h"
 
+#include "engine/asset/JShader.h"
+
 J_ENGINE_BEGIN
+
+JMaterial::~JMaterial()
+{
+	delete _shader;
+	_shader = nullptr;
+
+	delete _pipeline;
+	_pipeline = nullptr;
+}
+
+void JMaterial::SetShader(Render::JShader* shader)
+{
+	_shader = shader;
+	MarkDirty();
+}
+
+void JMaterial::SetPipeline(Render::JPipeline* pipeline)
+{
+	_pipeline = pipeline;
+	MarkDirty();
+}
 
 void JMaterial::SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer)
 {
