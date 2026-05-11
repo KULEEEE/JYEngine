@@ -1,7 +1,8 @@
-#include "engine/JCommandQueue.h"
+﻿#include "engine/JCommandQueue.h"
 #include "engine/JEngineContext.h"
 #include "engine/JSwapChain.h"
 #include "engine/JRenderTarget.h"
+#include "engine/JGraphicResource.h"
 #include "engine/JRenderDefinition.h"
 #include "engine/JRenderResource.h"
 #include "engine/asset/JShader.h"
@@ -39,7 +40,6 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
-	// - D3D12_COMMAND_LIST_TYPE_DIRECT : GPU가 직접 실행하는 명령 목록
 	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAlloc));
 	if (FAILED(hr))
 	{
@@ -47,10 +47,6 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
-	// GPU가 하나인 시스템에서는 0으로
-	// DIRECT or BUNDLE
-	// Allocator
-	// 초기 상태 (그리기 명령은 nullptr 지정)
 	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAlloc.Get(), nullptr, IID_PPV_ARGS(&_cmdList));
 	if (FAILED(hr))
 	{
@@ -58,8 +54,6 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
-	// CommandList는 Close / Open 상태가 있는데
-	// Open 상태에서 Command를 넣다가 Close한 다음 제출하는 개념
 	hr = _cmdList->Close();
 	if (FAILED(hr))
 	{
@@ -67,8 +61,6 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
-	// CreateFence
-	// - CPU와 GPU의 동기화 수단으로 쓰인다
 	hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
 	if (FAILED(hr))
 	{
@@ -111,18 +103,17 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	{
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			rtvResource,
-			D3D12_RESOURCE_STATE_PRESENT, // 화면 출력
-			D3D12_RESOURCE_STATE_RENDER_TARGET)); // 외주 결과물
+			D3D12_RESOURCE_STATE_PRESENT,
+			D3D12_RESOURCE_STATE_RENDER_TARGET));
 	}
-	
-	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
-	// ClearColors
+
+	_cmdList->ResourceBarrier(static_cast<uint32>(barriers.size()), barriers.data());
 	for (auto& rtvHandle : rtvHandles)
 	{
 		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
 	}
 
-	_cmdList->OMSetRenderTargets(rtvHandles.size(), rtvHandles.data(), FALSE, nullptr);
+	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, nullptr);
 }
 
 void JCommandQueue::SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport)
@@ -163,6 +154,53 @@ void JCommandQueue::SetGraphicResources(JShader* shader)
 	_cmdList->SetGraphicsRootSignature(shader->GetRootSignature()->signature.Get());
 }
 
+void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
+{
+	if (resource == nullptr)
+	{
+		std::cerr << "SetGraphicResources skipped: graphic resource is null." << std::endl;
+		return;
+	}
+
+	JShader* shader = resource->GetShader();
+	if (shader == nullptr || shader->GetRootSignature() == nullptr)
+	{
+		std::cerr << "SetGraphicResources skipped: graphic resource shader is null." << std::endl;
+		return;
+	}
+
+	SetGraphicResources(shader);
+
+	for (const JGraphicResource::ConstantBufferBinding& binding : resource->GetConstantBuffers())
+	{
+		if (binding.buffer == nullptr || binding.buffer->buffer == nullptr)
+		{
+			continue;
+		}
+
+		_cmdList->SetGraphicsRootConstantBufferView(binding.rootParameterIndex, binding.buffer->buffer->GetGPUVirtualAddress());
+	}
+
+	if (!resource->GetTextures().empty())
+	{
+		const JTexture* texture = resource->GetTextures().front().texture;
+		if (texture != nullptr && texture->srvHeap != nullptr)
+		{
+			ID3D12DescriptorHeap* heaps[] = { texture->srvHeap, texture->samplerHeap };
+			_cmdList->SetDescriptorHeaps(texture->samplerHeap != nullptr ? 2u : 1u, heaps);
+
+			const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
+			_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, texture->srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+			if (texture->samplerHeap != nullptr && !shader->bindingInfo.samplers.empty())
+			{
+				const uint32 samplerRootParameterIndex = textureRootParameterIndex + 1;
+				_cmdList->SetGraphicsRootDescriptorTable(samplerRootParameterIndex, texture->samplerHeap->GetGPUDescriptorHandleForHeapStart());
+			}
+		}
+	}
+}
+
 void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
 {
 	if (_cmdList == nullptr || meshResource == nullptr)
@@ -171,7 +209,7 @@ void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
 		return;
 	}
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	_cmdList->IASetVertexBuffers(0, meshResource->soaBuffers.size(), meshResource->soaBuffers.data());
+	_cmdList->IASetVertexBuffers(0, static_cast<uint32>(meshResource->soaBuffers.size()), meshResource->soaBuffers.data());
 	_cmdList->IASetIndexBuffer(&meshResource->indexBuffer);
 }
 
@@ -199,7 +237,6 @@ void JCommandQueue::EndRenderPass()
 
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 
-
 	for (auto& rtvResource : _currentRenderTarget->GetRTVResource())
 	{
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
@@ -208,7 +245,7 @@ void JCommandQueue::EndRenderPass()
 			D3D12_RESOURCE_STATE_PRESENT));
 	}
 
-	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
+	_cmdList->ResourceBarrier(static_cast<uint32>(barriers.size()), barriers.data());
 }
 
 void JCommandQueue::RenderEnd()
@@ -226,7 +263,6 @@ void JCommandQueue::RenderEnd()
 		return;
 	}
 
-	// 커맨드 리스트 수행
 	ID3D12CommandList* cmdListArr[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(_countof(cmdListArr), cmdListArr);
 }
@@ -239,32 +275,18 @@ void JCommandQueue::WaitSync()
 		return;
 	}
 
-	// Advance the fence value to mark commands up to this fence point.
 	_fenceValue++;
-
-	// Add an instruction to the command queue to set a new fence point.  Because we 
-	// are on the GPU timeline, the new fence point won't be set until the GPU finishes
-	// processing all the commands prior to this Signal().
 	_cmdQueue->Signal(_fence.Get(), _fenceValue);
 
-	// Wait until the GPU has completed commands up to this fence point.
 	if (_fence->GetCompletedValue() < _fenceValue)
 	{
-		// Fire event when GPU hits current fence.  
 		_fence->SetEventOnCompletion(_fenceValue, _fenceEvent);
-
-		// Wait until the GPU hits current fence event is fired.
 		::WaitForSingleObject(_fenceEvent, INFINITE);
 	}
 }
 
 void JCommandQueue::destroy()
 {
-
 }
-
-
-
-
 
 J_RENDER_END

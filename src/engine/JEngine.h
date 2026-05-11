@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef __J_ENGINE_H__
 #define __J_ENGINE_H__
 
@@ -8,13 +8,13 @@
 #include "engine/JSwapChain.h"
 #include "engine/dx12/JDx12Helper.h"
 #include "engine/JRenderContext.h"
+#include "engine/JRenderServer.h"
 
 J_ENGINE_BEGIN
 
 class JEngine
 {
 public:
-
 	JEngine() = default;
 	JEngine(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
 	~JEngine();
@@ -24,6 +24,7 @@ public:
 	Render::JSwapChain* GetSwapChain() { return _swapChain; }
 	Render::JDx12Helper* GetDx12Helper() { return _dx12Helper; }
 	Render::JRenderContext* GetRenderContext() { return _renderContext; }
+	JRenderServer* GetRenderServer() { return _renderServer; }
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
@@ -33,8 +34,8 @@ private:
 	Render::JCommandQueue* _cmdQueue = nullptr;
 	Render::JSwapChain* _swapChain = nullptr;
 	Render::JDx12Helper* _dx12Helper = nullptr;
-
 	Render::JRenderContext* _renderContext = nullptr;
+	JRenderServer* _renderServer = nullptr;
 };
 
 J_ENGINE_END

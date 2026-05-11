@@ -5,7 +5,7 @@
 #include "client/framework.h"
 #include "client/Client.h"
 
-#include "client/editor/JPanel.h"
+#include "client/editor/JScenePanel.h"
 #include "client/editor/JFBXLoader.h"
 
 #include "Engine/JRenderDefinition.h"
@@ -71,7 +71,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain);
     swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(),cmdQueue->GetCmdQueue());
 
-    unique_ptr<J::Editor::JPanel> panel = make_unique<J::Editor::JPanel>();
+    unique_ptr<J::Editor::JEditorPanel> panel = make_unique<J::Editor::JScenePanel>();
     panel->Init();
 
 	while (true)

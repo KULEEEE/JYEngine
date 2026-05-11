@@ -80,11 +80,29 @@ struct JConstantBuffer : public JInstantiable
 
 struct JTexture : public JInstantiable// TODO: Refactoring
 {
-	ID3D12Resource* texture;
+	ID3D12Resource* texture = nullptr;
+	ID3D12DescriptorHeap* srvHeap = nullptr;
+	ID3D12DescriptorHeap* samplerHeap = nullptr;
 
 	void Destroy()
 	{
-		if (nullptr != texture)	delete texture;
+		if (nullptr != texture)
+		{
+			texture->Release();
+			texture = nullptr;
+		}
+
+		if (nullptr != srvHeap)
+		{
+			srvHeap->Release();
+			srvHeap = nullptr;
+		}
+
+		if (nullptr != samplerHeap)
+		{
+			samplerHeap->Release();
+			samplerHeap = nullptr;
+		}
 	}
 };
 
@@ -93,12 +111,6 @@ struct JDescriptorHeap : public JInstantiable
 	ID3D12DescriptorHeap* heap;
 
 	void Destroy();
-};
-
-struct JGraphicResource : JInstantiable
-{
-	std::vector<JConstantBuffer> constantBuffers;
-
 };
 
 struct JPipeline

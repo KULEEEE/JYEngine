@@ -33,6 +33,10 @@ JShader::~JShader()
 
 void JShader::CompileShader()
 {
+	bindingInfo.cBuffers.clear();
+	bindingInfo.textures.clear();
+	bindingInfo.samplers.clear();
+
 	uint32 compileFlag = 0;
 #ifdef _DEBUG
 	compileFlag = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -45,7 +49,7 @@ void JShader::CompileShader()
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
 		, name.c_str(), version.c_str(), compileFlag, 0, &_vsBlob, &_errBlob)))
 	{
-		std::string errorMessage = static_cast<const char*>(_errBlob->GetBufferPointer());
+		std::string errorMessage = _errBlob != nullptr ? static_cast<const char*>(_errBlob->GetBufferPointer()) : "Unknown shader compile error.";
 		::MessageBoxA(nullptr, errorMessage.c_str(), nullptr, MB_OK);
 		return;
 	}
@@ -57,13 +61,25 @@ void JShader::CompileShader()
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
 		, name.c_str(), version.c_str(), compileFlag, 0, &_psBlob, &_errBlob)))
 	{
-		std::string errorMessage = static_cast<const char*>(_errBlob->GetBufferPointer());
+		std::string errorMessage = _errBlob != nullptr ? static_cast<const char*>(_errBlob->GetBufferPointer()) : "Unknown shader compile error.";
 		::MessageBoxA(nullptr, errorMessage.c_str(), nullptr, MB_OK);
 		return;
 	}
 
 	_byteCodes[0] = {_vsBlob->GetBufferPointer(), _vsBlob->GetBufferSize()};
 	_byteCodes[1] = {_psBlob->GetBufferPointer(), _psBlob->GetBufferSize()};
+
+	auto appendUniqueResource = [](std::vector<JShader::BindingInfo::Resource>& resources, const JShader::BindingInfo::Resource& resource)
+		{
+			for (const JShader::BindingInfo::Resource& existing : resources)
+			{
+				if (existing.nameHash == resource.nameHash && existing.slot == resource.slot)
+				{
+					return;
+				}
+			}
+			resources.push_back(resource);
+		};
 
 	auto setReflection = [&](ComPtr<ID3DBlob> blob)
 		{
@@ -90,17 +106,17 @@ void JShader::CompileShader()
 				{
 				case D3D_SIT_CBUFFER:
 				{
-					bindingInfo.cBuffers.push_back(resource);
+					appendUniqueResource(bindingInfo.cBuffers, resource);
 					break;
 				}
 				case D3D_SIT_TEXTURE:
 				{
-					bindingInfo.textures.push_back(resource);
+					appendUniqueResource(bindingInfo.textures, resource);
 					break;
 				}
 				case D3D_SIT_SAMPLER:
 				{
-					bindingInfo.samplers.push_back(resource);
+					appendUniqueResource(bindingInfo.samplers, resource);
 					break;
 				}
 				default:

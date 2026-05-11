@@ -154,6 +154,96 @@ public:
 
 		buffer->buffer->Unmap(0, nullptr);
 	}
+
+	JTexture* CreateSolidColorTexture(const JColor& color)
+	{
+		ComPtr<ID3D12Device> device = _device->GetDevice();
+
+		JTexture* texture = new JTexture();
+
+		D3D12_RESOURCE_DESC textureDesc = {};
+		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		textureDesc.Width = 1;
+		textureDesc.Height = 1;
+		textureDesc.DepthOrArraySize = 1;
+		textureDesc.MipLevels = 1;
+		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		D3D12_HEAP_PROPERTIES heapProps = {};
+		heapProps.Type = D3D12_HEAP_TYPE_CUSTOM;
+		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+
+		HRESULT hr = device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&textureDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&texture->texture));
+		if (FAILED(hr))
+		{
+			delete texture;
+			return nullptr;
+		}
+
+		const uint8 pixelData[4] =
+		{
+			static_cast<uint8>(std::clamp(color.r, 0.0f, 1.0f) * 255.0f),
+			static_cast<uint8>(std::clamp(color.g, 0.0f, 1.0f) * 255.0f),
+			static_cast<uint8>(std::clamp(color.b, 0.0f, 1.0f) * 255.0f),
+			static_cast<uint8>(std::clamp(color.a, 0.0f, 1.0f) * 255.0f)
+		};
+
+		hr = texture->texture->WriteToSubresource(0, nullptr, pixelData, sizeof(pixelData), sizeof(pixelData));
+		if (FAILED(hr))
+		{
+			delete texture;
+			return nullptr;
+		}
+
+		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+		srvHeapDesc.NumDescriptors = 1;
+		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		hr = device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&texture->srvHeap));
+		if (FAILED(hr))
+		{
+			delete texture;
+			return nullptr;
+		}
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+		device->CreateShaderResourceView(texture->texture, &srvDesc, texture->srvHeap->GetCPUDescriptorHandleForHeapStart());
+
+		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+		samplerHeapDesc.NumDescriptors = 1;
+		samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		hr = device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&texture->samplerHeap));
+		if (FAILED(hr))
+		{
+			delete texture;
+			return nullptr;
+		}
+
+		D3D12_SAMPLER_DESC samplerDesc = {};
+		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+		device->CreateSampler(&samplerDesc, texture->samplerHeap->GetCPUDescriptorHandleForHeapStart());
+
+		return texture;
+	}
 	
 	JShader* CreateShader(const std::string& path)
 	{
@@ -170,7 +260,7 @@ public:
 	}
 	void DestroyShader(JShader* shader) { delete shader; }
 
-	JPipeline* CreatePipeline(JShader* shader)
+	JPipeline* CreatePipeline(JShader* shader, bool enableAlphaBlend = false)
 	{
 		if (shader == nullptr || shader->GetRootSignature() == nullptr)
 		{
@@ -197,6 +287,17 @@ public:
 		pipelineDesc.VS = shader->GetByteCode()[0];
 		pipelineDesc.PS = shader->GetByteCode()[1];
 		pipelineDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		if (enableAlphaBlend)
+		{
+			D3D12_RENDER_TARGET_BLEND_DESC& blendDesc = pipelineDesc.BlendState.RenderTarget[0];
+			blendDesc.BlendEnable = TRUE;
+			blendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			blendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			blendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+			blendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+			blendDesc.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+			blendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		}
 		pipelineDesc.SampleMask = UINT_MAX;
 		pipelineDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		pipelineDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
