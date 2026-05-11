@@ -303,24 +303,36 @@ namespace JColors
 } // namespace Colors
 
 // path function
+inline std::filesystem::path get_Engine_Executable_Path()
+{
+	wchar_t path[MAX_PATH] = {};
+	DWORD length = ::GetModuleFileNameW(nullptr, path, MAX_PATH);
+	if (length == 0 || length == MAX_PATH)
+	{
+		return std::filesystem::current_path();
+	}
+
+	return std::filesystem::path(path).parent_path();
+}
+
 inline std::string get_Engine_Path()
 {
-	return std::filesystem::current_path().string();
+	return get_Engine_Executable_Path().string();
 }
 
 inline std::string get_Engine_Res_Path()
 {
-	return std::filesystem::current_path().string() + "\\res";
+	return (get_Engine_Executable_Path() / "res").string();
 }
 
 inline std::string get_Engine_Shader_Path()
 {
-	return std::filesystem::current_path().string() + "\\res\\shader";
+	return (get_Engine_Executable_Path() / "res" / "shader").string();
 }
 
 inline std::string get_Engine_Mesh_Path()
 {
-	return std::filesystem::current_path().string() + "\\res\\mesh";
+	return (get_Engine_Executable_Path() / "res" / "mesh").string();
 }
 
 
