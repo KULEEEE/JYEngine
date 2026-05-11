@@ -6,6 +6,8 @@
 #include "engine/JRenderResource.h"
 #include "engine/asset/JShader.h"
 
+#include <iostream>
+
 J_RENDER_BEGIN
 
 using namespace J::Engine;
@@ -20,39 +22,86 @@ JCommandQueue::~JCommandQueue()
 
 void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain)
 {
+	if (device == nullptr)
+	{
+		std::cerr << "JCommandQueue::Initialize failed: device is null." << std::endl;
+		return;
+	}
+
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
-	device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&_cmdQueue));
+	HRESULT hr = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&_cmdQueue));
+	if (FAILED(hr))
+	{
+		std::cerr << "CreateCommandQueue failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
 
-	// - D3D12_COMMAND_LIST_TYPE_DIRECT : GPU°¡ Á÷Á¢ ½ÇÇàÇÏ´Â ¸í·É ¸ñ·Ï
-	device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAlloc));
+	// - D3D12_COMMAND_LIST_TYPE_DIRECT : GPUê°€ ì§ì ‘ ì‹¤í–‰í•˜ëŠ” ëª…ë ¹ ëª©ë¡
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAlloc));
+	if (FAILED(hr))
+	{
+		std::cerr << "CreateCommandAllocator failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
 
-	// GPU°¡ ÇÏ³ªÀÎ ½Ã½ºÅÛ¿¡¼­´Â 0À¸·Î
+	// GPUê°€ í•˜ë‚˜ì¸ ì‹œìŠ¤í…œì—ì„œëŠ” 0ìœ¼ë¡œ
 	// DIRECT or BUNDLE
 	// Allocator
-	// ÃÊ±â »óÅÂ (±×¸®±â ¸í·ÉÀº nullptr ÁöÁ¤)
-	device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAlloc.Get(), nullptr, IID_PPV_ARGS(&_cmdList));
+	// ì´ˆê¸° ìƒíƒœ (ê·¸ë¦¬ê¸° ëª…ë ¹ì€ nullptr ì§€ì •)
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAlloc.Get(), nullptr, IID_PPV_ARGS(&_cmdList));
+	if (FAILED(hr))
+	{
+		std::cerr << "CreateCommandList failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
 
-	// CommandList´Â Close / Open »óÅÂ°¡ ÀÖ´Âµ¥
-	// Open »óÅÂ¿¡¼­ Command¸¦ ³Ö´Ù°¡ CloseÇÑ ´ÙÀ½ Á¦ÃâÇÏ´Â °³³ä
-	_cmdList->Close();
+	// CommandListëŠ” Close / Open ìƒíƒœê°€ ìžˆëŠ”ë°
+	// Open ìƒíƒœì—ì„œ Commandë¥¼ ë„£ë‹¤ê°€ Closeí•œ ë‹¤ìŒ ì œì¶œí•˜ëŠ” ê°œë…
+	hr = _cmdList->Close();
+	if (FAILED(hr))
+	{
+		std::cerr << "Initial command list Close failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
 
 	// CreateFence
-	// - CPU¿Í GPUÀÇ µ¿±âÈ­ ¼ö´ÜÀ¸·Î ¾²ÀÎ´Ù
-	device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+	// - CPUì™€ GPUì˜ ë™ê¸°í™” ìˆ˜ë‹¨ìœ¼ë¡œ ì“°ì¸ë‹¤
+	hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+	if (FAILED(hr))
+	{
+		std::cerr << "CreateFence failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
 	_fenceEvent = ::CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (_fenceEvent == nullptr)
+	{
+		std::cerr << "CreateEvent failed." << std::endl;
+	}
 }
 
 void JCommandQueue::RenderBegin()
 {
+	if (_cmdAlloc == nullptr || _cmdList == nullptr)
+	{
+		std::cerr << "RenderBegin skipped: command queue is not initialized." << std::endl;
+		return;
+	}
+
 	_cmdAlloc->Reset();
 	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
 }
 
 void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount)
 {
+	if (_cmdList == nullptr || renderTarget == nullptr)
+	{
+		std::cerr << "BeginRenderPass skipped: command list or render target is null." << std::endl;
+		return;
+	}
+
 	_currentRenderTarget = renderTarget;
 
 	vector<D3D12_RESOURCE_BARRIER> barriers;
@@ -62,8 +111,8 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	{
 		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 			rtvResource,
-			D3D12_RESOURCE_STATE_PRESENT, // È­¸é Ãâ·Â
-			D3D12_RESOURCE_STATE_RENDER_TARGET)); // ¿ÜÁÖ °á°ú¹°
+			D3D12_RESOURCE_STATE_PRESENT, // í™”ë©´ ì¶œë ¥
+			D3D12_RESOURCE_STATE_RENDER_TARGET)); // ì™¸ì£¼ ê²°ê³¼ë¬¼
 	}
 	
 	_cmdList->ResourceBarrier(barriers.size(), barriers.data());
@@ -78,26 +127,49 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 
 void JCommandQueue::SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport)
 {
+	if (_cmdList == nullptr)
+	{
+		return;
+	}
 	_cmdList->RSSetViewports(viewPortCount, viewport);
 }
 
 void JCommandQueue::SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect)
 {
+	if (_cmdList == nullptr)
+	{
+		return;
+	}
 	_cmdList->RSSetScissorRects(rectCount, rect);
 }
 
 void JCommandQueue::SetPipeline(const JPipeline* pipeline)
 {
+	if (pipeline == nullptr)
+	{
+		std::cerr << "SetPipeline skipped: pipeline is null." << std::endl;
+		return;
+	}
 	_cmdList->SetPipelineState(pipeline->pipelineState.Get());
 }
 
 void JCommandQueue::SetGraphicResources(JShader* shader)
 {
+	if (shader == nullptr || shader->GetRootSignature() == nullptr)
+	{
+		std::cerr << "SetGraphicResources skipped: shader or root signature is null." << std::endl;
+		return;
+	}
 	_cmdList->SetGraphicsRootSignature(shader->GetRootSignature()->signature.Get());
 }
 
 void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
 {
+	if (_cmdList == nullptr || meshResource == nullptr)
+	{
+		std::cerr << "BindVertexBuffer skipped: command list or mesh resource is null." << std::endl;
+		return;
+	}
 	_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	_cmdList->IASetVertexBuffers(0, meshResource->soaBuffers.size(), meshResource->soaBuffers.data());
 	_cmdList->IASetIndexBuffer(&meshResource->indexBuffer);
@@ -110,11 +182,21 @@ void JCommandQueue::Draw(const uint32& vertexCount, const uint32& instanceCount)
 
 void JCommandQueue::DrawIndexed(const uint32& indexCount, const uint32& instanceCount, const uint32& startIndex, const uint32& baseVertex, const uint32& startInstance)
 {
+	if (_cmdList == nullptr)
+	{
+		return;
+	}
 	_cmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
 }
 
 void JCommandQueue::EndRenderPass()
 {
+	if (_cmdList == nullptr || _currentRenderTarget == nullptr)
+	{
+		std::cerr << "EndRenderPass skipped: command list or current render target is null." << std::endl;
+		return;
+	}
+
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 
 
@@ -131,15 +213,32 @@ void JCommandQueue::EndRenderPass()
 
 void JCommandQueue::RenderEnd()
 {
-	_cmdList->Close();
+	if (_cmdList == nullptr || _cmdQueue == nullptr)
+	{
+		std::cerr << "RenderEnd skipped: command queue is not initialized." << std::endl;
+		return;
+	}
 
-	// Ä¿¸Çµå ¸®½ºÆ® ¼öÇà
+	HRESULT hr = _cmdList->Close();
+	if (FAILED(hr))
+	{
+		std::cerr << "RenderEnd Close failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return;
+	}
+
+	// ì»¤ë§¨ë“œ ë¦¬ìŠ¤íŠ¸ ìˆ˜í–‰
 	ID3D12CommandList* cmdListArr[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(_countof(cmdListArr), cmdListArr);
 }
 
 void JCommandQueue::WaitSync()
 {
+	if (_cmdQueue == nullptr || _fence == nullptr || _fenceEvent == nullptr)
+	{
+		std::cerr << "WaitSync skipped: synchronization objects are not initialized." << std::endl;
+		return;
+	}
+
 	// Advance the fence value to mark commands up to this fence point.
 	_fenceValue++;
 

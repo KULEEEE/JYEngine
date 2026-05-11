@@ -38,6 +38,7 @@ public:
 	D3D12_SHADER_BYTECODE* GetByteCode() { return  _byteCodes; }
 
 	const JRootSignature* GetRootSignature() { return _rootSignature; }
+	bool IsReady() const { return _rootSignature != nullptr && _byteCodes[0].pShaderBytecode != nullptr && _byteCodes[1].pShaderBytecode != nullptr; }
 
 	void CompileShader();
 private:
@@ -45,11 +46,11 @@ private:
 	ComPtr<ID3DBlob>					_psBlob;
 	ComPtr<ID3DBlob>					_errBlob;
 
-	D3D12_SHADER_BYTECODE				_byteCodes[2];
+	D3D12_SHADER_BYTECODE				_byteCodes[2] = {};
 
 	std::wstring					_path;
 
-	JRootSignature* 				_rootSignature;
+	JRootSignature* 				_rootSignature = nullptr;
 };
 
 J_RENDER_END

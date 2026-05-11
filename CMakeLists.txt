@@ -79,29 +79,13 @@ set_source_files_properties(src/client/OpenFBX/libdeflate.c PROPERTIES LANGUAGE 
 
 add_executable(Client WIN32 ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS} ${CLIENT_RESOURCES})
 
-# FBX SDK 포함 경로 추가
 target_include_directories(Client PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/deps/include
 )
 
 # Client에 Engine을 명시적으로 종속시키고, 링크
 target_link_libraries(Client PRIVATE Engine)
 add_dependencies(Client Engine)
-
-# 빌드 구성에 따라 FBX 라이브러리 링크
-target_link_libraries(Client PRIVATE 
-    debug ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/debug/libfbxsdk.lib
-    optimized ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/release/libfbxsdk.lib
-)
-
-# XML 및 ZLIB 라이브러리도 추가 (FBX SDK 종속성)
-target_link_libraries(Client PRIVATE 
-    debug ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/debug/libxml2.lib
-    optimized ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/release/libxml2.lib
-    debug ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/debug/zlib.lib
-    optimized ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/release/zlib.lib
-)
 
 # 리소스 복사
 add_custom_command(
@@ -109,29 +93,6 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR}/res
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/res
-)
-
-# DLL 파일 복사 - 수정된 버전
-add_custom_command(
-    TARGET Client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/debug/libfbxsdk.dll"
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug/libfbxsdk.dll"
-)
-
-add_custom_command(
-    TARGET Client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/release/libfbxsdk.dll"
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release/libfbxsdk.dll"
-)
-
-# 실행 파일과 같은 디렉토리에도 DLL 복사
-add_custom_command(
-    TARGET Client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/deps/lib/$<$<CONFIG:Debug>:debug>$<$<NOT:$<CONFIG:Debug>>:release>/libfbxsdk.dll"
-    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/libfbxsdk.dll"
 )
 
 # 모든 빌드 구성이 동일한 출력 디렉토리를 사용하도록 설정

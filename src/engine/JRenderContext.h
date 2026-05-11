@@ -7,6 +7,7 @@
 #include "engine/JDevice.h"
 #include "engine/JRenderDefinition.h"
 #include "engine/asset/JShader.h"
+#include <iostream>
 
 J_RENDER_BEGIN
 
@@ -156,21 +157,34 @@ public:
 	
 	JShader* CreateShader(const std::string& path)
 	{
+		std::cout << "Loading shader: " << path << std::endl;
 		JShader* shader = new JShader(path);
 		shader->CompileShader();
+		if (!shader->IsReady())
+		{
+			std::cerr << "CreateShader failed: " << path << std::endl;
+			delete shader;
+			return nullptr;
+		}
 		return shader;
 	}
 	void DestroyShader(JShader* shader) { delete shader; }
 
 	JPipeline* CreatePipeline(JShader* shader)
 	{
+		if (shader == nullptr || shader->GetRootSignature() == nullptr)
+		{
+			std::cerr << "CreatePipeline failed: shader or root signature is null." << std::endl;
+			return nullptr;
+		}
+
 		ComPtr<ID3D12Device> device = _device->GetDevice();
 
 		JPipeline* pipeline = new JPipeline();
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC& pipelineDesc = pipeline->pipelineDesc;
 
-		// ÀÌ ºÎºÐÀº ³ªÁß¿¡ shader¿¡¼­ °¡Á®¿Àµµ·Ï ÇØ¾ßÇÔ
+		// ì´ ë¶€ë¶„ì€ ë‚˜ì¤‘ì— shaderì—ì„œ ê°€ì ¸ì˜¤ë„ë¡ í•´ì•¼í•¨
 		D3D12_INPUT_ELEMENT_DESC desc[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -194,7 +208,8 @@ public:
 
 		HRESULT hr = device->CreateGraphicsPipelineState(&pipelineDesc, IID_PPV_ARGS(&pipeline->pipelineState));
 		if (FAILED(hr)) {
-			
+			std::cerr << "CreateGraphicsPipelineState failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+			delete pipeline;
 			return nullptr;
 		}
 
@@ -213,7 +228,7 @@ public:
 		// 1. Add Root Parameters for Constant Buffers
 		for (const auto& cb : bindingInfo.cBuffers) {
 			CD3DX12_ROOT_PARAMETER rootParam;
-			rootParam.InitAsConstantBufferView(cb.slot); // °¢ »ó¼ö ¹öÆÛ¸¦ °³º° ·çÆ® ÆÄ¶ó¹ÌÅÍ·Î Ãß°¡
+			rootParam.InitAsConstantBufferView(cb.slot); // ê° ìƒìˆ˜ ë²„í¼ë¥¼ ê°œë³„ ë£¨íŠ¸ íŒŒë¼ë¯¸í„°ë¡œ ì¶”ê°€
 			rootParameters.push_back(rootParam);
 		}
 
@@ -237,7 +252,7 @@ public:
 			rootParameters.push_back(samplerRootParam);
 		}
 
-		// 4. ·çÆ® ¼­¸í »ý¼º
+		// 4. ë£¨íŠ¸ ì„œëª… ìƒì„±
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init(static_cast<UINT>(rootParameters.size()), rootParameters.data(), 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 

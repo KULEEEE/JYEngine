@@ -3,7 +3,7 @@
 #define __J_FBX_LOADER_H__
 
 #include <vector>
-#include "fbxsdk.h"
+#include "client/OpenFBX/ofbx.h"
 #include "engine/asset/JMesh.h"
 
 class JFBXLoader
@@ -41,14 +41,8 @@ public:
 
 private:
 
-	void initialize();
-	void destroy();
-
-	void extractMesh(FbxNode* node, ParsingData& parsingData);
+	void extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData);
 	void setMesh(J::Engine::JMesh* mesh, ParsingData& parsingData);
-
-	::FbxManager* _fbxManager = nullptr;
-	::FbxScene* _fbxScene = nullptr;
 };
 
 #endif

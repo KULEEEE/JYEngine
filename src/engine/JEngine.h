@@ -29,12 +29,12 @@ private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
 	void destroy();
 
-	Render::JDevice* _device;
-	Render::JCommandQueue* _cmdQueue;
-	Render::JSwapChain* _swapChain;
-	Render::JDx12Helper* _dx12Helper;
+	Render::JDevice* _device = nullptr;
+	Render::JCommandQueue* _cmdQueue = nullptr;
+	Render::JSwapChain* _swapChain = nullptr;
+	Render::JDx12Helper* _dx12Helper = nullptr;
 
-	Render::JRenderContext* _renderContext;
+	Render::JRenderContext* _renderContext = nullptr;
 };
 
 J_ENGINE_END

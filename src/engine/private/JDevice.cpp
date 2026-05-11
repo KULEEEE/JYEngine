@@ -16,34 +16,58 @@ JDevice::~JDevice()
 	destroy();
 }
 
-
 void JDevice::initialize()
 {
-	// D3D12 디버그층 활성화
-	// - VC++ 출력창에 상세한 디버깅 메시지 출력
-	// - riid : 디바이스의 COM ID
-	// - ppDevice : 생성된 장치가 매개변수에 설정
-#ifdef _DEBUG
-	::D3D12GetDebugInterface(IID_PPV_ARGS(&_debugController));
-	_debugController->EnableDebugLayer();
-	if (_debugController) _debugController->Release();
+	UINT dxgiFactoryFlags = 0;
 
+#ifdef _DEBUG
+	// Enable the D3D12 debug layer when the SDK layers are available.
+	const HRESULT debugHr = ::D3D12GetDebugInterface(IID_PPV_ARGS(&_debugController));
+	if (SUCCEEDED(debugHr) && _debugController)
+	{
+		_debugController->EnableDebugLayer();
+		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+	}
+	else
+	{
+		std::cerr << "D3D12 debug layer is unavailable. HRESULT=0x"
+			<< std::hex << debugHr << std::dec << std::endl;
+	}
 #endif
 
-	// DXGI(DirectX Graphics Infrastructure)
-	// Direct3D와 함께 쓰이는 API
-	// - 전체 화면 모드 전환
-	// - 지원되는 디스플레이 모드 열거 등
-	// CreateDXGIFactory
-	// - riid : 디바이스의 COM ID
-	// - ppDevice : 생성된 장치가 매개변수에 설정
-	::CreateDXGIFactory(IID_PPV_ARGS(&_dxgi));
+	HRESULT factoryHr = ::CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&_dxgi));
+	if (FAILED(factoryHr) && dxgiFactoryFlags != 0)
+	{
+		std::cerr << "CreateDXGIFactory2 with debug flag failed. HRESULT=0x"
+			<< std::hex << factoryHr << std::dec << std::endl;
+		factoryHr = ::CreateDXGIFactory2(0, IID_PPV_ARGS(&_dxgi));
+	}
 
-	IDXGIAdapter* adapter = nullptr;
-	_dxgi->EnumAdapters(0, &adapter);
+	if (FAILED(factoryHr))
+	{
+		std::cerr << "CreateDXGIFactory2 failed. Retrying with CreateDXGIFactory1. HRESULT=0x"
+			<< std::hex << factoryHr << std::dec << std::endl;
+		factoryHr = ::CreateDXGIFactory1(IID_PPV_ARGS(&_dxgi));
+	}
+
+	if (FAILED(factoryHr) || _dxgi == nullptr)
+	{
+		std::cerr << "DXGI factory creation failed. HRESULT=0x"
+			<< std::hex << factoryHr << std::dec << std::endl;
+		return;
+	}
+
+	ComPtr<IDXGIAdapter> adapter;
+	const HRESULT adapterHr = _dxgi->EnumAdapters(0, adapter.GetAddressOf());
+	if (FAILED(adapterHr) || adapter == nullptr)
+	{
+		std::cerr << "EnumAdapters failed. HRESULT=0x" << std::hex << adapterHr << std::dec << std::endl;
+		return;
+	}
+
 	DXGI_ADAPTER_DESC desc;
-	
 	adapter->GetDesc(&desc);
+
 	std::wcout << L"Description: " << desc.Description << std::endl;
 	std::wcout << L"Vendor ID: " << desc.VendorId << std::endl;
 	std::wcout << L"Device ID: " << desc.DeviceId << std::endl;
@@ -53,14 +77,12 @@ void JDevice::initialize()
 	std::wcout << L"Dedicated System Memory: " << desc.DedicatedSystemMemory / (1024 * 1024) << L" MB" << std::endl;
 	std::wcout << L"Shared System Memory: " << desc.SharedSystemMemory / (1024 * 1024) << L" MB" << std::endl;
 	std::wcout << std::endl;
-	
-	// CreateDevice
-	// - 디스플레이 어댑터(그래픽 카드)를 나타내는 객체
-	// - pAdapter : nullptr 지정하면 시스템 기본 디스플레이 어댑터
-	// - MinimumFeatureLevel : 응용 프로그램이 요구하는 최소 기능 수준 (구닥다리 걸러낸다)
-	// - riid : 디바이스의 COM ID
-	// - ppDevice : 생성된 장치가 매개변수에 설정
-	::D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device));
+
+	const HRESULT deviceHr = ::D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&_device));
+	if (FAILED(deviceHr) || _device == nullptr)
+	{
+		std::cerr << "D3D12CreateDevice failed. HRESULT=0x" << std::hex << deviceHr << std::dec << std::endl;
+	}
 }
 
 void JDevice::destroy()

@@ -20,7 +20,7 @@ using namespace std;
 #include <d3d12.h>
 #include <wrl.h>
 #include <d3dcompiler.h>
-#include <dxgi.h>
+#include <dxgi1_4.h>
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
 #include <DirectXColors.h>
@@ -69,12 +69,12 @@ struct JVec2 {
 	JVec2(JVec2&&) = default;
 	JVec2& operator=(JVec2&&) = default;
 
-	// float ¹è¿­·ÎÀÇ ¾Ï½ÃÀû Å¸ÀÔ º¯È¯À» À§ÇÑ ¿¬»êÀÚ ¿À¹ö·Îµù
+	// float ë°°ì—´ë¡œì˜ ì•”ì‹œì  íƒ€ì… ë³€í™˜ì„ ìœ„í•œ ì—°ì‚°ì ì˜¤ë²„ë¡œë”©
 	operator float* () {
 		return &x;
 	}
 
-	// const ¹öÀü
+	// const ë²„ì „
 	operator const float* () const {
 		return &x;
 	}
@@ -92,12 +92,12 @@ struct JVec3 {
 	JVec3(JVec3&&) = default;
 	JVec3& operator=(JVec3&&) = default;
 
-	// float ¹è¿­·ÎÀÇ ¾Ï½ÃÀû Å¸ÀÔ º¯È¯À» À§ÇÑ ¿¬»êÀÚ ¿À¹ö·Îµù
+	// float ë°°ì—´ë¡œì˜ ì•”ì‹œì  íƒ€ì… ë³€í™˜ì„ ìœ„í•œ ì—°ì‚°ì ì˜¤ë²„ë¡œë”©
 	operator float* () {
 		return &x;
 	}
 
-	// const ¹öÀü
+	// const ë²„ì „
 	operator const float* () const {
 		return &x;
 	}
@@ -115,12 +115,12 @@ struct JVec4 {
 	JVec4(JVec4&&) = default;
 	JVec4& operator=(JVec4&&) = default;
 
-	// float ¹è¿­·ÎÀÇ ¾Ï½ÃÀû Å¸ÀÔ º¯È¯À» À§ÇÑ ¿¬»êÀÚ ¿À¹ö·Îµù
+	// float ë°°ì—´ë¡œì˜ ì•”ì‹œì  íƒ€ì… ë³€í™˜ì„ ìœ„í•œ ì—°ì‚°ì ì˜¤ë²„ë¡œë”©
 	operator float* () {
 		return &x;
 	}
 
-	// const ¹öÀü
+	// const ë²„ì „
 	operator const float* () const {
 		return &x;
 	}
@@ -140,12 +140,12 @@ struct JColor {
 
 	JColor(const JVec4& vec4) : r(vec4.x), g(vec4.y), b(vec4.z), a(vec4.w) {}
 
-	// float ¹è¿­·ÎÀÇ ¾Ï½ÃÀû Å¸ÀÔ º¯È¯À» À§ÇÑ ¿¬»êÀÚ ¿À¹ö·Îµù
+	// float ë°°ì—´ë¡œì˜ ì•”ì‹œì  íƒ€ì… ë³€í™˜ì„ ìœ„í•œ ì—°ì‚°ì ì˜¤ë²„ë¡œë”©
 	operator float* () {
 		return &r;
 	}
 
-	// const ¹öÀü
+	// const ë²„ì „
 	operator const float* () const {
 		return &r;
 	}

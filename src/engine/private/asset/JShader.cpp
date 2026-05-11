@@ -16,7 +16,19 @@ JShader::JShader(const std::string& path)
 
 JShader::~JShader()
 {
-	GetEngine()->GetRenderContext()->DestroyRootSignature(_rootSignature);
+	if (_rootSignature == nullptr)
+	{
+		return;
+	}
+
+	J::Engine::JEngine* engine = GetEngine();
+	if (engine == nullptr || engine->GetRenderContext() == nullptr)
+	{
+		return;
+	}
+
+	engine->GetRenderContext()->DestroyRootSignature(_rootSignature);
+	_rootSignature = nullptr;
 }
 
 void JShader::CompileShader()
@@ -27,7 +39,7 @@ void JShader::CompileShader()
 #endif
 
 	// vertex shader
-	std::string name = "vMain"; // TODO: µû·Î ÆÄ½ÌÇØ¼­ ¾ò¾î¿ÀÀÚ
+	std::string name = "vMain"; // TODO: ë”°ë¡œ íŒŒì‹±í•´ì„œ ì–»ì–´ì˜¤ì
 	std::string version = "vs_5_0";
 	
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -39,7 +51,7 @@ void JShader::CompileShader()
 	}
 
 	// pixel shader
-	name = "pMain"; // TODO: µû·Î ÆÄ½ÌÇØ¼­ ¾ò¾î¿ÀÀÚ
+	name = "pMain"; // TODO: ë”°ë¡œ íŒŒì‹±í•´ì„œ ì–»ì–´ì˜¤ì
 	version = "ps_5_0";
 
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -93,7 +105,7 @@ void JShader::CompileShader()
 				}
 				default:
 				{
-					// ±¸Çö ÇÊ¿ä
+					// êµ¬í˜„ í•„ìš”
 				}
 				}
 			}

@@ -30,7 +30,13 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 
 void JEngine::destroy()
 {
-	delete _device;
 	delete _renderContext;
+	_renderContext = nullptr;
+
+	delete _dx12Helper;
+	_dx12Helper = nullptr;
+
+	delete _device;
+	_device = nullptr;
 }
 J_ENGINE_END
