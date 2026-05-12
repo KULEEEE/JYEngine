@@ -1,11 +1,15 @@
-﻿#include "engine/JRenderServer.h"
+#include "engine/JRenderServer.h"
 
 #include "engine/JGraphicResource.h"
-#include "engine/JCameraComponent.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/JMaterialResource.h"
 
 J_ENGINE_BEGIN
+
+uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
+{
+	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
+}
 
 uint32 JRenderServer::FindMaterialIndex(uint32 materialID) const
 {
@@ -19,21 +23,21 @@ JMaterial* JRenderServer::FindMaterial(uint32 materialID) const
 	return index == static_cast<uint32>(-1) ? nullptr : _materials[index].source;
 }
 
-uint32 JRenderServer::FindCameraIndex(uint32 cameraID) const
+uint32 JRenderServer::FindCameraIndex(JCameraHandle camera) const
 {
-	const auto iter = _cameraIndexMap.find(cameraID);
+	const auto iter = _cameraIndexMap.find(MakeCameraKey(camera));
 	return iter == _cameraIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(uint32 cameraID)
+JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(JCameraHandle camera)
 {
-	const uint32 index = FindCameraIndex(cameraID);
+	const uint32 index = FindCameraIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameras[index];
 }
 
-const JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(uint32 cameraID) const
+const JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(JCameraHandle camera) const
 {
-	const uint32 index = FindCameraIndex(cameraID);
+	const uint32 index = FindCameraIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameras[index];
 }
 
@@ -83,54 +87,53 @@ void JRenderServer::UnregisterMaterial(uint32 materialID)
 	_renderDB.RemoveMaterialResource(materialID);
 }
 
-void JRenderServer::RegisterCamera(JCameraComponent* camera, Render::JConstantBuffer* perFrameBuffer, float aspectRatio)
+void JRenderServer::RegisterCamera(JCameraHandle camera, Render::JConstantBuffer* perFrameBuffer)
 {
-	if (camera == nullptr)
+	if (!camera.IsValid())
 	{
 		return;
 	}
 
-	if (FindCameraIndex(camera->instanceID) != static_cast<uint32>(-1))
+	if (FindCameraIndex(camera) != static_cast<uint32>(-1))
 	{
-		CameraRecord* record = FindCameraRecord(camera->instanceID);
+		CameraRecord* record = FindCameraRecord(camera);
 		record->perFrameBuffer = perFrameBuffer;
-		record->aspectRatio = aspectRatio;
 		MarkCameraDirty(camera);
 		return;
 	}
 
 	const uint32 newIndex = static_cast<uint32>(_cameras.size());
-	_cameras.push_back({ camera->instanceID, camera, perFrameBuffer, aspectRatio });
-	_cameraIndexMap[camera->instanceID] = newIndex;
+	_cameras.push_back({ camera, perFrameBuffer });
+	_cameraIndexMap[MakeCameraKey(camera)] = newIndex;
 	MarkCameraDirty(camera);
 }
 
-void JRenderServer::UnregisterCamera(uint32 cameraID)
+void JRenderServer::UnregisterCamera(JCameraHandle camera)
 {
-	const uint32 index = FindCameraIndex(cameraID);
+	const uint32 index = FindCameraIndex(camera);
 	if (index != static_cast<uint32>(-1))
 	{
 		const uint32 lastIndex = static_cast<uint32>(_cameras.size() - 1);
 		if (index != lastIndex)
 		{
 			_cameras[index] = _cameras[lastIndex];
-			_cameraIndexMap[_cameras[index].cameraID] = index;
+			_cameraIndexMap[MakeCameraKey(_cameras[index].camera)] = index;
 		}
 		_cameras.pop_back();
-		_cameraIndexMap.erase(cameraID);
+		_cameraIndexMap.erase(MakeCameraKey(camera));
 	}
 
-	for (auto iter = _dirtyCameraIDs.begin(); iter != _dirtyCameraIDs.end();)
+	for (auto iter = _dirtyCameraKeys.begin(); iter != _dirtyCameraKeys.end();)
 	{
-		if (*iter == cameraID)
+		if (*iter == MakeCameraKey(camera))
 		{
-			iter = _dirtyCameraIDs.erase(iter);
+			iter = _dirtyCameraKeys.erase(iter);
 			continue;
 		}
 		++iter;
 	}
 
-	_renderDB.RemoveCameraResource(cameraID);
+	_renderDB.RemoveCameraResource(camera);
 }
 
 void JRenderServer::MarkMaterialDirty(JMaterial* material)
@@ -153,22 +156,23 @@ void JRenderServer::MarkMaterialDirty(JMaterial* material)
 	_dirtyMaterialIDs.push_back(material->instanceID);
 }
 
-void JRenderServer::MarkCameraDirty(JCameraComponent* camera)
+void JRenderServer::MarkCameraDirty(JCameraHandle camera)
 {
-	if (camera == nullptr)
+	if (!camera.IsValid())
 	{
 		return;
 	}
 
-	for (uint32 dirtyCameraID : _dirtyCameraIDs)
+	const uint64 cameraKey = MakeCameraKey(camera);
+	for (uint64 dirtyCameraKey : _dirtyCameraKeys)
 	{
-		if (dirtyCameraID == camera->instanceID)
+		if (dirtyCameraKey == cameraKey)
 		{
 			return;
 		}
 	}
 
-	_dirtyCameraIDs.push_back(camera->instanceID);
+	_dirtyCameraKeys.push_back(cameraKey);
 }
 
 void JRenderServer::Sync()
@@ -186,20 +190,95 @@ void JRenderServer::Sync()
 	}
 
 	_dirtyMaterialIDs.clear();
+}
 
-	for (uint32 cameraID : _dirtyCameraIDs)
+void JRenderServer::SyncScene(const JScene& scene)
+{
+	for (uint64 cameraKey : _dirtyCameraKeys)
 	{
-		const CameraRecord* record = FindCameraRecord(cameraID);
-		if (record == nullptr || record->source == nullptr)
+		for (const CameraRecord& record : _cameras)
+		{
+			if (MakeCameraKey(record.camera) != cameraKey)
+			{
+				continue;
+			}
+
+			const JScene::CameraData* cameraData = scene.GetCamera(record.camera);
+			if (cameraData == nullptr)
+			{
+				break;
+			}
+
+			const XMMATRIX viewProjection = scene.GetCameraViewMatrix(record.camera) * scene.GetCameraProjectionMatrix(record.camera);
+			_renderDB.SyncCamera(record.camera, viewProjection, record.perFrameBuffer);
+			break;
+		}
+	}
+
+	_dirtyCameraKeys.clear();
+
+	for (const JScene::RenderObjectSlot& slot : scene.GetRenderObjectSlots())
+	{
+		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.mesh == nullptr)
 		{
 			continue;
 		}
 
-		const XMMATRIX viewProjection = record->source->GetViewMatrix() * record->source->GetProjectionMatrix(record->aspectRatio);
-		_renderDB.SyncCamera(record->cameraID, viewProjection, record->perFrameBuffer);
+		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
+	}
+}
+
+bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
+{
+	const JCameraHandle primaryCamera = scene.GetPrimaryCamera();
+	if (!primaryCamera.IsValid())
+	{
+		return false;
 	}
 
-	_dirtyCameraIDs.clear();
+	outFrameDesc = {};
+	outFrameDesc.camera = primaryCamera;
+	outFrameDesc.renderTarget = renderTarget;
+	outFrameDesc.clearColor = clearColor;
+	outFrameDesc.viewport = viewport;
+	outFrameDesc.scissorRect = scissorRect;
+
+	for (const JScene::LightSlot& lightSlot : scene.GetLightSlots())
+	{
+		if (!lightSlot.active || !lightSlot.data.active)
+		{
+			continue;
+		}
+
+		outFrameDesc.lights.push_back({ static_cast<uint32>(&lightSlot - scene.GetLightSlots().data()), lightSlot.generation });
+	}
+
+	for (const JScene::RenderObjectSlot& slot : scene.GetRenderObjectSlots())
+	{
+		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.mesh == nullptr)
+		{
+			continue;
+		}
+
+		JRenderer::DrawItem drawItem;
+		drawItem.entity = slot.data.entity;
+		drawItem.transform = slot.data.transform;
+		drawItem.renderObject = { static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation };
+		drawItem.materialID = slot.data.materialID;
+		drawItem.mesh = slot.data.mesh;
+		drawItem.transparent = slot.data.transparent;
+
+		if (drawItem.transparent)
+		{
+			outFrameDesc.transparentDrawItems.push_back(drawItem);
+		}
+		else
+		{
+			outFrameDesc.opaqueDrawItems.push_back(drawItem);
+		}
+	}
+
+	return true;
 }
 
 bool JRenderServer::BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const

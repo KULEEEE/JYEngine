@@ -5,6 +5,7 @@
 #include "engine/precompile.h"
 #include "engine/JMaterialResource.h"
 #include "engine/JRenderResource.h"
+#include "engine/JScene.h"
 
 /*#include "engine/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 /*#include "engine/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
@@ -24,14 +25,14 @@ public:
 
 	struct CameraResource
 	{
-		uint32 cameraID = 0;
+		JCameraHandle camera = {};
 		XMFLOAT4X4 viewProjection = {};
 		Render::JConstantBuffer* perFrameBuffer = nullptr;
 	};
 
 	struct CameraResourceRecord
 	{
-		uint32 cameraID = 0;
+		uint64 cameraKey = 0;
 		CameraResource resource;
 	};
 
@@ -42,16 +43,16 @@ public:
 
 	JMaterialResource* FindMaterialResource(uint32 materialID);
 	const JMaterialResource* FindMaterialResource(uint32 materialID) const;
-	CameraResource* FindCameraResource(uint32 cameraID);
-	const CameraResource* FindCameraResource(uint32 cameraID) const;
+	CameraResource* FindCameraResource(JCameraHandle camera);
+	const CameraResource* FindCameraResource(JCameraHandle camera) const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
-	void SyncCamera(uint32 cameraID, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
-	JMeshResource* CreateOrUpdateMeshResource(const JMesh* mesh);
+	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
+	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
 	void RemoveMaterialResource(uint32 materialID);
-	void RemoveCameraResource(uint32 cameraID);
+	void RemoveCameraResource(JCameraHandle camera);
 	void RemoveMeshResource(const JMesh* mesh);
 	void Clear();
 
@@ -59,15 +60,16 @@ public:
 
 private:
 	JMaterialResource& GetOrCreateMaterialResource(uint32 materialID);
-	CameraResource& GetOrCreateCameraResource(uint32 cameraID);
+	CameraResource& GetOrCreateCameraResource(JCameraHandle camera);
 	uint32 FindMaterialResourceIndex(uint32 materialID) const;
-	uint32 FindCameraResourceIndex(uint32 cameraID) const;
+	uint32 FindCameraResourceIndex(JCameraHandle camera) const;
+	static uint64 MakeCameraKey(JCameraHandle camera);
 
 	Render::JRenderContext* _renderContext = nullptr;
 	std::vector<MaterialResourceRecord> _materialResources;
 	std::unordered_map<uint32, uint32> _materialIndexMap;
 	std::vector<CameraResourceRecord> _cameraResources;
-	std::unordered_map<uint32, uint32> _cameraIndexMap;
+	std::unordered_map<uint64, uint32> _cameraIndexMap;
 	std::unordered_map<const JMesh*, JMeshResource> _meshResources;
 };
 

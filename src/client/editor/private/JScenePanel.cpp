@@ -2,11 +2,9 @@
 
 #include "engine/JSwapChain.h"
 #include "engine/JRenderDefinition.h"
-#include "engine/JRenderResource.h"
 #include "engine/JRenderServer.h"
 #include "engine/JRenderer.h"
 #include "engine/JMaterialFactory.h"
-#include "engine/JCameraComponent.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
@@ -69,9 +67,19 @@ JScenePanel::~JScenePanel()
 		renderServer->UnregisterMaterial(planeMaterial->instanceID);
 	}
 
-	if (renderServer != nullptr && camera != nullptr)
+	if (renderServer != nullptr && _camera.IsValid())
 	{
-		renderServer->UnregisterCamera(camera->instanceID);
+		renderServer->UnregisterCamera(_camera);
+	}
+
+	if (renderServer != nullptr && mesh != nullptr)
+	{
+		renderServer->GetRenderDB().RemoveMeshResource(mesh);
+	}
+
+	if (renderServer != nullptr && planeMesh != nullptr)
+	{
+		renderServer->GetRenderDB().RemoveMeshResource(planeMesh);
 	}
 
 	if (_cameraInfoWindow != nullptr)
@@ -81,23 +89,21 @@ JScenePanel::~JScenePanel()
 		_cameraInfoText = nullptr;
 	}
 
+	delete scene;
 	delete material;
 	delete planeMaterial;
 	delete perFrameBuffer;
 	delete materialBuffer;
 	delete materialTexture;
-	delete camera;
 	delete mesh;
 	delete planeMesh;
 
+	scene = nullptr;
 	material = nullptr;
 	planeMaterial = nullptr;
 	perFrameBuffer = nullptr;
 	materialBuffer = nullptr;
 	materialTexture = nullptr;
-	camera = nullptr;
-	meshResource = nullptr;
-	planeMeshResource = nullptr;
 	mesh = nullptr;
 	planeMesh = nullptr;
 }
@@ -119,6 +125,13 @@ void JScenePanel::Init()
 		return;
 	}
 
+	scene = new Engine::JScene();
+	if (scene == nullptr)
+	{
+		std::cerr << "JScenePanel::Init failed: scene creation failed." << std::endl;
+		return;
+	}
+
 	std::string baseShaderPath = get_Engine_Shader_Path() + "\\base.hlsl";
 	material = materialFactory->CreateMaterial(baseShaderPath);
 	if (material == nullptr)
@@ -135,16 +148,6 @@ void JScenePanel::Init()
 		return;
 	}
 
-	camera = new Engine::JCameraComponent();
-	if (camera == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: camera creation failed." << std::endl;
-		return;
-	}
-
-	camera->SetMoveSpeed(0.1f);
-	camera->SetRotateSpeed(1.0f);
-
 	PerFrameConstants perFrameConstants{};
 	XMStoreFloat4x4(&perFrameConstants.viewProjection, XMMatrixIdentity());
 	perFrameBuffer = materialFactory->CreateConstantBuffer(&perFrameConstants, sizeof(perFrameConstants));
@@ -153,8 +156,9 @@ void JScenePanel::Init()
 		std::cerr << "JScenePanel::Init failed: per-frame buffer creation failed." << std::endl;
 		return;
 	}
+
 	material->SetConstantBuffer("PerFrame", perFrameBuffer);
-	renderServer->RegisterCamera(camera, perFrameBuffer, 800.0f / 600.0f);
+	planeMaterial->SetConstantBuffer("PerFrame", perFrameBuffer);
 
 	MaterialConstants materialConstants{};
 	materialConstants.baseColor = JVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -171,7 +175,32 @@ void JScenePanel::Init()
 		std::cerr << "JScenePanel::Init failed: material texture creation failed." << std::endl;
 		return;
 	}
-	planeMaterial->SetConstantBuffer("PerFrame", perFrameBuffer);
+
+	renderServer->RegisterMaterial(material);
+	renderServer->RegisterMaterial(planeMaterial);
+	renderServer->Sync();
+
+	_cameraEntity = scene->CreateEntity();
+	Engine::JScene::TransformData cameraTransformData{};
+	cameraTransformData.position = { 0.0f, 0.0f, -8.0f };
+	_cameraTransform = scene->AddTransform(_cameraEntity, cameraTransformData);
+	_camera = scene->AddCamera(_cameraEntity, _cameraTransform, 800.0f / 600.0f);
+	if (!_camera.IsValid())
+	{
+		std::cerr << "JScenePanel::Init failed: camera creation failed." << std::endl;
+		return;
+	}
+
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	if (cameraData == nullptr)
+	{
+		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
+		return;
+	}
+	cameraData->moveSpeed = 0.1f;
+	cameraData->rotateSpeed = 1.0f;
+	scene->SetPrimaryCamera(_camera);
+	renderServer->RegisterCamera(_camera, perFrameBuffer);
 
 	std::vector<float> planePositions =
 	{
@@ -191,16 +220,9 @@ void JScenePanel::Init()
 	planeMesh->SetPositions(std::move(planePositions));
 	planeMesh->SetIndices(std::move(planeIndices));
 
-	planeMeshResource = renderServer->GetRenderDB().CreateOrUpdateMeshResource(planeMesh);
-	if (planeMeshResource == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: plane buffer creation failed." << std::endl;
-		return;
-	}
-
-	renderServer->RegisterMaterial(material);
-	renderServer->RegisterMaterial(planeMaterial);
-	renderServer->Sync();
+	_planeEntity = scene->CreateEntity();
+	_planeTransform = scene->AddTransform(_planeEntity);
+	_planeRenderObject = scene->AddRenderObject(_planeEntity, _planeTransform, planeMaterial->instanceID, planeMesh, true);
 
 	std::string meshPath = get_Engine_Mesh_Path() + "\\Car.fbx";
 	std::cout << "Loading mesh: " << meshPath << std::endl;
@@ -213,12 +235,11 @@ void JScenePanel::Init()
 		return;
 	}
 
-	meshResource = renderServer->GetRenderDB().CreateOrUpdateMeshResource(mesh);
-	if (meshResource == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: buffer creation failed." << std::endl;
-		return;
-	}
+	_carEntity = scene->CreateEntity();
+	_carTransform = scene->AddTransform(_carEntity);
+	_carRenderObject = scene->AddRenderObject(_carEntity, _carTransform, material->instanceID, mesh, false);
+
+	renderServer->SyncScene(*scene);
 
 	createCameraInfoPanel();
 	updateCameraInfoPanel();
@@ -235,7 +256,7 @@ void JScenePanel::Update()
 	Render::JSwapChain* swapChain = GetEngine()->GetSwapChain();
 	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
-	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || material == nullptr || planeMaterial == nullptr || camera == nullptr || mesh == nullptr || planeMesh == nullptr || meshResource == nullptr || planeMeshResource == nullptr)
+	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || material == nullptr || planeMaterial == nullptr || mesh == nullptr || planeMesh == nullptr || !_camera.IsValid())
 	{
 		std::cerr << "JScenePanel::Update skipped: render resources are not ready." << std::endl;
 		_isReady = false;
@@ -243,30 +264,27 @@ void JScenePanel::Update()
 	}
 
 	updateCamera(FIXED_DELTA_TIME);
-	renderServer->MarkCameraDirty(camera);
-	renderServer->MarkMaterialDirty(material);
-	renderServer->MarkMaterialDirty(planeMaterial);
+	renderServer->MarkCameraDirty(_camera);
 	renderServer->Sync();
+	renderServer->SyncScene(*scene);
 	updateCameraInfoPanel();
 
 	Render::JViewport viewport = { 0, 0, 800, 600, 0, 1 };
 	D3D12_RECT rect = CD3DX12_RECT(0, 0, 800, 600);
 
 	Engine::JRenderer::FrameDesc frameDesc;
-	frameDesc.cameraID = camera->instanceID;
-	frameDesc.renderTarget = swapChain->GetRenderTarget();
-	frameDesc.clearColor = JColors::DarkGray;
-	frameDesc.viewport = viewport;
-	frameDesc.scissorRect = rect;
-	frameDesc.drawItems.push_back({ planeMaterial->instanceID, planeMeshResource });
-	frameDesc.drawItems.push_back({ material->instanceID, meshResource });
+	if (!renderServer->BuildFrameDesc(*scene, swapChain->GetRenderTarget(), JColors::DarkGray, viewport, rect, frameDesc))
+	{
+		std::cerr << "JScenePanel::Update skipped: failed to build frame description." << std::endl;
+		return;
+	}
 
 	renderer->Render(frameDesc);
 }
 
 void JScenePanel::updateCamera(float deltaTime)
 {
-	if (camera == nullptr)
+	if (scene == nullptr || !_camera.IsValid())
 	{
 		return;
 	}
@@ -312,8 +330,8 @@ void JScenePanel::updateCamera(float deltaTime)
 		_isMouseLookActive = false;
 	}
 
-	camera->Rotate(yawInput, pitchInput);
-	camera->MoveLocal(forwardInput, rightInput, upInput, deltaTime);
+	scene->RotateCamera(_camera, yawInput, pitchInput);
+	scene->MoveCameraLocal(_camera, forwardInput, rightInput, upInput, deltaTime);
 }
 
 void JScenePanel::createCameraInfoPanel()
@@ -368,7 +386,7 @@ void JScenePanel::createCameraInfoPanel()
 
 void JScenePanel::updateCameraInfoPanel()
 {
-	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || camera == nullptr)
+	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || scene == nullptr || !_camera.IsValid())
 	{
 		return;
 	}
@@ -380,19 +398,22 @@ void JScenePanel::updateCameraInfoPanel()
 		SetWindowPos(_cameraInfoWindow, HWND_TOPMOST, mainRect.right + 16, mainRect.top, 320, 260, SWP_NOACTIVATE);
 	}
 
-	const JVec3& position = camera->GetPosition();
-	const float yawDegrees = wrapDegrees(toDegrees(camera->GetYaw()));
-	const float pitchDegrees = wrapDegrees(toDegrees(camera->GetPitch()));
+	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	const Engine::JScene::TransformData* transformData = cameraData != nullptr ? scene->GetTransform(cameraData->transform) : nullptr;
+	if (transformData == nullptr)
+	{
+		return;
+	}
 
 	std::wostringstream stream;
 	stream << std::fixed << std::setprecision(2);
 	stream << L"World Position\n";
-	stream << L"X: " << position.x << L"\n";
-	stream << L"Y: " << position.y << L"\n";
-	stream << L"Z: " << position.z << L"\n\n";
+	stream << L"X: " << transformData->position.x << L"\n";
+	stream << L"Y: " << transformData->position.y << L"\n";
+	stream << L"Z: " << transformData->position.z << L"\n\n";
 	stream << L"World Rotation\n";
-	stream << L"Pitch(X): " << pitchDegrees << L"\n";
-	stream << L"Yaw(Y): " << yawDegrees << L"\n";
+	stream << L"Pitch(X): " << wrapDegrees(toDegrees(transformData->pitch)) << L"\n";
+	stream << L"Yaw(Y): " << wrapDegrees(toDegrees(transformData->yaw)) << L"\n";
 	stream << L"Roll(Z): 0.00";
 
 	SetWindowTextW(_cameraInfoText, stream.str().c_str());

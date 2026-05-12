@@ -5,11 +5,13 @@
 #include "engine/precompile.h"
 #include "engine/JRenderDefinition.h"
 #include "engine/JRenderResource.h"
+#include "engine/JScene.h"
 
 /*#include "engine/JCommandQueue.h"*/ namespace J { namespace Render { class JCommandQueue; } }
 /*#include "engine/JRenderContext.h"*/ namespace J { namespace Render { class JRenderContext; } }
 /*#include "engine/JRenderDB.h"*/ namespace J { namespace Engine { class JRenderDB; } }
 /*#include "engine/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
+/*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 /*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
 
 J_ENGINE_BEGIN
@@ -19,18 +21,24 @@ class JRenderer
 public:
 	struct DrawItem
 	{
+		JEntityHandle entity = {};
+		JTransformHandle transform = {};
+		JRenderObjectHandle renderObject = {};
 		uint32 materialID = 0;
-		const JMeshResource* meshResource = nullptr;
+		const JMesh* mesh = nullptr;
+		bool transparent = false;
 	};
 
 	struct FrameDesc
 	{
-		uint32 cameraID = 0;
+		JCameraHandle camera = {};
 		JRenderTarget* renderTarget = nullptr;
 		JColor clearColor = JColors::DarkGray;
 		Render::JViewport viewport = {};
 		D3D12_RECT scissorRect = {};
-		std::vector<DrawItem> drawItems;
+		std::vector<JLightHandle> lights;
+		std::vector<DrawItem> opaqueDrawItems;
+		std::vector<DrawItem> transparentDrawItems;
 	};
 
 	JRenderer() = default;

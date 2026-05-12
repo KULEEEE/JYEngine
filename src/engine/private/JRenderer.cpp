@@ -17,6 +17,44 @@ namespace
 	{
 		XMFLOAT4X4 viewProjection;
 	};
+
+	void renderDrawItems(Render::JCommandQueue* commandQueue, JRenderDB* renderDB, const std::vector<JRenderer::DrawItem>& drawItems)
+	{
+		for (const JRenderer::DrawItem& drawItem : drawItems)
+		{
+			if (drawItem.mesh == nullptr)
+			{
+				std::cerr << "JRenderer::Render draw skipped: draw item mesh is null." << std::endl;
+				continue;
+			}
+
+			const JMeshResource* meshResource = renderDB->FindMeshResource(drawItem.mesh);
+			if (meshResource == nullptr)
+			{
+				std::cerr << "JRenderer::Render draw skipped: mesh resource is not ready." << std::endl;
+				continue;
+			}
+
+			const JMaterialResource* materialResource = renderDB->FindMaterialResource(drawItem.materialID);
+			if (materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
+			{
+				std::cerr << "JRenderer::Render draw skipped: material render data is incomplete." << std::endl;
+				continue;
+			}
+
+			Render::JGraphicResource graphicResource(materialResource->GetShader());
+			if (!renderDB->BuildGraphicResource(drawItem.materialID, materialResource->GetShader(), graphicResource))
+			{
+				std::cerr << "JRenderer::Render draw skipped: failed to build graphic resource." << std::endl;
+				continue;
+			}
+
+			commandQueue->SetPipeline(materialResource->GetPipeline());
+			commandQueue->SetGraphicResources(&graphicResource);
+			commandQueue->BindVertexBuffer(meshResource);
+			commandQueue->DrawIndexed(static_cast<uint32>(meshResource->indexSize), 1, 0, 0, 0);
+		}
+	}
 }
 
 void JRenderer::Initialize(Render::JCommandQueue* commandQueue, Render::JRenderContext* renderContext, JRenderDB* renderDB)
@@ -40,7 +78,7 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 		return;
 	}
 
-	const JRenderDB::CameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.cameraID);
+	const JRenderDB::CameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.camera);
 	if (cameraResource == nullptr || cameraResource->perFrameBuffer == nullptr)
 	{
 		std::cerr << "JRenderer::Render skipped: camera resource is not ready." << std::endl;
@@ -55,33 +93,8 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	_commandQueue->SetViewports(1, &frameDesc.viewport);
 	_commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	for (const DrawItem& drawItem : frameDesc.drawItems)
-	{
-		if (drawItem.meshResource == nullptr)
-		{
-			std::cerr << "JRenderer::Render draw skipped: draw item is incomplete." << std::endl;
-			continue;
-		}
-
-		const JMaterialResource* materialResource = _renderDB->FindMaterialResource(drawItem.materialID);
-		if (materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
-		{
-			std::cerr << "JRenderer::Render draw skipped: material render data is incomplete." << std::endl;
-			continue;
-		}
-
-		Render::JGraphicResource graphicResource(materialResource->GetShader());
-		if (!_renderDB->BuildGraphicResource(drawItem.materialID, materialResource->GetShader(), graphicResource))
-		{
-			std::cerr << "JRenderer::Render draw skipped: failed to build graphic resource." << std::endl;
-			continue;
-		}
-
-		_commandQueue->SetPipeline(materialResource->GetPipeline());
-		_commandQueue->SetGraphicResources(&graphicResource);
-		_commandQueue->BindVertexBuffer(drawItem.meshResource);
-		_commandQueue->DrawIndexed(static_cast<uint32>(drawItem.meshResource->indexSize), 1, 0, 0, 0);
-	}
+	renderDrawItems(_commandQueue, _renderDB, frameDesc.opaqueDrawItems);
+	renderDrawItems(_commandQueue, _renderDB, frameDesc.transparentDrawItems);
 
 	_commandQueue->EndRenderPass();
 }

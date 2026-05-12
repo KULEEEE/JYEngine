@@ -5,11 +5,10 @@
 #include "client/editor/JEditorPanel.h"
 #include "Engine/JEngineContext.h"
 #include "Engine/JCommandQueue.h"
+#include "engine/JScene.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
-/*#include "engine/JRenderResource.h"*/ namespace J { namespace Engine { struct JMeshResource; } }
-/*#include "engine/JCameraComponent.h"*/ namespace J { namespace Engine { class JCameraComponent; } }
 /*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
 /*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JTexture; } }
 
@@ -30,16 +29,23 @@ private:
 	void createCameraInfoPanel();
 
 	Render::JCommandQueue* _commandQueue = nullptr;
+	Engine::JScene* scene = nullptr;
 	Engine::JMaterial* material = nullptr;
 	Engine::JMaterial* planeMaterial = nullptr;
 	Engine::JMesh* mesh = nullptr;
 	Engine::JMesh* planeMesh = nullptr;
-	Engine::JMeshResource* meshResource = nullptr;
-	Engine::JMeshResource* planeMeshResource = nullptr;
 	Render::JConstantBuffer* perFrameBuffer = nullptr;
 	Render::JConstantBuffer* materialBuffer = nullptr;
 	Render::JTexture* materialTexture = nullptr;
-	Engine::JCameraComponent* camera = nullptr;
+	Engine::JEntityHandle _cameraEntity = {};
+	Engine::JEntityHandle _planeEntity = {};
+	Engine::JEntityHandle _carEntity = {};
+	Engine::JTransformHandle _cameraTransform = {};
+	Engine::JTransformHandle _planeTransform = {};
+	Engine::JTransformHandle _carTransform = {};
+	Engine::JCameraHandle _camera = {};
+	Engine::JRenderObjectHandle _planeRenderObject = {};
+	Engine::JRenderObjectHandle _carRenderObject = {};
 	bool _isMouseLookActive = false;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;

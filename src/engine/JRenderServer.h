@@ -4,11 +4,13 @@
 
 #include "engine/precompile.h"
 #include "engine/JRenderDB.h"
+#include "engine/JScene.h"
+#include "engine/JRenderer.h"
 
 /*#include "engine/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
-/*#include "engine/JCameraComponent.h"*/ namespace J { namespace Engine { class JCameraComponent; } }
 /*#include "engine/JGraphicResource.h"*/ namespace J { namespace Render { class JGraphicResource; class JShader; } }
 /*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
+/*#include "engine/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 
 J_ENGINE_BEGIN
 
@@ -23,10 +25,8 @@ public:
 
 	struct CameraRecord
 	{
-		uint32 cameraID = 0;
-		JCameraComponent* source = nullptr;
+		JCameraHandle camera = {};
 		Render::JConstantBuffer* perFrameBuffer = nullptr;
-		float aspectRatio = 1.0f;
 	};
 
 	JRenderServer() = default;
@@ -37,27 +37,31 @@ public:
 	void RegisterMaterial(JMaterial* material);
 	void UnregisterMaterial(uint32 materialID);
 	void MarkMaterialDirty(JMaterial* material);
-	void RegisterCamera(JCameraComponent* camera, Render::JConstantBuffer* perFrameBuffer, float aspectRatio);
-	void UnregisterCamera(uint32 cameraID);
-	void MarkCameraDirty(JCameraComponent* camera);
+	void RegisterCamera(JCameraHandle camera, Render::JConstantBuffer* perFrameBuffer);
+	void UnregisterCamera(JCameraHandle camera);
+	void MarkCameraDirty(JCameraHandle camera);
 	void Sync();
+	void SyncScene(const JScene& scene);
+
+	bool BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
 
 	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:
 	uint32 FindMaterialIndex(uint32 materialID) const;
 	JMaterial* FindMaterial(uint32 materialID) const;
-	uint32 FindCameraIndex(uint32 cameraID) const;
-	CameraRecord* FindCameraRecord(uint32 cameraID);
-	const CameraRecord* FindCameraRecord(uint32 cameraID) const;
+	uint32 FindCameraIndex(JCameraHandle camera) const;
+	CameraRecord* FindCameraRecord(JCameraHandle camera);
+	const CameraRecord* FindCameraRecord(JCameraHandle camera) const;
+	static uint64 MakeCameraKey(JCameraHandle camera);
 
 	JRenderDB _renderDB;
 	std::vector<MaterialRecord> _materials;
 	std::unordered_map<uint32, uint32> _materialIndexMap;
 	std::vector<uint32> _dirtyMaterialIDs;
 	std::vector<CameraRecord> _cameras;
-	std::unordered_map<uint32, uint32> _cameraIndexMap;
-	std::vector<uint32> _dirtyCameraIDs;
+	std::unordered_map<uint64, uint32> _cameraIndexMap;
+	std::vector<uint64> _dirtyCameraKeys;
 };
 
 J_ENGINE_END

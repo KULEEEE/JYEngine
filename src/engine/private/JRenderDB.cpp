@@ -13,6 +13,11 @@ JRenderDB::~JRenderDB()
 	Clear();
 }
 
+uint64 JRenderDB::MakeCameraKey(JCameraHandle camera)
+{
+	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
+}
+
 void JRenderDB::Initialize(Render::JRenderContext* renderContext)
 {
 	_renderContext = renderContext;
@@ -42,27 +47,28 @@ uint32 JRenderDB::FindMaterialResourceIndex(uint32 materialID) const
 	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JRenderDB::CameraResource& JRenderDB::GetOrCreateCameraResource(uint32 cameraID)
+JRenderDB::CameraResource& JRenderDB::GetOrCreateCameraResource(JCameraHandle camera)
 {
-	const auto iter = _cameraIndexMap.find(cameraID);
+	const uint64 cameraKey = MakeCameraKey(camera);
+	const auto iter = _cameraIndexMap.find(cameraKey);
 	if (iter != _cameraIndexMap.end())
 	{
 		return _cameraResources[iter->second].resource;
 	}
 
 	CameraResourceRecord record;
-	record.cameraID = cameraID;
-	record.resource.cameraID = cameraID;
+	record.cameraKey = cameraKey;
+	record.resource.camera = camera;
 
 	const uint32 newIndex = static_cast<uint32>(_cameraResources.size());
 	_cameraResources.push_back(record);
-	_cameraIndexMap[cameraID] = newIndex;
+	_cameraIndexMap[cameraKey] = newIndex;
 	return _cameraResources.back().resource;
 }
 
-uint32 JRenderDB::FindCameraResourceIndex(uint32 cameraID) const
+uint32 JRenderDB::FindCameraResourceIndex(JCameraHandle camera) const
 {
-	const auto iter = _cameraIndexMap.find(cameraID);
+	const auto iter = _cameraIndexMap.find(MakeCameraKey(camera));
 	return iter == _cameraIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
@@ -78,15 +84,15 @@ const JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID) cons
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
-JRenderDB::CameraResource* JRenderDB::FindCameraResource(uint32 cameraID)
+JRenderDB::CameraResource* JRenderDB::FindCameraResource(JCameraHandle camera)
 {
-	const uint32 index = FindCameraResourceIndex(cameraID);
+	const uint32 index = FindCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
-const JRenderDB::CameraResource* JRenderDB::FindCameraResource(uint32 cameraID) const
+const JRenderDB::CameraResource* JRenderDB::FindCameraResource(JCameraHandle camera) const
 {
-	const uint32 index = FindCameraResourceIndex(cameraID);
+	const uint32 index = FindCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
@@ -122,22 +128,26 @@ void JRenderDB::SyncMaterial(const JMaterial& material)
 	resource.ClearDirty();
 }
 
-void JRenderDB::SyncCamera(uint32 cameraID, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer)
+void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer)
 {
-	CameraResource& resource = GetOrCreateCameraResource(cameraID);
-	resource.cameraID = cameraID;
+	CameraResource& resource = GetOrCreateCameraResource(camera);
+	resource.camera = camera;
 	resource.perFrameBuffer = perFrameBuffer;
 	XMStoreFloat4x4(&resource.viewProjection, XMMatrixTranspose(viewProjection));
 }
 
-JMeshResource* JRenderDB::CreateOrUpdateMeshResource(const JMesh* mesh)
+JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 {
 	if (_renderContext == nullptr || mesh == nullptr)
 	{
 		return nullptr;
 	}
 
-	RemoveMeshResource(mesh);
+	JMeshResource* existingResource = FindMeshResource(mesh);
+	if (existingResource != nullptr)
+	{
+		return existingResource;
+	}
 
 	JMeshResource resource;
 	Render::JVertexBuffer* vertexBuffer = _renderContext->CreateVertexBuffer(mesh->GetPositions(), mesh->GetVertexCount());
@@ -178,9 +188,9 @@ void JRenderDB::RemoveMaterialResource(uint32 materialID)
 	_materialIndexMap.erase(materialID);
 }
 
-void JRenderDB::RemoveCameraResource(uint32 cameraID)
+void JRenderDB::RemoveCameraResource(JCameraHandle camera)
 {
-	const uint32 index = FindCameraResourceIndex(cameraID);
+	const uint32 index = FindCameraResourceIndex(camera);
 	if (index == static_cast<uint32>(-1))
 	{
 		return;
@@ -190,11 +200,11 @@ void JRenderDB::RemoveCameraResource(uint32 cameraID)
 	if (index != lastIndex)
 	{
 		_cameraResources[index] = _cameraResources[lastIndex];
-		_cameraIndexMap[_cameraResources[index].cameraID] = index;
+		_cameraIndexMap[_cameraResources[index].cameraKey] = index;
 	}
 
 	_cameraResources.pop_back();
-	_cameraIndexMap.erase(cameraID);
+	_cameraIndexMap.erase(MakeCameraKey(camera));
 }
 
 void JRenderDB::RemoveMeshResource(const JMesh* mesh)
@@ -223,6 +233,7 @@ void JRenderDB::Clear()
 		}
 		delete iter.second.indexBufferResource;
 	}
+
 	_meshResources.clear();
 	_materialResources.clear();
 	_materialIndexMap.clear();
