@@ -3,6 +3,7 @@
 #define __J_SCENE_H__
 
 #include "engine/precompile.h"
+#include "engine/JPool.h"
 
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 
@@ -93,19 +94,17 @@ public:
 		bool active = true;
 	};
 
-	template <typename T>
-	struct PoolSlot
-	{
-		uint32 generation = 1;
-		bool active = false;
-		T data = {};
-	};
+	using EntityPool = JPool<JEntityHandle, EntityData>;
+	using TransformPool = JPool<JTransformHandle, TransformData>;
+	using CameraPool = JPool<JCameraHandle, CameraData>;
+	using LightPool = JPool<JLightHandle, LightData>;
+	using RenderObjectPool = JPool<JRenderObjectHandle, RenderObjectData>;
 
-	using EntitySlot = PoolSlot<EntityData>;
-	using TransformSlot = PoolSlot<TransformData>;
-	using CameraSlot = PoolSlot<CameraData>;
-	using LightSlot = PoolSlot<LightData>;
-	using RenderObjectSlot = PoolSlot<RenderObjectData>;
+	using EntitySlot = EntityPool::SlotType;
+	using TransformSlot = TransformPool::SlotType;
+	using CameraSlot = CameraPool::SlotType;
+	using LightSlot = LightPool::SlotType;
+	using RenderObjectSlot = RenderObjectPool::SlotType;
 
 	JScene() = default;
 
@@ -129,11 +128,11 @@ public:
 	RenderObjectData* GetRenderObject(JRenderObjectHandle handle);
 	const RenderObjectData* GetRenderObject(JRenderObjectHandle handle) const;
 
-	const std::vector<EntitySlot>& GetEntitySlots() const { return _entities; }
-	const std::vector<TransformSlot>& GetTransformSlots() const { return _transforms; }
-	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras; }
-	const std::vector<LightSlot>& GetLightSlots() const { return _lights; }
-	const std::vector<RenderObjectSlot>& GetRenderObjectSlots() const { return _renderObjects; }
+	const std::vector<EntitySlot>& GetEntitySlots() const { return _entities.GetSlots(); }
+	const std::vector<TransformSlot>& GetTransformSlots() const { return _transforms.GetSlots(); }
+	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras.GetSlots(); }
+	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
+	const std::vector<RenderObjectSlot>& GetRenderObjectSlots() const { return _renderObjects.GetSlots(); }
 
 	void RotateCamera(JCameraHandle camera, float yawDelta, float pitchDelta);
 	void MoveCameraLocal(JCameraHandle camera, float forward, float right, float up, float deltaTime);
@@ -141,22 +140,11 @@ public:
 	XMMATRIX GetCameraProjectionMatrix(JCameraHandle camera) const;
 
 private:
-	static uint64 MakeHandleKey(uint32 index, uint32 generation)
-	{
-		return (static_cast<uint64>(generation) << 32) | index;
-	}
-
-	bool IsValidEntity(JEntityHandle handle) const;
-	bool IsValidTransform(JTransformHandle handle) const;
-	bool IsValidCamera(JCameraHandle handle) const;
-	bool IsValidLight(JLightHandle handle) const;
-	bool IsValidRenderObject(JRenderObjectHandle handle) const;
-
-	std::vector<EntitySlot> _entities;
-	std::vector<TransformSlot> _transforms;
-	std::vector<CameraSlot> _cameras;
-	std::vector<LightSlot> _lights;
-	std::vector<RenderObjectSlot> _renderObjects;
+	EntityPool _entities;
+	TransformPool _transforms;
+	CameraPool _cameras;
+	LightPool _lights;
+	RenderObjectPool _renderObjects;
 	JCameraHandle _primaryCamera = {};
 };
 

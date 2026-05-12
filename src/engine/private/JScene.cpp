@@ -35,41 +35,34 @@ namespace
 
 JEntityHandle JScene::CreateEntity()
 {
-	EntitySlot slot;
-	slot.active = true;
-	_entities.push_back(slot);
-	return { static_cast<uint32>(_entities.size() - 1), slot.generation };
+	EntityData data;
+	data.active = true;
+	return _entities.Add(data);
 }
 
 JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData& data)
 {
-	if (!IsValidEntity(entity))
+	if (!_entities.IsValid(entity))
 	{
 		return {};
 	}
 
-	TransformSlot slot;
-	slot.active = true;
-	slot.data = data;
-	_transforms.push_back(slot);
-	return { static_cast<uint32>(_transforms.size() - 1), slot.generation };
+	return _transforms.Add(data);
 }
 
 JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio)
 {
-	if (!IsValidEntity(entity) || !IsValidTransform(transform))
+	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
 	{
 		return {};
 	}
 
-	CameraSlot slot;
-	slot.active = true;
-	slot.data.entity = entity;
-	slot.data.transform = transform;
-	slot.data.aspectRatio = aspectRatio;
-	_cameras.push_back(slot);
+	CameraData data;
+	data.entity = entity;
+	data.transform = transform;
+	data.aspectRatio = aspectRatio;
 
-	const JCameraHandle handle = { static_cast<uint32>(_cameras.size() - 1), slot.generation };
+	const JCameraHandle handle = _cameras.Add(data);
 	if (!_primaryCamera.IsValid())
 	{
 		_primaryCamera = handle;
@@ -79,86 +72,81 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 
 JLightHandle JScene::AddLight(JEntityHandle entity, JTransformHandle transform, const LightData& data)
 {
-	if (!IsValidEntity(entity) || !IsValidTransform(transform))
+	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
 	{
 		return {};
 	}
 
-	LightSlot slot;
-	slot.active = true;
-	slot.data = data;
-	slot.data.entity = entity;
-	slot.data.transform = transform;
-	_lights.push_back(slot);
-	return { static_cast<uint32>(_lights.size() - 1), slot.generation };
+	LightData lightData = data;
+	lightData.entity = entity;
+	lightData.transform = transform;
+	return _lights.Add(lightData);
 }
 
 JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent)
 {
-	if (!IsValidEntity(entity) || !IsValidTransform(transform))
+	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
 	{
 		return {};
 	}
 
-	RenderObjectSlot slot;
-	slot.active = true;
-	slot.data.entity = entity;
-	slot.data.transform = transform;
-	slot.data.materialID = materialID;
-	slot.data.mesh = mesh;
-	slot.data.transparent = transparent;
-	_renderObjects.push_back(slot);
-	return { static_cast<uint32>(_renderObjects.size() - 1), slot.generation };
+	RenderObjectData data;
+	data.entity = entity;
+	data.transform = transform;
+	data.materialID = materialID;
+	data.mesh = mesh;
+	data.transparent = transparent;
+	return _renderObjects.Add(data);
 }
 
 JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
 {
-	return IsValidEntity(handle) ? &_entities[handle.index].data : nullptr;
+	return _entities.Get(handle);
 }
 
 const JScene::EntityData* JScene::GetEntity(JEntityHandle handle) const
 {
-	return IsValidEntity(handle) ? &_entities[handle.index].data : nullptr;
+	return _entities.Get(handle);
 }
 
 JScene::TransformData* JScene::GetTransform(JTransformHandle handle)
 {
-	return IsValidTransform(handle) ? &_transforms[handle.index].data : nullptr;
+	return _transforms.Get(handle);
 }
 
 const JScene::TransformData* JScene::GetTransform(JTransformHandle handle) const
 {
-	return IsValidTransform(handle) ? &_transforms[handle.index].data : nullptr;
+	return _transforms.Get(handle);
 }
 
 JScene::CameraData* JScene::GetCamera(JCameraHandle handle)
 {
-	return IsValidCamera(handle) ? &_cameras[handle.index].data : nullptr;
+	return _cameras.Get(handle);
 }
 
 const JScene::CameraData* JScene::GetCamera(JCameraHandle handle) const
 {
-	return IsValidCamera(handle) ? &_cameras[handle.index].data : nullptr;
+	return _cameras.Get(handle);
 }
 
 JScene::LightData* JScene::GetLight(JLightHandle handle)
 {
-	return IsValidLight(handle) ? &_lights[handle.index].data : nullptr;
+	return _lights.Get(handle);
 }
 
 const JScene::LightData* JScene::GetLight(JLightHandle handle) const
 {
-	return IsValidLight(handle) ? &_lights[handle.index].data : nullptr;
+	return _lights.Get(handle);
 }
 
 JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle)
 {
-	return IsValidRenderObject(handle) ? &_renderObjects[handle.index].data : nullptr;
+	return _renderObjects.Get(handle);
 }
 
 const JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle) const
 {
-	return IsValidRenderObject(handle) ? &_renderObjects[handle.index].data : nullptr;
+	return _renderObjects.Get(handle);
 }
 
 void JScene::RotateCamera(JCameraHandle camera, float yawDelta, float pitchDelta)
@@ -233,46 +221,6 @@ XMMATRIX JScene::GetCameraProjectionMatrix(JCameraHandle camera) const
 	return cameraData != nullptr
 		? XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, 0.1f, 1000.0f)
 		: XMMatrixIdentity();
-}
-
-bool JScene::IsValidEntity(JEntityHandle handle) const
-{
-	return handle.IsValid()
-		&& handle.index < _entities.size()
-		&& _entities[handle.index].active
-		&& _entities[handle.index].generation == handle.generation;
-}
-
-bool JScene::IsValidTransform(JTransformHandle handle) const
-{
-	return handle.IsValid()
-		&& handle.index < _transforms.size()
-		&& _transforms[handle.index].active
-		&& _transforms[handle.index].generation == handle.generation;
-}
-
-bool JScene::IsValidCamera(JCameraHandle handle) const
-{
-	return handle.IsValid()
-		&& handle.index < _cameras.size()
-		&& _cameras[handle.index].active
-		&& _cameras[handle.index].generation == handle.generation;
-}
-
-bool JScene::IsValidLight(JLightHandle handle) const
-{
-	return handle.IsValid()
-		&& handle.index < _lights.size()
-		&& _lights[handle.index].active
-		&& _lights[handle.index].generation == handle.generation;
-}
-
-bool JScene::IsValidRenderObject(JRenderObjectHandle handle) const
-{
-	return handle.IsValid()
-		&& handle.index < _renderObjects.size()
-		&& _renderObjects[handle.index].active
-		&& _renderObjects[handle.index].generation == handle.generation;
 }
 
 J_ENGINE_END
