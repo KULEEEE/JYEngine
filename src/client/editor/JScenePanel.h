@@ -3,16 +3,11 @@
 #define __J_SCENE_PANEL_H__
 
 #include "client/editor/JEditorPanel.h"
+#include "client/editor/JSceneBuilder.h"
 #include "engine/core/JEngineContext.h"
-#include "engine/render/JCommandQueue.h"
 #include "engine/scene/JScene.h"
 
 #include <chrono>
-
-/*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
-/*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
-/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
-/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JTexture; } }
 
 J_EDITOR_BEGIN
 
@@ -27,34 +22,15 @@ public:
 	void OnMouseWheel(short delta) override;
 
 private:
+	Engine::JScene* getScene();
+	const Engine::JScene* getScene() const;
 	void updateCamera(float deltaTime);
 	void updateCameraInfoPanel();
 	void createCameraInfoPanel();
 
-	Render::JCommandQueue* _commandQueue = nullptr;
-	Engine::JScene* scene = nullptr;
-	Engine::JMaterial* material = nullptr;
-	Engine::JMaterial* planeMaterial = nullptr;
-	Engine::JMesh* mesh = nullptr;
-	Engine::JMesh* planeMesh = nullptr;
-	Render::JConstantBuffer* perFrameBuffer = nullptr;
-	Render::JConstantBuffer* materialBuffer = nullptr;
-	Render::JTexture* baseColorTexture = nullptr;
-	Render::JTexture* normalTexture = nullptr;
-	Render::JTexture* roughnessTexture = nullptr;
-	Render::JTexture* metallicTexture = nullptr;
-	Engine::JEntityHandle _cameraEntity = {};
-	Engine::JEntityHandle _lightEntity = {};
-	Engine::JEntityHandle _planeEntity = {};
-	Engine::JEntityHandle _carEntity = {};
-	Engine::JTransformHandle _cameraTransform = {};
-	Engine::JTransformHandle _lightTransform = {};
-	Engine::JTransformHandle _planeTransform = {};
-	Engine::JTransformHandle _carTransform = {};
+	JSceneBuildResult _sceneBuild;
 	Engine::JCameraHandle _camera = {};
 	Engine::JLightHandle _light = {};
-	Engine::JRenderObjectHandle _planeRenderObject = {};
-	Engine::JRenderObjectHandle _carRenderObject = {};
 	bool _isMouseLookActive = false;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;
@@ -70,12 +46,3 @@ private:
 J_EDITOR_END
 
 #endif
-
-
-
-
-
-
-
-
-

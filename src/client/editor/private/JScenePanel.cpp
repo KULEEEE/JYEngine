@@ -1,15 +1,12 @@
 #include "client/editor/JScenePanel.h"
 
+#include "client/editor/JSampleSceneData.h"
 #include "engine/render/JSwapChain.h"
 #include "engine/render/JRenderDefinition.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderServer.h"
 #include "engine/render/JRenderer.h"
 #include "engine/render/JMaterialFactory.h"
-#include "engine/asset/JMaterial.h"
-#include "engine/asset/JMesh.h"
-
-#include "client/editor/JFBXLoader.h"
 
 #include <iostream>
 #include <iomanip>
@@ -20,27 +17,12 @@ J_EDITOR_BEGIN
 
 namespace
 {
-	struct PerFrameConstants
-	{
-		XMFLOAT4X4 viewProjection;
-	};
-
-	struct MaterialConstants
-	{
-		JVec4 baseColor;
-		float roughness = 0.5f;
-		float metallic = 1.0f;
-		JVec2 padding = {};
-	};
-
 	constexpr float MOUSE_LOOK_SENSITIVITY = 0.0025f;
 	constexpr float MAX_FRAME_DELTA_TIME = 0.1f;
 	constexpr float CAMERA_SPEED_MIN = 0.5f;
 	constexpr float CAMERA_SPEED_MAX = 100.0f;
 	constexpr float CAMERA_SPEED_STEP_MULTIPLIER = 1.2f;
 	constexpr float CAMERA_SPEED_SHIFT_MULTIPLIER = 4.0f;
-	constexpr float PLANE_SIZE = 5000.0f;
-	constexpr float PLANE_Y = -0.1f;
 
 	float toDegrees(float radians)
 	{
@@ -86,30 +68,7 @@ namespace
 JScenePanel::~JScenePanel()
 {
 	J::Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr;
-	if (renderServer != nullptr && material != nullptr)
-	{
-		renderServer->UnregisterMaterial(material->instanceID);
-	}
-
-	if (renderServer != nullptr && planeMaterial != nullptr)
-	{
-		renderServer->UnregisterMaterial(planeMaterial->instanceID);
-	}
-
-	if (renderServer != nullptr && _camera.IsValid())
-	{
-		renderServer->UnregisterCamera(_camera);
-	}
-
-	if (renderServer != nullptr && mesh != nullptr)
-	{
-		renderServer->GetRenderDB().RemoveMeshResource(mesh);
-	}
-
-	if (renderServer != nullptr && planeMesh != nullptr)
-	{
-		renderServer->GetRenderDB().RemoveMeshResource(planeMesh);
-	}
+	_sceneBuild.Release(renderServer);
 
 	if (_cameraInfoWindow != nullptr)
 	{
@@ -117,35 +76,20 @@ JScenePanel::~JScenePanel()
 		_cameraInfoWindow = nullptr;
 		_cameraInfoText = nullptr;
 	}
+}
 
-	delete scene;
-	delete material;
-	delete planeMaterial;
-	delete perFrameBuffer;
-	delete materialBuffer;
-	delete baseColorTexture;
-	delete normalTexture;
-	delete roughnessTexture;
-	delete metallicTexture;
-	delete mesh;
-	delete planeMesh;
+Engine::JScene* JScenePanel::getScene()
+{
+	return _sceneBuild.GetScene();
+}
 
-	scene = nullptr;
-	material = nullptr;
-	planeMaterial = nullptr;
-	perFrameBuffer = nullptr;
-	materialBuffer = nullptr;
-	baseColorTexture = nullptr;
-	normalTexture = nullptr;
-	roughnessTexture = nullptr;
-	metallicTexture = nullptr;
-	mesh = nullptr;
-	planeMesh = nullptr;
+const Engine::JScene* JScenePanel::getScene() const
+{
+	return _sceneBuild.GetScene();
 }
 
 void JScenePanel::Init()
 {
-	_commandQueue = GetEngine()->GetCmdQueue();
 	_mainWindow = GetActiveWindow();
 	if (_mainWindow == nullptr)
 	{
@@ -160,77 +104,31 @@ void JScenePanel::Init()
 		return;
 	}
 
-	scene = new Engine::JScene();
-	if (scene == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: scene creation failed." << std::endl;
-		return;
-	}
-
-	std::string baseShaderPath = get_Engine_Shader_Path() + "\\base.hlsl";
-	material = materialFactory->CreateMaterial(baseShaderPath);
-	if (material == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: material creation failed." << std::endl;
-		return;
-	}
-
-	std::string gridShaderPath = get_Engine_Shader_Path() + "\\grid.hlsl";
-	planeMaterial = materialFactory->CreateMaterial(gridShaderPath, true);
-	if (planeMaterial == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: plane material creation failed." << std::endl;
-		return;
-	}
-
-	PerFrameConstants perFrameConstants{};
-	XMStoreFloat4x4(&perFrameConstants.viewProjection, XMMatrixIdentity());
-	perFrameBuffer = materialFactory->CreateConstantBuffer(&perFrameConstants, sizeof(perFrameConstants));
-	if (perFrameBuffer == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: per-frame buffer creation failed." << std::endl;
-		return;
-	}
-
-	material->SetConstantBuffer("PerFrame", perFrameBuffer);
-	planeMaterial->SetConstantBuffer("PerFrame", perFrameBuffer);
-
-	MaterialConstants materialConstants{};
-	materialConstants.baseColor = JVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	materialBuffer = materialFactory->CreateAndSetConstantBuffer(material, "PerMaterial", &materialConstants, sizeof(materialConstants));
-	if (materialBuffer == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: material buffer creation failed." << std::endl;
-		return;
-	}
-
-	const std::string texturePath = get_Engine_Res_Path() + "\\texture";
-	baseColorTexture = materialFactory->CreateAndSetTextureFromFile(material, "BaseTexture", texturePath + "\\Base_color.png");
-	normalTexture = materialFactory->CreateAndSetTextureFromFile(material, "NormalTexture", texturePath + "\\normal.png");
-	roughnessTexture = materialFactory->CreateAndSetTextureFromFile(material, "RoughnessTexture", texturePath + "\\roughness.png");
-	metallicTexture = materialFactory->CreateAndSetTextureFromFile(material, "MetallicTexture", texturePath + "\\metallic.png");
-	if (baseColorTexture == nullptr || normalTexture == nullptr || roughnessTexture == nullptr || metallicTexture == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: PBR texture creation failed." << std::endl;
-		return;
-	}
-
-	renderServer->RegisterMaterial(material);
-	renderServer->RegisterMaterial(planeMaterial);
-	renderServer->Sync();
-
-	_cameraEntity = scene->CreateEntity();
-	Engine::JScene::TransformData cameraTransformData{};
-	cameraTransformData.position = { 0.0f, 0.0f, -8.0f };
-	_cameraTransform = scene->AddTransform(_cameraEntity, cameraTransformData);
 	const uint32 initialWidth = getClientWidth(_mainWindow);
 	const uint32 initialHeight = getClientHeight(_mainWindow);
 	_viewportWidth = initialWidth;
 	_viewportHeight = initialHeight;
-	_camera = scene->AddCamera(_cameraEntity, _cameraTransform, static_cast<float>(initialWidth) / static_cast<float>(initialHeight));
-	if (!_camera.IsValid())
+
+	JSceneBuildContext buildContext;
+	buildContext.materialFactory = materialFactory;
+	buildContext.renderServer = renderServer;
+	buildContext.cameraAspectRatio = static_cast<float>(initialWidth) / static_cast<float>(initialHeight);
+
+	const Engine::JSceneData sceneData = MakeSampleSceneData();
+	if (!JSceneBuilder::Build(sceneData, buildContext, _sceneBuild))
 	{
-		std::cerr << "JScenePanel::Init failed: camera creation failed." << std::endl;
+		std::cerr << "JScenePanel::Init failed: scene build failed." << std::endl;
+		return;
+	}
+
+	_camera = _sceneBuild.primaryCamera;
+	_light = _sceneBuild.firstLight;
+
+	Engine::JScene* scene = getScene();
+	if (scene == nullptr || !_camera.IsValid())
+	{
+		std::cerr << "JScenePanel::Init failed: scene or camera is invalid." << std::endl;
+		_sceneBuild.Release(renderServer);
 		return;
 	}
 
@@ -238,62 +136,10 @@ void JScenePanel::Init()
 	if (cameraData == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
+		_sceneBuild.Release(renderServer);
 		return;
 	}
-	cameraData->moveSpeed = _editorCameraMoveSpeed;
-	cameraData->rotateSpeed = 1.0f;
-	scene->SetPrimaryCamera(_camera);
-	renderServer->RegisterCamera(_camera, perFrameBuffer);
-
-	_lightEntity = scene->CreateEntity();
-	Engine::JScene::TransformData lightTransformData{};
-	lightTransformData.position = { 0.0f, 4.0f, -4.0f };
-	_lightTransform = scene->AddTransform(_lightEntity, lightTransformData);
-	Engine::JScene::LightData lightData{};
-	lightData.color = { 1.0f, 0.9f, 0.65f };
-	lightData.intensity = 3.0f;
-	_light = scene->AddLight(_lightEntity, _lightTransform, lightData);
-
-	std::vector<float> planePositions =
-	{
-		-PLANE_SIZE, PLANE_Y, -PLANE_SIZE, 1.0f,
-		 PLANE_SIZE, PLANE_Y, -PLANE_SIZE, 1.0f,
-		 PLANE_SIZE, PLANE_Y,  PLANE_SIZE, 1.0f,
-		-PLANE_SIZE, PLANE_Y,  PLANE_SIZE, 1.0f,
-	};
-
-	std::vector<uint32> planeIndices = { 0, 1, 2, 0, 2, 3 };
-	planeMesh = new Engine::JMesh();
-	if (planeMesh == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: plane mesh creation failed." << std::endl;
-		return;
-	}
-	planeMesh->SetPositions(std::move(planePositions));
-	planeMesh->SetIndices(std::move(planeIndices));
-
-	_planeEntity = scene->CreateEntity();
-	_planeTransform = scene->AddTransform(_planeEntity);
-	_planeRenderObject = scene->AddRenderObject(_planeEntity, _planeTransform, planeMaterial->instanceID, planeMesh, true);
-
-	std::string meshPath = get_Engine_Mesh_Path() + "\\Cup.fbx";
-	std::cout << "Loading mesh: " << meshPath << std::endl;
-
-	JFBXLoader fbxLoader;
-	mesh = fbxLoader.LoadFBX(meshPath.c_str());
-	if (mesh == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: mesh load failed." << std::endl;
-		return;
-	}
-
-	_carEntity = scene->CreateEntity();
-	Engine::JScene::TransformData cupTransformData{};
-	cupTransformData.pitch = 1.507f;
-	_carTransform = scene->AddTransform(_carEntity, cupTransformData);
-	_carRenderObject = scene->AddRenderObject(_carEntity, _carTransform, material->instanceID, mesh, false);
-
-	renderServer->SyncScene(*scene);
+	_editorCameraMoveSpeed = cameraData->moveSpeed;
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -317,7 +163,8 @@ void JScenePanel::Update()
 	Render::JSwapChain* swapChain = GetEngine()->GetSwapChain();
 	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
-	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || material == nullptr || planeMaterial == nullptr || mesh == nullptr || planeMesh == nullptr || !_camera.IsValid())
+	Engine::JScene* scene = getScene();
+	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || !_camera.IsValid())
 	{
 		std::cerr << "JScenePanel::Update skipped: render resources are not ready." << std::endl;
 		_isReady = false;
@@ -388,6 +235,7 @@ void JScenePanel::OnMouseWheel(short delta)
 
 	_editorCameraMoveSpeed = std::clamp(_editorCameraMoveSpeed, CAMERA_SPEED_MIN, CAMERA_SPEED_MAX);
 
+	Engine::JScene* scene = getScene();
 	if (scene == nullptr || !_camera.IsValid())
 	{
 		return;
@@ -402,6 +250,7 @@ void JScenePanel::OnMouseWheel(short delta)
 
 void JScenePanel::updateCamera(float deltaTime)
 {
+	Engine::JScene* scene = getScene();
 	if (scene == nullptr || !_camera.IsValid())
 	{
 		return;
@@ -524,6 +373,7 @@ void JScenePanel::createCameraInfoPanel()
 
 void JScenePanel::updateCameraInfoPanel()
 {
+	Engine::JScene* scene = getScene();
 	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || scene == nullptr || !_camera.IsValid())
 	{
 		return;
@@ -600,7 +450,3 @@ void JScenePanel::updateCameraInfoPanel()
 }
 
 J_EDITOR_END
-
-
-
-

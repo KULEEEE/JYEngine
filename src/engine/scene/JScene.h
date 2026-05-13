@@ -49,6 +49,24 @@ struct JRenderObjectHandle
 	bool IsValid() const { return index != static_cast<uint32>(-1); }
 };
 
+enum class JSceneComponentMask : uint32
+{
+	None = 0,
+	Transform = 1 << 0,
+	Camera = 1 << 1,
+	Light = 1 << 2,
+	RenderObject = 1 << 3,
+};
+
+struct JEntityMetadata
+{
+	uint64 stableIDHash = 0;
+	uint32 componentMask = 0;
+	std::string stableID;
+	std::string name;
+	std::vector<std::string> tags;
+};
+
 class JScene
 {
 public:
@@ -108,11 +126,17 @@ public:
 
 	JScene() = default;
 
-	JEntityHandle CreateEntity();
+	JEntityHandle CreateEntity(const std::string& stableID = "", const std::string& name = "", const std::vector<std::string>& tags = {});
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f);
 	JLightHandle AddLight(JEntityHandle entity, JTransformHandle transform, const LightData& data = {});
 	JRenderObjectHandle AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent = false);
+
+	bool SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags = {});
+	void SetEntityName(JEntityHandle entity, const std::string& name);
+	const JEntityMetadata* GetEntityMetadata(JEntityHandle entity) const;
+	JEntityMetadata* GetEntityMetadata(JEntityHandle entity);
+	JEntityHandle FindEntityByStableID(const std::string& stableID) const;
 
 	void SetPrimaryCamera(JCameraHandle camera) { _primaryCamera = camera; }
 	JCameraHandle GetPrimaryCamera() const { return _primaryCamera; }
@@ -140,12 +164,18 @@ public:
 	XMMATRIX GetCameraProjectionMatrix(JCameraHandle camera) const;
 
 private:
+	std::string GenerateStableID();
+	void AddEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
+
 	EntityPool _entities;
 	TransformPool _transforms;
 	CameraPool _cameras;
 	LightPool _lights;
 	RenderObjectPool _renderObjects;
+	std::vector<JEntityMetadata> _entityMetadata;
+	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
 	JCameraHandle _primaryCamera = {};
+	uint32 _nextStableID = 1;
 };
 
 J_ENGINE_END

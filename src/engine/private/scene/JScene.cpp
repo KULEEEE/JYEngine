@@ -1,9 +1,26 @@
 #include "engine/scene/JScene.h"
 
+#include <iomanip>
+#include <sstream>
+
 J_ENGINE_BEGIN
 
 namespace
 {
+	uint64 makeStableIDHash(const std::string& stableID)
+	{
+		constexpr uint64 FNV_OFFSET = 14695981039346656037ull;
+		constexpr uint64 FNV_PRIME = 1099511628211ull;
+
+		uint64 hash = FNV_OFFSET;
+		for (unsigned char ch : stableID)
+		{
+			hash ^= ch;
+			hash *= FNV_PRIME;
+		}
+		return hash;
+	}
+
 	XMVECTOR getForward(float yaw, float pitch)
 	{
 		const float cosPitch = cosf(pitch);
@@ -33,11 +50,120 @@ namespace
 	}
 }
 
-JEntityHandle JScene::CreateEntity()
+std::string JScene::GenerateStableID()
 {
+	for (;;)
+	{
+		std::ostringstream stream;
+		stream << "ent_" << std::setw(6) << std::setfill('0') << _nextStableID++;
+		const std::string stableID = stream.str();
+		if (!FindEntityByStableID(stableID).IsValid())
+		{
+			return stableID;
+		}
+	}
+}
+
+JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::string& name, const std::vector<std::string>& tags)
+{
+	if (!stableID.empty() && FindEntityByStableID(stableID).IsValid())
+	{
+		return {};
+	}
+
 	EntityData data;
 	data.active = true;
-	return _entities.Add(data);
+	const JEntityHandle entity = _entities.Add(data);
+	_entityMetadata.resize(_entities.GetSlots().size());
+
+	const std::string resolvedStableID = stableID.empty() ? GenerateStableID() : stableID;
+	SetEntityMetadata(entity, resolvedStableID, name, tags);
+	return entity;
+}
+
+bool JScene::SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags)
+{
+	if (!_entities.IsValid(entity))
+	{
+		return false;
+	}
+
+	const std::string resolvedStableID = stableID.empty() ? GenerateStableID() : stableID;
+	const uint64 stableIDHash = makeStableIDHash(resolvedStableID);
+	const auto existingIter = _stableIDLookup.find(stableIDHash);
+	if (existingIter != _stableIDLookup.end()
+		&& (existingIter->second.index != entity.index || existingIter->second.generation != entity.generation))
+	{
+		return false;
+	}
+
+	if (entity.index >= _entityMetadata.size())
+	{
+		_entityMetadata.resize(entity.index + 1);
+	}
+
+	JEntityMetadata& metadata = _entityMetadata[entity.index];
+	if (metadata.stableIDHash != 0 && metadata.stableIDHash != stableIDHash)
+	{
+		_stableIDLookup.erase(metadata.stableIDHash);
+	}
+
+	metadata.stableIDHash = stableIDHash;
+	metadata.stableID = resolvedStableID;
+	metadata.name = name;
+	metadata.tags = tags;
+	_stableIDLookup[stableIDHash] = entity;
+	return true;
+}
+
+void JScene::SetEntityName(JEntityHandle entity, const std::string& name)
+{
+	JEntityMetadata* metadata = GetEntityMetadata(entity);
+	if (metadata != nullptr)
+	{
+		metadata->name = name;
+	}
+}
+
+const JEntityMetadata* JScene::GetEntityMetadata(JEntityHandle entity) const
+{
+	return _entities.IsValid(entity) && entity.index < _entityMetadata.size()
+		? &_entityMetadata[entity.index]
+		: nullptr;
+}
+
+JEntityMetadata* JScene::GetEntityMetadata(JEntityHandle entity)
+{
+	return _entities.IsValid(entity) && entity.index < _entityMetadata.size()
+		? &_entityMetadata[entity.index]
+		: nullptr;
+}
+
+JEntityHandle JScene::FindEntityByStableID(const std::string& stableID) const
+{
+	if (stableID.empty())
+	{
+		return {};
+	}
+
+	const uint64 stableIDHash = makeStableIDHash(stableID);
+	const auto iter = _stableIDLookup.find(stableIDHash);
+	if (iter == _stableIDLookup.end())
+	{
+		return {};
+	}
+
+	const JEntityMetadata* metadata = GetEntityMetadata(iter->second);
+	return metadata != nullptr && metadata->stableID == stableID ? iter->second : JEntityHandle{};
+}
+
+void JScene::AddEntityComponentMask(JEntityHandle entity, JSceneComponentMask component)
+{
+	JEntityMetadata* metadata = GetEntityMetadata(entity);
+	if (metadata != nullptr)
+	{
+		metadata->componentMask |= static_cast<uint32>(component);
+	}
 }
 
 JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData& data)
@@ -47,7 +173,9 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 		return {};
 	}
 
-	return _transforms.Add(data);
+	const JTransformHandle transform = _transforms.Add(data);
+	AddEntityComponentMask(entity, JSceneComponentMask::Transform);
+	return transform;
 }
 
 JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio)
@@ -67,6 +195,7 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	{
 		_primaryCamera = handle;
 	}
+	AddEntityComponentMask(entity, JSceneComponentMask::Camera);
 	return handle;
 }
 
@@ -80,7 +209,9 @@ JLightHandle JScene::AddLight(JEntityHandle entity, JTransformHandle transform, 
 	LightData lightData = data;
 	lightData.entity = entity;
 	lightData.transform = transform;
-	return _lights.Add(lightData);
+	const JLightHandle light = _lights.Add(lightData);
+	AddEntityComponentMask(entity, JSceneComponentMask::Light);
+	return light;
 }
 
 JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent)
@@ -96,7 +227,9 @@ JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, JTransformHand
 	data.materialID = materialID;
 	data.mesh = mesh;
 	data.transparent = transparent;
-	return _renderObjects.Add(data);
+	const JRenderObjectHandle renderObject = _renderObjects.Add(data);
+	AddEntityComponentMask(entity, JSceneComponentMask::RenderObject);
+	return renderObject;
 }
 
 JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
