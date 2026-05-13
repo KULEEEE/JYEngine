@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JYEngine Pull Change Overview</title>
+  <style>
+    :root {
+      --bg: #f3f0e8;
+      --paper: #fffdf8;
+      --ink: #1d1b19;
+      --muted: #6c645c;
+      --line: #d8d1c7;
+      --accent: #0d5c63;
+      --accent-2: #c97c5d;
+      --accent-3: #7a8b5a;
+      --shadow: 0 14px 32px rgba(35, 26, 18, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(201, 124, 93, 0.10), transparent 24%),
+        radial-gradient(circle at top right, rgba(13, 92, 99, 0.10), transparent 22%),
+        linear-gradient(180deg, #f7f4ed 0%, var(--bg) 100%);
+    }
+
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    .hero {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    h1 {
+      font-size: clamp(30px, 4vw, 46px);
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-size: 24px;
+      margin-bottom: 18px;
+    }
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    .summary {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fffdf8 0%, #faf6ef 100%);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .diagram {
+      display: grid;
+      gap: 14px;
+    }
+
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      background: #fffaf2;
+    }
+
+    .lane.engine {
+      background: linear-gradient(180deg, rgba(13, 92, 99, 0.08), rgba(13, 92, 99, 0.03));
+    }
+
+    .lane.render {
+      background: linear-gradient(180deg, rgba(122, 139, 90, 0.10), rgba(122, 139, 90, 0.04));
+    }
+
+    .lane.panel {
+      background: linear-gradient(180deg, rgba(201, 124, 93, 0.10), rgba(201, 124, 93, 0.04));
+    }
+
+    .lane-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .nodes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .node {
+      min-width: 180px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .node strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    .node span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .arrow {
+      font-size: 22px;
+      color: var(--accent);
+      font-weight: 700;
+      padding: 0 2px;
+    }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fffaf4;
+    }
+
+    .flow-step .num {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      line-height: 1.7;
+    }
+
+    li + li {
+      margin-top: 4px;
+    }
+
+    .files {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .file {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: #fffefb;
+    }
+
+    .file code {
+      display: inline-block;
+      font-family: Consolas, "Courier New", monospace;
+      background: #f3efe7;
+      padding: 2px 6px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: #f7f1e8;
+      color: var(--muted);
+    }
+
+    .note {
+      margin-top: 24px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px dashed #bda98f;
+      background: rgba(201, 124, 93, 0.08);
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .node {
+        min-width: 100%;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <p class="eyebrow">Pulled Change Overview</p>
+      <h1>Move scene rendering through <code>JRenderer</code> and <code>RenderDB</code></h1>
+      <p>
+        최신 pull의 핵심은 <code>JScenePanel</code>이 직접 렌더링 자원을 만들고 그리던 구조에서 벗어나,
+        <code>JMaterialFactory</code>, <code>JRenderServer</code>, <code>JRenderDB</code>, <code>JRenderer</code>를 거쳐
+        씬 렌더링을 수행하도록 책임을 재배치한 것입니다.
+      </p>
+
+      <div class="summary">
+        <div class="stat">
+          <strong>69716f9</strong>
+          <span>최신 핵심 커밋</span>
+        </div>
+        <div class="stat">
+          <strong>18 files</strong>
+          <span>직접 수정된 파일</span>
+        </div>
+        <div class="stat">
+          <strong>4 files</strong>
+          <span>새로 추가된 파일</span>
+        </div>
+        <div class="stat">
+          <strong>Scene → Renderer</strong>
+          <span>렌더 경로 이동</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>구조도</h2>
+        <div class="diagram">
+          <div class="lane panel">
+            <div class="lane-title">Editor / Client Layer</div>
+            <div class="nodes">
+              <div class="node">
+                <strong>JScenePanel</strong>
+                <span>카메라 입력, 메시 로드, material 생성, frameDesc 작성</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane engine">
+            <div class="lane-title">Engine Services</div>
+            <div class="nodes">
+              <div class="node">
+                <strong>JMaterialFactory</strong>
+                <span>Shader / Pipeline / CBV / Texture 생성 helper</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <strong>JRenderServer</strong>
+                <span>Material / Camera 등록, dirty 관리, Sync</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <strong>JRenderDB</strong>
+                <span>MaterialResource / CameraResource / MeshResource 캐시</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <strong>JRenderer</strong>
+                <span>FrameDesc 기반 draw loop 실행</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane render">
+            <div class="lane-title">Render Backend</div>
+            <div class="nodes">
+              <div class="node">
+                <strong>JGraphicResource</strong>
+                <span>Draw 1회용 shader binding 묶음</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <strong>JCommandQueue</strong>
+                <span>Pipeline, CBV, SRV, draw 호출 기록</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="node">
+                <strong>DX12</strong>
+                <span>실제 command list / swap chain 출력</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          이전 구조는 <code>ScenePanel</code>이 shader, pipeline, vertex/index buffer, graphic resource까지 직접 소유했습니다.
+          현재 구조는 씬 패널이 authoring/조립 역할만 맡고, 렌더링 실행은 엔진 쪽 서비스로 이동했습니다.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>렌더 흐름</h2>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="num">1</div>
+            <div>
+              <h3>Material 생성</h3>
+              <p><code>JMaterialFactory</code>가 shader와 pipeline을 묶어 <code>JMaterial</code>을 만듭니다.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="num">2</div>
+            <div>
+              <h3>ScenePanel 등록</h3>
+              <p><code>JScenePanel</code>이 material, camera, mesh를 준비하고 <code>JRenderServer</code>에 등록합니다.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="num">3</div>
+            <div>
+              <h3>Sync</h3>
+              <p><code>JRenderServer::Sync()</code>가 dirty material / camera를 <code>JRenderDB</code>로 반영합니다.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="num">4</div>
+            <div>
+              <h3>FrameDesc 작성</h3>
+              <p><code>JScenePanel</code>이 cameraID, renderTarget, viewport, drawItems를 채워 <code>JRenderer</code>로 넘깁니다.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="num">5</div>
+            <div>
+              <h3>Draw 실행</h3>
+              <p><code>JRenderer</code>가 material resource를 읽고 <code>JGraphicResource</code>를 만들어 draw를 실행합니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>추가된 핵심 타입</h2>
+        <div class="files">
+          <div class="file">
+            <code>src/engine/JRenderer.*</code>
+            <p>렌더링 실행 계층. <code>FrameDesc</code>와 <code>DrawItem</code>을 입력받아 draw loop를 수행합니다.</p>
+          </div>
+          <div class="file">
+            <code>src/engine/JMaterialFactory.*</code>
+            <p>material authoring helper. shader/pipeline 생성과 CBV/texture 설정을 묶습니다.</p>
+          </div>
+          <div class="file">
+            <code>src/engine/JRenderDB.*</code>
+            <p>material뿐 아니라 camera, mesh까지 렌더러용 캐시를 보관합니다.</p>
+          </div>
+          <div class="file">
+            <code>src/engine/JRenderServer.*</code>
+            <p>source object와 RenderDB 사이의 동기화 계층입니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>바뀐 책임</h2>
+        <ul>
+          <li><code>JScenePanel</code>: 직접 draw 호출하는 구조에서, render request 작성 쪽으로 축소</li>
+          <li><code>JMaterial</code>: 이제 shader와 pipeline도 소유</li>
+          <li><code>JRenderDB</code>: camera per-frame data와 mesh GPU resource까지 관리</li>
+          <li><code>JEngine</code>: <code>JRenderer</code>, <code>JMaterialFactory</code>를 새로 소유</li>
+          <li><code>JMeshResource</code>: 단순 view 묶음에서 실제 vertex/index buffer 포인터 소유 구조로 확장</li>
+        </ul>
+
+        <div class="tag-row">
+          <span class="tag">Scene Simplified</span>
+          <span class="tag">Renderer Introduced</span>
+          <span class="tag">Camera Sync Added</span>
+          <span class="tag">Material Factory Added</span>
+          <span class="tag">RenderDB Expanded</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top: 24px;">
+      <h2>현재 읽는 포인트</h2>
+      <ul>
+        <li>좋아진 점: 패널 코드가 가벼워지고, 렌더링 실행 책임이 엔진 서비스로 모였습니다.</li>
+        <li>구조 의미: 향후 <code>Actor/Component</code>, 여러 panel, render graph로 확장하기 쉬운 방향입니다.</li>
+        <li>남은 숙제: draw마다 <code>JGraphicResource</code>를 매번 재생성하는 부분과 mesh cache의 소유권 모델은 더 다듬을 여지가 있습니다.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

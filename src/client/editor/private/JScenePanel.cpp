@@ -2,6 +2,7 @@
 
 #include "engine/JSwapChain.h"
 #include "engine/JRenderDefinition.h"
+#include "engine/JRenderDB.h"
 #include "engine/JRenderServer.h"
 #include "engine/JRenderer.h"
 #include "engine/JMaterialFactory.h"
@@ -202,6 +203,15 @@ void JScenePanel::Init()
 	scene->SetPrimaryCamera(_camera);
 	renderServer->RegisterCamera(_camera, perFrameBuffer);
 
+	_lightEntity = scene->CreateEntity();
+	Engine::JScene::TransformData lightTransformData{};
+	lightTransformData.position = { 0.0f, 4.0f, -4.0f };
+	_lightTransform = scene->AddTransform(_lightEntity, lightTransformData);
+	Engine::JScene::LightData lightData{};
+	lightData.color = { 1.0f, 1.0f, 1.0f };
+	lightData.intensity = 0.65f;
+	_light = scene->AddLight(_lightEntity, _lightTransform, lightData);
+
 	std::vector<float> planePositions =
 	{
 		-PLANE_SIZE, PLANE_Y, -PLANE_SIZE, 1.0f,
@@ -351,8 +361,8 @@ void JScenePanel::createCameraInfoPanel()
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
 		mainRect.right + 16,
 		mainRect.top,
-		320,
-		260,
+		360,
+		460,
 		_mainWindow,
 		nullptr,
 		GetModuleHandleW(nullptr),
@@ -370,8 +380,8 @@ void JScenePanel::createCameraInfoPanel()
 		WS_CHILD | WS_VISIBLE | SS_LEFT,
 		12,
 		12,
-		280,
-		210,
+		320,
+		400,
 		_cameraInfoWindow,
 		nullptr,
 		GetModuleHandleW(nullptr),
@@ -395,7 +405,7 @@ void JScenePanel::updateCameraInfoPanel()
 	{
 		RECT mainRect{};
 		GetWindowRect(_mainWindow, &mainRect);
-		SetWindowPos(_cameraInfoWindow, HWND_TOPMOST, mainRect.right + 16, mainRect.top, 320, 260, SWP_NOACTIVATE);
+		SetWindowPos(_cameraInfoWindow, HWND_TOPMOST, mainRect.right + 16, mainRect.top, 360, 460, SWP_NOACTIVATE);
 	}
 
 	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
@@ -414,7 +424,46 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"World Rotation\n";
 	stream << L"Pitch(X): " << wrapDegrees(toDegrees(transformData->pitch)) << L"\n";
 	stream << L"Yaw(Y): " << wrapDegrees(toDegrees(transformData->yaw)) << L"\n";
-	stream << L"Roll(Z): 0.00";
+	stream << L"Roll(Z): 0.00\n\n";
+
+	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
+	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->transform) : nullptr;
+	stream << L"Scene Light\n";
+	if (lightData != nullptr && lightTransformData != nullptr)
+	{
+		stream << L"Count: 1\n";
+		stream << L"Pos: "
+			<< lightTransformData->position.x << L", "
+			<< lightTransformData->position.y << L", "
+			<< lightTransformData->position.z << L"\n";
+		stream << L"Color: "
+			<< lightData->color.x << L", "
+			<< lightData->color.y << L", "
+			<< lightData->color.z << L"\n";
+		stream << L"Intensity: " << lightData->intensity << L"\n\n";
+	}
+	else
+	{
+		stream << L"Count: 0\n\n";
+	}
+
+	const Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr;
+	const Engine::JRenderDB::LightResource* lightResource = renderServer != nullptr ? renderServer->GetRenderDB().GetLightResource() : nullptr;
+	stream << L"RenderDB Light\n";
+	if (lightResource != nullptr)
+	{
+		stream << L"GPU Buffer: " << (lightResource->lightBuffer != nullptr ? L"Ready" : L"Null") << L"\n";
+		stream << L"Count: " << lightResource->lightCount << L"\n";
+		stream << L"Pos: "
+			<< lightResource->positionCount.x << L", "
+			<< lightResource->positionCount.y << L", "
+			<< lightResource->positionCount.z << L"\n";
+		stream << L"Intensity: " << lightResource->colorIntensity.w;
+	}
+	else
+	{
+		stream << L"Unavailable";
+	}
 
 	SetWindowTextW(_cameraInfoText, stream.str().c_str());
 }

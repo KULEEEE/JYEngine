@@ -3,6 +3,11 @@ cbuffer PerFrame : register(b0)
     matrix ViewProjection;
 }
 
+cbuffer PerObject : register(b2)
+{
+    matrix World;
+}
+
 struct VS_INPUT
 {
     float4 Pos : POSITION;
@@ -17,8 +22,9 @@ struct PS_INPUT
 PS_INPUT vMain(VS_INPUT input)
 {
     PS_INPUT output;
-    output.WorldPos = input.Pos.xyz;
-    output.Pos = mul(input.Pos, ViewProjection);
+    float4 worldPos = mul(input.Pos, World);
+    output.WorldPos = worldPos.xyz;
+    output.Pos = mul(worldPos, ViewProjection);
     return output;
 }
 

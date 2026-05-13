@@ -36,6 +36,27 @@ public:
 		CameraResource resource;
 	};
 
+	struct TransformResource
+	{
+		JTransformHandle transform = {};
+		XMFLOAT4X4 world = {};
+		Render::JConstantBuffer* perObjectBuffer = nullptr;
+	};
+
+	struct TransformResourceRecord
+	{
+		uint64 transformKey = 0;
+		TransformResource resource;
+	};
+
+	struct LightResource
+	{
+		Render::JConstantBuffer* lightBuffer = nullptr;
+		JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
+		JVec4 positionCount = { 0.0f, 4.0f, -4.0f, 0.0f };
+		uint32 lightCount = 0;
+	};
+
 	JRenderDB() = default;
 	~JRenderDB();
 
@@ -45,14 +66,21 @@ public:
 	const JMaterialResource* FindMaterialResource(uint32 materialID) const;
 	CameraResource* FindCameraResource(JCameraHandle camera);
 	const CameraResource* FindCameraResource(JCameraHandle camera) const;
+	TransformResource* FindTransformResource(JTransformHandle transform);
+	const TransformResource* FindTransformResource(JTransformHandle transform) const;
+	LightResource* GetLightResource();
+	const LightResource* GetLightResource() const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
+	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
+	void SyncLights(const JScene& scene);
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
 	void RemoveMaterialResource(uint32 materialID);
 	void RemoveCameraResource(JCameraHandle camera);
+	void RemoveTransformResource(JTransformHandle transform);
 	void RemoveMeshResource(const JMesh* mesh);
 	void Clear();
 
@@ -61,15 +89,21 @@ public:
 private:
 	JMaterialResource& GetOrCreateMaterialResource(uint32 materialID);
 	CameraResource& GetOrCreateCameraResource(JCameraHandle camera);
+	TransformResource& GetOrCreateTransformResource(JTransformHandle transform);
 	uint32 FindMaterialResourceIndex(uint32 materialID) const;
 	uint32 FindCameraResourceIndex(JCameraHandle camera) const;
+	uint32 FindTransformResourceIndex(JTransformHandle transform) const;
 	static uint64 MakeCameraKey(JCameraHandle camera);
+	static uint64 MakeTransformKey(JTransformHandle transform);
 
 	Render::JRenderContext* _renderContext = nullptr;
 	std::vector<MaterialResourceRecord> _materialResources;
 	std::unordered_map<uint32, uint32> _materialIndexMap;
 	std::vector<CameraResourceRecord> _cameraResources;
 	std::unordered_map<uint64, uint32> _cameraIndexMap;
+	std::vector<TransformResourceRecord> _transformResources;
+	std::unordered_map<uint64, uint32> _transformIndexMap;
+	LightResource _lightResource;
 	std::unordered_map<const JMesh*, JMeshResource> _meshResources;
 };
 

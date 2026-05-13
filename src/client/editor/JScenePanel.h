@@ -38,12 +38,15 @@ private:
 	Render::JConstantBuffer* materialBuffer = nullptr;
 	Render::JTexture* materialTexture = nullptr;
 	Engine::JEntityHandle _cameraEntity = {};
+	Engine::JEntityHandle _lightEntity = {};
 	Engine::JEntityHandle _planeEntity = {};
 	Engine::JEntityHandle _carEntity = {};
 	Engine::JTransformHandle _cameraTransform = {};
+	Engine::JTransformHandle _lightTransform = {};
 	Engine::JTransformHandle _planeTransform = {};
 	Engine::JTransformHandle _carTransform = {};
 	Engine::JCameraHandle _camera = {};
+	Engine::JLightHandle _light = {};
 	Engine::JRenderObjectHandle _planeRenderObject = {};
 	Engine::JRenderObjectHandle _carRenderObject = {};
 	bool _isMouseLookActive = false;

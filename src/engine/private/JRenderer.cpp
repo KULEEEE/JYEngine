@@ -49,6 +49,18 @@ namespace
 				continue;
 			}
 
+			const JRenderDB::TransformResource* transformResource = renderDB->FindTransformResource(drawItem.transform);
+			if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
+			{
+				graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
+			}
+
+			const JRenderDB::LightResource* lightResource = renderDB->GetLightResource();
+			if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
+			{
+				graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer);
+			}
+
 			commandQueue->SetPipeline(materialResource->GetPipeline());
 			commandQueue->SetGraphicResources(&graphicResource);
 			commandQueue->BindVertexBuffer(meshResource);

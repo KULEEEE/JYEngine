@@ -6,6 +6,16 @@
 
 J_ENGINE_BEGIN
 
+namespace
+{
+	XMMATRIX makeWorldMatrix(const JScene::TransformData& transform)
+	{
+		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.pitch, transform.yaw, 0.0f);
+		const XMMATRIX translation = XMMatrixTranslation(transform.position.x, transform.position.y, transform.position.z);
+		return rotation * translation;
+	}
+}
+
 uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
 {
 	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
@@ -225,7 +235,15 @@ void JRenderServer::SyncScene(const JScene& scene)
 		}
 
 		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
+
+		const JScene::TransformData* transform = scene.GetTransform(slot.data.transform);
+		if (transform != nullptr)
+		{
+			_renderDB.SyncTransform(slot.data.transform, makeWorldMatrix(*transform));
+		}
 	}
+
+	_renderDB.SyncLights(scene);
 }
 
 bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const

@@ -326,7 +326,7 @@
       <div class="stats">
         <div class="stat">
           <strong>Object Layer</strong>
-          <span><code>JObject</code>, <code>JMaterial</code>, <code>JCameraComponent</code></span>
+          <span><code>JObject</code>, <code>JMaterial</code>, <code>JScene::CameraData</code></span>
         </div>
         <div class="stat">
           <strong>Sync Layer</strong>
@@ -370,8 +370,8 @@
                 <span>shader, pipeline, constant buffer, texture authoring object</span>
               </div>
               <div class="node">
-                <strong>JCameraComponent</strong>
-                <span>position, yaw, pitch, view/projection 계산</span>
+                <strong>CameraData</strong>
+                <span>entity, transform, speed, aspect ratio를 가진 scene pool data</span>
               </div>
               <div class="node">
                 <strong>JMesh</strong>
@@ -512,7 +512,7 @@
           </div>
 
           <div class="mini">
-            <h3><code>JCameraComponent</code></h3>
+            <h3><code>JScene::CameraData</code></h3>
             <ul>
               <li><code>position</code></li>
               <li><code>yaw</code>, <code>pitch</code></li>
@@ -621,7 +621,7 @@
 
           <div class="data-box">
             <h3>Camera 경로</h3>
-            <p><code>JCameraComponent</code> → <code>JRenderServer::MarkCameraDirty()</code> → <code>JRenderDB::SyncCamera()</code> → <code>CameraResource.viewProjection</code> → <code>perFrameBuffer</code></p>
+            <p><code>JScene::CameraData</code> → <code>JRenderServer::MarkCameraDirty()</code> → <code>JRenderDB::SyncCamera()</code> → <code>CameraResource.viewProjection</code> → <code>perFrameBuffer</code></p>
           </div>
 
           <div class="data-box">
