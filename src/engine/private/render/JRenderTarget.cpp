@@ -1,0 +1,211 @@
+#include "engine/render/JRenderTarget.h"
+
+#include "engine/core/JEngineContext.h"
+#include "engine/dx12/JDx12Helper.h"
+#include "engine/platform/JDevice.h"
+
+#include <iostream>
+
+J_ENGINE_BEGIN
+
+namespace
+{
+	D3D12_CLEAR_VALUE makeClearValue(DXGI_FORMAT format, const JColor& color)
+	{
+		D3D12_CLEAR_VALUE clearValue{};
+		clearValue.Format = format;
+		clearValue.Color[0] = color.r;
+		clearValue.Color[1] = color.g;
+		clearValue.Color[2] = color.b;
+		clearValue.Color[3] = color.a;
+		return clearValue;
+	}
+}
+
+JRenderTarget::JRenderTarget()
+	: JRenderTarget(Desc{})
+{
+}
+
+JRenderTarget::JRenderTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor)
+	: JRenderTarget(Desc{ width, height, format, clearColor })
+{
+}
+
+JRenderTarget::JRenderTarget(const Desc& desc)
+{
+	CreateOffscreenResource(desc);
+}
+
+JRenderTarget::JRenderTarget(ID3D12Resource* resource)
+{
+	if (resource == nullptr)
+	{
+		return;
+	}
+
+	D3D12_RESOURCE_DESC desc = resource->GetDesc();
+	_width = static_cast<uint32>(desc.Width);
+	_height = desc.Height;
+	_format = desc.Format;
+	_isSwapChainTarget = true;
+	_ownsResource = false;
+	_shaderResource = false;
+	_resourceState = D3D12_RESOURCE_STATE_PRESENT;
+
+	_rtvResources.push_back(resource);
+	_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource));
+}
+
+JRenderTarget::~JRenderTarget()
+{
+	_rtvResources.clear();
+	_rtvHandles.clear();
+	_ownedResources.clear();
+}
+
+bool JRenderTarget::CreateOffscreenResource(const Desc& desc)
+{
+	if (GetEngine() == nullptr || GetEngine()->GetDevice() == nullptr || GetEngine()->GetDx12Helper() == nullptr)
+	{
+		std::cerr << "JRenderTarget::CreateOffscreenResource failed: engine device or dx12 helper is null." << std::endl;
+		return false;
+	}
+
+	ComPtr<ID3D12Device> device = GetEngine()->GetDevice()->GetDevice();
+	if (device == nullptr)
+	{
+		std::cerr << "JRenderTarget::CreateOffscreenResource failed: D3D12 device is null." << std::endl;
+		return false;
+	}
+
+	_width = std::max(desc.width, 1u);
+	_height = std::max(desc.height, 1u);
+	_format = desc.format;
+	_clearColor = desc.clearColor;
+	_isSwapChainTarget = false;
+	_ownsResource = true;
+	_shaderResource = desc.shaderResource;
+	_resourceState = desc.initialState;
+
+	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	if (!desc.shaderResource)
+	{
+		flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+	}
+
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resourceDesc.Alignment = 0;
+	resourceDesc.Width = _width;
+	resourceDesc.Height = _height;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.Format = _format;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.SampleDesc.Quality = 0;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resourceDesc.Flags = flags;
+
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProperties.CreationNodeMask = 1;
+	heapProperties.VisibleNodeMask = 1;
+
+	D3D12_CLEAR_VALUE clearValue = makeClearValue(_format, _clearColor);
+	ComPtr<ID3D12Resource> resource;
+	const HRESULT hr = device->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDesc,
+		desc.initialState,
+		&clearValue,
+		IID_PPV_ARGS(&resource));
+	if (FAILED(hr) || resource == nullptr)
+	{
+		std::cerr << "JRenderTarget::CreateOffscreenResource failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return false;
+	}
+
+	ID3D12Resource* rawResource = resource.Get();
+	_ownedResources.push_back(resource);
+	_rtvResources.push_back(rawResource);
+	_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(rawResource));
+
+	if (_shaderResource && !CreateShaderResourceView(rawResource))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool JRenderTarget::CreateShaderResourceView(ID3D12Resource* resource)
+{
+	if (resource == nullptr)
+	{
+		return false;
+	}
+
+	ComPtr<ID3D12Device> device = GetEngine()->GetDevice()->GetDevice();
+	if (device == nullptr)
+	{
+		return false;
+	}
+
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
+	heapDesc.NumDescriptors = 1;
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	const HRESULT heapHr = device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_srvHeap));
+	if (FAILED(heapHr) || _srvHeap == nullptr)
+	{
+		std::cerr << "JRenderTarget::CreateShaderResourceView heap creation failed. HRESULT=0x" << std::hex << heapHr << std::dec << std::endl;
+		return false;
+	}
+
+	_srvCPUHandle = _srvHeap->GetCPUDescriptorHandleForHeapStart();
+	_srvGPUHandle = _srvHeap->GetGPUDescriptorHandleForHeapStart();
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = _format;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = 1;
+	device->CreateShaderResourceView(resource, &srvDesc, _srvCPUHandle);
+
+	_textureView.texture = resource;
+	_textureView.srvHeap = _srvHeap.Get();
+	_textureView.samplerHeap = nullptr;
+	return true;
+}
+
+std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& JRenderTarget::GetRTVHandle()
+{
+	return _rtvHandles;
+}
+
+const std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& JRenderTarget::GetRTVHandle() const
+{
+	return _rtvHandles;
+}
+
+std::vector<ID3D12Resource*>& JRenderTarget::GetRTVResource()
+{
+	return _rtvResources;
+}
+
+const std::vector<ID3D12Resource*>& JRenderTarget::GetRTVResource() const
+{
+	return _rtvResources;
+}
+
+ID3D12Resource* JRenderTarget::GetResource(uint32 index) const
+{
+	return index < _rtvResources.size() ? _rtvResources[index] : nullptr;
+}
+
+J_ENGINE_END

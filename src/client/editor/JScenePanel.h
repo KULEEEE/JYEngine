@@ -3,14 +3,14 @@
 #define __J_SCENE_PANEL_H__
 
 #include "client/editor/JEditorPanel.h"
-#include "Engine/JEngineContext.h"
-#include "Engine/JCommandQueue.h"
-#include "engine/JScene.h"
+#include "engine/core/JEngineContext.h"
+#include "engine/render/JCommandQueue.h"
+#include "engine/scene/JScene.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
-/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
-/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JTexture; } }
+/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
+/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JTexture; } }
 
 J_EDITOR_BEGIN
 

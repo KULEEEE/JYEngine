@@ -45,8 +45,13 @@ float4 pMain(PS_INPUT input) : SV_TARGET
     float4 texColor = BaseTexture.Sample(LinearSampler, float2(0.5f, 0.5f));
     float lightCount = LightPositionCount.w;
     float3 lightVector = LightPositionCount.xyz - input.WorldPos;
-    float distanceFalloff = 1.0f / max(dot(lightVector, lightVector) * 0.08f, 1.0f);
-    float lightAmount = lightCount > 0.0f ? LightColorIntensity.a * distanceFalloff : LightColorIntensity.a;
-    float3 lighting = 0.25f + LightColorIntensity.rgb * lightAmount;
-    return float4((texColor.rgb * BaseColor.rgb) * lighting, texColor.a * BaseColor.a);
+    float lightDistance = length(lightVector);
+    float distanceFalloff = saturate(1.0f - lightDistance / 10.0f);
+    float lightAmount = lightCount > 0.0f ? saturate(distanceFalloff * LightColorIntensity.a) : 0.0f;
+    float3 baseColor = texColor.rgb * BaseColor.rgb;
+    float3 litColor = baseColor * (0.15f + lightAmount);
+
+    // Temporary debug tint until normal-based lighting exists.
+    litColor += LightColorIntensity.rgb * (lightAmount * 0.35f);
+    return float4(litColor, texColor.a * BaseColor.a);
 }

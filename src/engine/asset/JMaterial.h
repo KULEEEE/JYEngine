@@ -2,11 +2,11 @@
 #ifndef __J_MATERIAL_H__
 #define __J_MATERIAL_H__
 
-#include "engine/JObject.h"
-#include "engine/JHashFunction.h"
+#include "engine/core/JObject.h"
+#include "engine/core/JHashFunction.h"
 
 /*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
-/*#include "engine/JRenderDefinition.h"*/ namespace J { namespace Render { struct JPipeline; } }
+/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JPipeline; } }
 
 J_ENGINE_BEGIN
 

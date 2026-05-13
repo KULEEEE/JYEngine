@@ -2,7 +2,7 @@
 #ifndef __J_EDITOR_PANEL_H__
 #define __J_EDITOR_PANEL_H__
 
-#include "Engine/precompile.h"
+#include "engine/precompile.h"
 
 J_EDITOR_BEGIN
 

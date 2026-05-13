@@ -1,0 +1,84 @@
+#include "engine/render/JSwapChain.h"
+#include "engine/platform/JDevice.h"
+
+#include <iostream>
+
+J_RENDER_BEGIN
+
+JSwapChain::JSwapChain()
+{
+}
+JSwapChain::~JSwapChain()
+{
+
+}
+
+void JSwapChain::Present()
+{
+	// Present the frame.
+	if (_swapChain == nullptr)
+	{
+		std::cerr << "Present skipped: swap chain is null." << std::endl;
+		return;
+	}
+	_swapChain->Present(0, 0);
+}
+
+void JSwapChain::SwapIndex()
+{
+	_backBufferIndex = (_backBufferIndex + 1) % SWAP_CHAIN_BUFFER_COUNT;
+}
+
+void JSwapChain::Initialize(const JWindowInfo& info, const JDevice* device, ComPtr<ID3D12CommandQueue> cmdQueue)
+{
+	createSwapChain(info, device->GetDXGI(), cmdQueue);
+}
+
+void JSwapChain::createSwapChain(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue)
+{
+	if (dxgi == nullptr || cmdQueue == nullptr)
+	{
+		std::cerr << "createSwapChain failed: dxgi or command queue is null." << std::endl;
+		return;
+	}
+
+	// ?�전??만든 ?�보 ?�린??	_swapChain.Reset();
+
+	DXGI_SWAP_CHAIN_DESC sd;
+	sd.BufferDesc.Width = static_cast<uint32>(info.width); // 버퍼???�상???�비
+	sd.BufferDesc.Height = static_cast<uint32>(info.height); // 버퍼???�상???�이
+	sd.BufferDesc.RefreshRate.Numerator = 60; // ?�면 갱신 비율
+	sd.BufferDesc.RefreshRate.Denominator = 1; // ?�면 갱신 비율
+	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // 버퍼???�스?�레???�식
+	sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+	sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+	sd.SampleDesc.Count = 1; // 멀???�플�?OFF
+	sd.SampleDesc.Quality = 0;
+	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // ?�면 버퍼???�더링할 �?
+	sd.BufferCount = SWAP_CHAIN_BUFFER_COUNT; // ?�면+?�면 버퍼
+	sd.OutputWindow = info.hwnd;
+	sd.Windowed = info.windowed;
+	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; // ?�면 ?�면 버퍼 교체 ???�전 ?�레???�보 버림
+	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+	const HRESULT swapChainHr = dxgi->CreateSwapChain(cmdQueue.Get(), &sd, &_swapChain);
+	if (FAILED(swapChainHr) || _swapChain == nullptr)
+	{
+		std::cerr << "CreateSwapChain failed. HRESULT=0x" << std::hex << swapChainHr << std::dec << std::endl;
+		return;
+	}
+
+	for (int32 i = 0; i < SWAP_CHAIN_BUFFER_COUNT; i++)
+	{
+		ID3D12Resource* rtvResource = nullptr;
+		const HRESULT bufferHr = _swapChain->GetBuffer(i, IID_PPV_ARGS(&rtvResource));
+		if (FAILED(bufferHr) || rtvResource == nullptr)
+		{
+			std::cerr << "GetBuffer failed for swap chain buffer " << i << ". HRESULT=0x" << std::hex << bufferHr << std::dec << std::endl;
+			return;
+		}
+		_renderTargets[i] = new Engine::JRenderTarget(rtvResource);
+	}
+}
+
+J_RENDER_END

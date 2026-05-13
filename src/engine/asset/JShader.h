@@ -4,7 +4,7 @@
 
 #include "engine/precompile.h"
 
-/*#include "engine/JRenderContext.h"*/	namespace J { namespace Render { struct JRootSignature; } }
+/*#include "engine/render/JRenderContext.h"*/	namespace J { namespace Render { struct JRootSignature; } }
 
 J_RENDER_BEGIN
 

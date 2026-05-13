@@ -1,8 +1,8 @@
 #include "engine/asset/JShader.h"
-#include "engine/JHashFunction.h"
+#include "engine/core/JHashFunction.h"
 
-#include "engine/JRenderContext.h"
-#include "engine/JEngineContext.h"
+#include "engine/render/JRenderContext.h"
+#include "engine/core/JEngineContext.h"
 
 J_RENDER_BEGIN
 
@@ -43,7 +43,7 @@ void JShader::CompileShader()
 #endif
 
 	// vertex shader
-	std::string name = "vMain"; // TODO: 따로 파싱해서 얻어오자
+	std::string name = "vMain"; // TODO: ?�로 ?�싱?�서 ?�어?�자
 	std::string version = "vs_5_0";
 	
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -55,7 +55,7 @@ void JShader::CompileShader()
 	}
 
 	// pixel shader
-	name = "pMain"; // TODO: 따로 파싱해서 얻어오자
+	name = "pMain"; // TODO: ?�로 ?�싱?�서 ?�어?�자
 	version = "ps_5_0";
 
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -121,7 +121,7 @@ void JShader::CompileShader()
 				}
 				default:
 				{
-					// 구현 필요
+					// 구현 ?�요
 				}
 				}
 			}

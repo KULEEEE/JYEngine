@@ -1,11 +1,11 @@
 #include "client/editor/JScenePanel.h"
 
-#include "engine/JSwapChain.h"
-#include "engine/JRenderDefinition.h"
-#include "engine/JRenderDB.h"
-#include "engine/JRenderServer.h"
-#include "engine/JRenderer.h"
-#include "engine/JMaterialFactory.h"
+#include "engine/render/JSwapChain.h"
+#include "engine/render/JRenderDefinition.h"
+#include "engine/render/JRenderDB.h"
+#include "engine/render/JRenderServer.h"
+#include "engine/render/JRenderer.h"
+#include "engine/render/JMaterialFactory.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
@@ -208,8 +208,8 @@ void JScenePanel::Init()
 	lightTransformData.position = { 0.0f, 4.0f, -4.0f };
 	_lightTransform = scene->AddTransform(_lightEntity, lightTransformData);
 	Engine::JScene::LightData lightData{};
-	lightData.color = { 1.0f, 1.0f, 1.0f };
-	lightData.intensity = 0.65f;
+	lightData.color = { 1.0f, 0.9f, 0.65f };
+	lightData.intensity = 3.0f;
 	_light = scene->AddLight(_lightEntity, _lightTransform, lightData);
 
 	std::vector<float> planePositions =
@@ -250,6 +250,12 @@ void JScenePanel::Init()
 	_carRenderObject = scene->AddRenderObject(_carEntity, _carTransform, material->instanceID, mesh, false);
 
 	renderServer->SyncScene(*scene);
+
+	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
+	if (renderer != nullptr)
+	{
+		renderer->SetRenderPath(Engine::JRenderer::RenderPath::Deferred);
+	}
 
 	createCameraInfoPanel();
 	updateCameraInfoPanel();
