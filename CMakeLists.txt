@@ -111,12 +111,30 @@ set_target_properties(Engine PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}
 )
 
+# Benchmark (콘솔 실행 파일 — Engine 의존 없음)
+file(GLOB BENCHMARK_SOURCES "benchmark/*.cpp")
+file(GLOB BENCHMARK_HEADERS "benchmark/*.h")
+
+add_executable(Benchmark ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
+
+target_include_directories(Benchmark PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmark
+)
+
+set_target_properties(Benchmark PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+)
+
 # Visual Studio 프로젝트 설정
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # 모든 프로젝트를 "Projects" 폴더에 배치
-set_property(TARGET Engine PROPERTY FOLDER "Projects")
-set_property(TARGET Client PROPERTY FOLDER "Projects")
+set_property(TARGET Engine     PROPERTY FOLDER "Projects")
+set_property(TARGET Client    PROPERTY FOLDER "Projects")
+set_property(TARGET Benchmark PROPERTY FOLDER "Projects")
 
 # Client를 시작 프로젝트로 설정 (Visual Studio에서 작동)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Client)
@@ -138,4 +156,5 @@ endforeach()
 
 # IDE에서 소스 그룹 구조 설정
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src FILES ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS})
+source_group("benchmark" FILES ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
 source_group("Resource Files" FILES ${CLIENT_RESOURCES})
