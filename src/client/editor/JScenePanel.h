@@ -7,6 +7,8 @@
 #include "engine/render/JCommandQueue.h"
 #include "engine/scene/JScene.h"
 
+#include <chrono>
+
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 /*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
@@ -22,6 +24,7 @@ public:
 
 	void Init() override;
 	void Update() override;
+	void OnMouseWheel(short delta) override;
 
 private:
 	void updateCamera(float deltaTime);
@@ -55,6 +58,8 @@ private:
 	bool _isMouseLookActive = false;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;
+	std::chrono::steady_clock::time_point _lastUpdateTime = {};
+	float _editorCameraMoveSpeed = 6.0f;
 	HWND _cameraInfoWindow = nullptr;
 	HWND _cameraInfoText = nullptr;
 	HWND _mainWindow = nullptr;

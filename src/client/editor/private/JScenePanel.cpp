@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <algorithm>
 #include <sstream>
 
 J_EDITOR_BEGIN
@@ -32,8 +33,12 @@ namespace
 		JVec2 padding = {};
 	};
 
-	constexpr float FIXED_DELTA_TIME = 1.0f / 60.0f;
 	constexpr float MOUSE_LOOK_SENSITIVITY = 0.0025f;
+	constexpr float MAX_FRAME_DELTA_TIME = 0.1f;
+	constexpr float CAMERA_SPEED_MIN = 0.5f;
+	constexpr float CAMERA_SPEED_MAX = 100.0f;
+	constexpr float CAMERA_SPEED_STEP_MULTIPLIER = 1.2f;
+	constexpr float CAMERA_SPEED_SHIFT_MULTIPLIER = 4.0f;
 	constexpr float PLANE_SIZE = 5000.0f;
 	constexpr float PLANE_Y = -0.1f;
 
@@ -235,7 +240,7 @@ void JScenePanel::Init()
 		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
 		return;
 	}
-	cameraData->moveSpeed = 0.1f;
+	cameraData->moveSpeed = _editorCameraMoveSpeed;
 	cameraData->rotateSpeed = 1.0f;
 	scene->SetPrimaryCamera(_camera);
 	renderServer->RegisterCamera(_camera, perFrameBuffer);
@@ -298,6 +303,7 @@ void JScenePanel::Init()
 
 	createCameraInfoPanel();
 	updateCameraInfoPanel();
+	_lastUpdateTime = std::chrono::steady_clock::now();
 	_isReady = true;
 }
 
@@ -336,7 +342,16 @@ void JScenePanel::Update()
 		}
 	}
 
-	updateCamera(FIXED_DELTA_TIME);
+	const auto now = std::chrono::steady_clock::now();
+	float deltaTime = 0.0f;
+	if (_lastUpdateTime != std::chrono::steady_clock::time_point{})
+	{
+		deltaTime = std::chrono::duration<float>(now - _lastUpdateTime).count();
+	}
+	_lastUpdateTime = now;
+	deltaTime = std::clamp(deltaTime, 0.0f, MAX_FRAME_DELTA_TIME);
+
+	updateCamera(deltaTime);
 	renderServer->MarkCameraDirty(_camera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
@@ -355,9 +370,51 @@ void JScenePanel::Update()
 	renderer->Render(frameDesc);
 }
 
+void JScenePanel::OnMouseWheel(short delta)
+{
+	if (!_isReady || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	{
+		return;
+	}
+
+	if (delta > 0)
+	{
+		_editorCameraMoveSpeed *= CAMERA_SPEED_STEP_MULTIPLIER;
+	}
+	else if (delta < 0)
+	{
+		_editorCameraMoveSpeed /= CAMERA_SPEED_STEP_MULTIPLIER;
+	}
+
+	_editorCameraMoveSpeed = std::clamp(_editorCameraMoveSpeed, CAMERA_SPEED_MIN, CAMERA_SPEED_MAX);
+
+	if (scene == nullptr || !_camera.IsValid())
+	{
+		return;
+	}
+
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	if (cameraData != nullptr)
+	{
+		cameraData->moveSpeed = _editorCameraMoveSpeed;
+	}
+}
+
 void JScenePanel::updateCamera(float deltaTime)
 {
 	if (scene == nullptr || !_camera.IsValid())
+	{
+		return;
+	}
+
+	if (_mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	{
+		_isMouseLookActive = false;
+		return;
+	}
+
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	if (cameraData == nullptr)
 	{
 		return;
 	}
@@ -367,6 +424,12 @@ void JScenePanel::updateCamera(float deltaTime)
 	float forwardInput = 0.0f;
 	float rightInput = 0.0f;
 	float upInput = 0.0f;
+	float moveSpeedMultiplier = 1.0f;
+
+	if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
+	{
+		moveSpeedMultiplier = CAMERA_SPEED_SHIFT_MULTIPLIER;
+	}
 
 	if (GetAsyncKeyState(VK_LEFT) & 0x8000) yawInput -= deltaTime;
 	if (GetAsyncKeyState(VK_RIGHT) & 0x8000) yawInput += deltaTime;
@@ -403,8 +466,10 @@ void JScenePanel::updateCamera(float deltaTime)
 		_isMouseLookActive = false;
 	}
 
+	cameraData->moveSpeed = _editorCameraMoveSpeed * moveSpeedMultiplier;
 	scene->RotateCamera(_camera, yawInput, pitchInput);
 	scene->MoveCameraLocal(_camera, forwardInput, rightInput, upInput, deltaTime);
+	cameraData->moveSpeed = _editorCameraMoveSpeed;
 }
 
 void JScenePanel::createCameraInfoPanel()
@@ -488,6 +553,9 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"Pitch(X): " << wrapDegrees(toDegrees(transformData->pitch)) << L"\n";
 	stream << L"Yaw(Y): " << wrapDegrees(toDegrees(transformData->yaw)) << L"\n";
 	stream << L"Roll(Z): 0.00\n\n";
+	stream << L"Editor Camera\n";
+	stream << L"Move Speed: " << cameraData->moveSpeed << L"\n";
+	stream << L"Base Speed: " << _editorCameraMoveSpeed << L"\n\n";
 
 	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
 	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->transform) : nullptr;
