@@ -25,6 +25,9 @@ public:
 	void RenderBegin();
 
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget = true);
+	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget = true, bool clearDepth = false);
+	void BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, bool clearRenderTarget = true);
+	void BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget = true, bool clearDepth = false);
 	void TransitionRenderTarget(Engine::JRenderTarget* renderTarget, D3D12_RESOURCE_STATES targetState);
 	void SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport);
 	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);
@@ -47,6 +50,7 @@ private:
 	void destroy();
 
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
+	ComPtr<ID3D12Device> _device;
 	ComPtr<ID3D12CommandAllocator> _cmdAlloc;
 	ComPtr<ID3D12GraphicsCommandList> _cmdList;
 
@@ -54,7 +58,9 @@ private:
 	uint32 _fenceValue = 0;
 	HANDLE _fenceEvent = INVALID_HANDLE_VALUE;
 
+	std::vector<ComPtr<ID3D12DescriptorHeap>> _transientDescriptorHeaps;
 	Engine::JRenderTarget* _currentRenderTarget = nullptr;
+	std::vector<Engine::JRenderTarget*> _currentRenderTargets;
 };
 
 J_RENDER_END

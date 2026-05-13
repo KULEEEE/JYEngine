@@ -21,9 +21,11 @@ public:
 	JMaterial* CreateMaterial(const std::string& shaderPath, bool enableAlphaBlend = false) const;
 	Render::JConstantBuffer* CreateConstantBuffer(void* data, size_t size) const;
 	Render::JTexture* CreateSolidColorTexture(const JColor& color) const;
+	Render::JTexture* CreateTextureFromFile(const std::string& path) const;
 
 	Render::JConstantBuffer* CreateAndSetConstantBuffer(JMaterial* material, const std::string& name, void* data, size_t size) const;
 	Render::JTexture* CreateAndSetSolidColorTexture(JMaterial* material, const std::string& name, const JColor& color) const;
+	Render::JTexture* CreateAndSetTextureFromFile(JMaterial* material, const std::string& name, const std::string& path) const;
 
 private:
 	Render::JRenderContext* _renderContext = nullptr;

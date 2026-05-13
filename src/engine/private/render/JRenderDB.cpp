@@ -287,10 +287,22 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 
 	JMeshResource resource;
 	Render::JVertexBuffer* vertexBuffer = _renderContext->CreateVertexBuffer(mesh->GetPositions(), mesh->GetVertexCount());
+	Render::JVertexBuffer* normalBuffer = nullptr;
+	Render::JVertexBuffer* texcoordBuffer = nullptr;
+	if (mesh->GetNormals().size() == mesh->GetVertexCount() * 3)
+	{
+		normalBuffer = _renderContext->CreateVertexBuffer(mesh->GetNormals(), mesh->GetVertexCount());
+	}
+	if (mesh->GetTexcoords(0).size() == mesh->GetVertexCount() * 2)
+	{
+		texcoordBuffer = _renderContext->CreateVertexBuffer(mesh->GetTexcoords(0), mesh->GetVertexCount());
+	}
 	Render::JIndexBuffer* indexBuffer = _renderContext->CreateIndexBuffer(mesh->GetIndices());
 	if (vertexBuffer == nullptr || indexBuffer == nullptr)
 	{
 		delete vertexBuffer;
+		delete normalBuffer;
+		delete texcoordBuffer;
 		delete indexBuffer;
 		return nullptr;
 	}
@@ -298,6 +310,18 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	resource.vertexBuffers.push_back(vertexBuffer);
 	resource.indexBufferResource = indexBuffer;
 	resource.soaBuffers.push_back(vertexBuffer->view);
+	if (normalBuffer != nullptr)
+	{
+		resource.vertexBuffers.push_back(normalBuffer);
+		resource.soaBuffers.push_back(normalBuffer->view);
+		resource.hasNormals = true;
+	}
+	if (texcoordBuffer != nullptr)
+	{
+		resource.vertexBuffers.push_back(texcoordBuffer);
+		resource.soaBuffers.push_back(texcoordBuffer->view);
+		resource.hasTexcoords = true;
+	}
 	resource.indexBuffer = indexBuffer->view;
 	resource.indexSize = mesh->GetIndices().size();
 

@@ -53,6 +53,11 @@ JRenderTarget::JRenderTarget(ID3D12Resource* resource)
 	_shaderResource = false;
 	_resourceState = D3D12_RESOURCE_STATE_PRESENT;
 
+	// GetBuffer가 올린 AddRef를 ComPtr에 그대로 양도(Attach)해야 한다.
+	// 이걸 안 하면 백버퍼 참조가 영구 누수되어 ResizeBuffers가 DXGI_ERROR_INVALID_CALL로 실패한다.
+	ComPtr<ID3D12Resource> ownedResource;
+	ownedResource.Attach(resource);
+	_ownedResources.push_back(ownedResource);
 	_rtvResources.push_back(resource);
 	_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource));
 }

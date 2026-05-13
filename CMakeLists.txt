@@ -39,6 +39,7 @@ target_link_libraries(Engine PUBLIC
     dxgi.lib
     d3dcompiler.lib
     dxguid.lib
+    windowscodecs.lib
 )
 
 # OpenFBX 명시적으로 포함

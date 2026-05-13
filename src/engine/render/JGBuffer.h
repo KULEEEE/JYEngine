@@ -17,6 +17,7 @@ public:
 		DXGI_FORMAT albedoFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT normalFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		DXGI_FORMAT materialFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT depthFormat = DXGI_FORMAT_D32_FLOAT;
 	};
 
 	bool Initialize(const Desc& desc);
@@ -29,16 +30,25 @@ public:
 	JRenderTarget* GetAlbedoTarget() const { return _albedo.get(); }
 	JRenderTarget* GetNormalTarget() const { return _normal.get(); }
 	JRenderTarget* GetMaterialTarget() const { return _material.get(); }
+	ID3D12Resource* GetDepthResource() const { return _depthResource.Get(); }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const { return _dsvHandle; }
+	D3D12_RESOURCE_STATES GetDepthState() const { return _depthState; }
+	void SetDepthState(D3D12_RESOURCE_STATES state) { _depthState = state; }
 
 	const Desc& GetDesc() const { return _desc; }
 
 private:
 	static std::unique_ptr<JRenderTarget> CreateTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor);
+	bool CreateDepthTarget();
 
 	Desc _desc;
 	std::unique_ptr<JRenderTarget> _albedo;
 	std::unique_ptr<JRenderTarget> _normal;
 	std::unique_ptr<JRenderTarget> _material;
+	ComPtr<ID3D12Resource> _depthResource;
+	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+	D3D12_CPU_DESCRIPTOR_HANDLE _dsvHandle = {};
+	D3D12_RESOURCE_STATES _depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 };
 
 J_ENGINE_END

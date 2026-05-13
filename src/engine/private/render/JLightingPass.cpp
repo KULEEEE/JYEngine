@@ -4,6 +4,7 @@
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderContext.h"
+#include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderTarget.h"
 #include "engine/asset/JShader.h"
 
@@ -39,7 +40,7 @@ bool JLightingPass::EnsureResources(const JRenderPassContext& context)
 		return false;
 	}
 
-	_pipeline = context.renderContext->CreatePipeline(_shader, false, false);
+	_pipeline = context.renderContext->CreatePipeline(_shader, false, false, false, false, {}, false);
 	if (_pipeline == nullptr)
 	{
 		std::cerr << "JLightingPass failed: pipeline creation failed." << std::endl;
@@ -60,8 +61,12 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	}
 
 	JRenderTarget* albedoTarget = context.gBuffer->GetAlbedoTarget();
+	JRenderTarget* normalTarget = context.gBuffer->GetNormalTarget();
+	JRenderTarget* materialTarget = context.gBuffer->GetMaterialTarget();
 	Render::JTexture* albedoTexture = albedoTarget != nullptr ? albedoTarget->GetTextureView() : nullptr;
-	if (albedoTexture == nullptr || !EnsureResources(context))
+	Render::JTexture* normalTexture = normalTarget != nullptr ? normalTarget->GetTextureView() : nullptr;
+	Render::JTexture* materialTexture = materialTarget != nullptr ? materialTarget->GetTextureView() : nullptr;
+	if (albedoTexture == nullptr || normalTexture == nullptr || materialTexture == nullptr || !EnsureResources(context))
 	{
 		return;
 	}
@@ -71,7 +76,14 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
 	Render::JGraphicResource graphicResource(_shader);
+	const JRenderDB::LightResource* lightResource = context.renderDB != nullptr ? context.renderDB->GetLightResource() : nullptr;
+	if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
+	{
+		graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer);
+	}
 	graphicResource.SetTexture("GBufferAlbedo", albedoTexture);
+	graphicResource.SetTexture("GBufferNormal", normalTexture);
+	graphicResource.SetTexture("GBufferMaterial", materialTexture);
 
 	context.commandQueue->SetPipeline(_pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);

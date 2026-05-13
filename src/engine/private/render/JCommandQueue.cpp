@@ -29,6 +29,8 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
+	_device = device;
+
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -84,9 +86,15 @@ void JCommandQueue::RenderBegin()
 
 	_cmdAlloc->Reset();
 	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
+	_transientDescriptorHeaps.clear();
 }
 
 void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget)
+{
+	BeginRenderPass(renderTarget, clearColor, rectCount, nullptr, clearRenderTarget, false);
+}
+
+void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget, bool clearDepth)
 {
 	if (_cmdList == nullptr || renderTarget == nullptr)
 	{
@@ -95,6 +103,8 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	}
 
 	_currentRenderTarget = renderTarget;
+	_currentRenderTargets.clear();
+	_currentRenderTargets.push_back(renderTarget);
 
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 	vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles = renderTarget->GetRTVHandle();
@@ -123,8 +133,87 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 			_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
 		}
 	}
+	if (dsvHandle != nullptr && clearDepth)
+	{
+		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, rectCount, nullptr);
+	}
 
-	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, nullptr);
+	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, dsvHandle);
+}
+
+void JCommandQueue::BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, bool clearRenderTarget)
+{
+	BeginRenderPass(renderTargets, rectCount, nullptr, clearRenderTarget, false);
+}
+
+void JCommandQueue::BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget, bool clearDepth)
+{
+	if (_cmdList == nullptr || renderTargets.empty())
+	{
+		std::cerr << "BeginRenderPass skipped: command list or render targets are invalid." << std::endl;
+		return;
+	}
+
+	_currentRenderTarget = renderTargets.front();
+	_currentRenderTargets = renderTargets;
+
+	vector<D3D12_RESOURCE_BARRIER> barriers;
+	vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles;
+
+	for (Engine::JRenderTarget* renderTarget : renderTargets)
+	{
+		if (renderTarget == nullptr || !renderTarget->IsValid())
+		{
+			continue;
+		}
+
+		for (ID3D12Resource* rtvResource : renderTarget->GetRTVResource())
+		{
+			if (rtvResource != nullptr && renderTarget->GetResourceState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
+			{
+				barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+					rtvResource,
+					renderTarget->GetResourceState(),
+					D3D12_RESOURCE_STATE_RENDER_TARGET));
+			}
+		}
+
+		renderTarget->SetResourceState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+		const auto& handles = renderTarget->GetRTVHandle();
+		rtvHandles.insert(rtvHandles.end(), handles.begin(), handles.end());
+	}
+
+	if (rtvHandles.empty())
+	{
+		return;
+	}
+
+	if (!barriers.empty())
+	{
+		_cmdList->ResourceBarrier(static_cast<uint32>(barriers.size()), barriers.data());
+	}
+
+	if (clearRenderTarget)
+	{
+		for (Engine::JRenderTarget* renderTarget : renderTargets)
+		{
+			if (renderTarget == nullptr)
+			{
+				continue;
+			}
+
+			for (const D3D12_CPU_DESCRIPTOR_HANDLE& rtvHandle : renderTarget->GetRTVHandle())
+			{
+				_cmdList->ClearRenderTargetView(rtvHandle, renderTarget->GetClearColor(), rectCount, nullptr);
+			}
+		}
+	}
+	if (dsvHandle != nullptr && clearDepth)
+	{
+		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, rectCount, nullptr);
+	}
+
+	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, dsvHandle);
 }
 
 void JCommandQueue::TransitionRenderTarget(Engine::JRenderTarget* renderTarget, D3D12_RESOURCE_STATES targetState)
@@ -222,19 +311,56 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 
 	if (!resource->GetTextures().empty())
 	{
-		const JTexture* texture = resource->GetTextures().front().texture;
-		if (texture != nullptr && texture->srvHeap != nullptr)
+		const auto& textures = resource->GetTextures();
+		if (textures.size() == 1)
 		{
-			ID3D12DescriptorHeap* heaps[] = { texture->srvHeap, texture->samplerHeap };
-			_cmdList->SetDescriptorHeaps(texture->samplerHeap != nullptr ? 2u : 1u, heaps);
-
-			const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
-			_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, texture->srvHeap->GetGPUDescriptorHandleForHeapStart());
-
-			if (texture->samplerHeap != nullptr && !shader->bindingInfo.samplers.empty())
+			const JTexture* texture = textures.front().texture;
+			if (texture != nullptr && texture->srvHeap != nullptr)
 			{
-				const uint32 samplerRootParameterIndex = textureRootParameterIndex + 1;
-				_cmdList->SetGraphicsRootDescriptorTable(samplerRootParameterIndex, texture->samplerHeap->GetGPUDescriptorHandleForHeapStart());
+				ID3D12DescriptorHeap* heaps[] = { texture->srvHeap, texture->samplerHeap };
+				_cmdList->SetDescriptorHeaps(texture->samplerHeap != nullptr ? 2u : 1u, heaps);
+
+				const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
+				_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, texture->srvHeap->GetGPUDescriptorHandleForHeapStart());
+			}
+		}
+		else if (_device != nullptr)
+		{
+			uint32 srvDescriptorCount = 0;
+			for (const JShader::BindingInfo::Resource& textureBinding : shader->bindingInfo.textures)
+			{
+				srvDescriptorCount = std::max(srvDescriptorCount, textureBinding.slot + 1);
+			}
+
+			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+			heapDesc.NumDescriptors = srvDescriptorCount;
+			heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+			ComPtr<ID3D12DescriptorHeap> srvHeap;
+			const HRESULT hr = _device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&srvHeap));
+			if (SUCCEEDED(hr) && srvHeap != nullptr)
+			{
+				const uint32 descriptorSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				for (const JGraphicResource::TextureBinding& binding : textures)
+				{
+					const JTexture* texture = binding.texture;
+					if (texture == nullptr || texture->srvHeap == nullptr || binding.shaderSlot >= heapDesc.NumDescriptors)
+					{
+						continue;
+					}
+
+					D3D12_CPU_DESCRIPTOR_HANDLE dest = srvHeap->GetCPUDescriptorHandleForHeapStart();
+					dest.ptr += static_cast<SIZE_T>(binding.shaderSlot) * descriptorSize;
+					_device->CopyDescriptorsSimple(1, dest, texture->srvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				}
+
+				ID3D12DescriptorHeap* heaps[] = { srvHeap.Get() };
+				_cmdList->SetDescriptorHeaps(1, heaps);
+
+				const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
+				_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, srvHeap->GetGPUDescriptorHandleForHeapStart());
+				_transientDescriptorHeaps.push_back(srvHeap);
 			}
 		}
 	}
@@ -291,24 +417,29 @@ void JCommandQueue::EndRenderPass()
 
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 
-	if (_currentRenderTarget->IsSwapChainTarget())
+	for (Engine::JRenderTarget* renderTarget : _currentRenderTargets)
 	{
-		for (auto& rtvResource : _currentRenderTarget->GetRTVResource())
+		if (renderTarget == nullptr || !renderTarget->IsSwapChainTarget())
+		{
+			continue;
+		}
+
+		for (auto& rtvResource : renderTarget->GetRTVResource())
 		{
 			if (rtvResource != nullptr)
 			{
 				barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 					rtvResource,
-					_currentRenderTarget->GetResourceState(),
+					renderTarget->GetResourceState(),
 					D3D12_RESOURCE_STATE_PRESENT));
 			}
 		}
+		renderTarget->SetResourceState(D3D12_RESOURCE_STATE_PRESENT);
 	}
 
 	if (!barriers.empty())
 	{
 		_cmdList->ResourceBarrier(static_cast<uint32>(barriers.size()), barriers.data());
-		_currentRenderTarget->SetResourceState(D3D12_RESOURCE_STATE_PRESENT);
 	}
 }
 

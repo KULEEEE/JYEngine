@@ -27,6 +27,9 @@ namespace
 	struct MaterialConstants
 	{
 		JVec4 baseColor;
+		float roughness = 0.5f;
+		float metallic = 1.0f;
+		JVec2 padding = {};
 	};
 
 	constexpr float FIXED_DELTA_TIME = 1.0f / 60.0f;
@@ -52,6 +55,26 @@ namespace
 		}
 
 		return degrees;
+	}
+
+	uint32 getClientWidth(HWND hwnd)
+	{
+		RECT rect{};
+		if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
+		{
+			return 1920u;
+		}
+		return static_cast<uint32>(std::max<LONG>(rect.right - rect.left, 1));
+	}
+
+	uint32 getClientHeight(HWND hwnd)
+	{
+		RECT rect{};
+		if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
+		{
+			return 1080u;
+		}
+		return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
 	}
 }
 
@@ -95,7 +118,10 @@ JScenePanel::~JScenePanel()
 	delete planeMaterial;
 	delete perFrameBuffer;
 	delete materialBuffer;
-	delete materialTexture;
+	delete baseColorTexture;
+	delete normalTexture;
+	delete roughnessTexture;
+	delete metallicTexture;
 	delete mesh;
 	delete planeMesh;
 
@@ -104,7 +130,10 @@ JScenePanel::~JScenePanel()
 	planeMaterial = nullptr;
 	perFrameBuffer = nullptr;
 	materialBuffer = nullptr;
-	materialTexture = nullptr;
+	baseColorTexture = nullptr;
+	normalTexture = nullptr;
+	roughnessTexture = nullptr;
+	metallicTexture = nullptr;
 	mesh = nullptr;
 	planeMesh = nullptr;
 }
@@ -170,10 +199,14 @@ void JScenePanel::Init()
 		return;
 	}
 
-	materialTexture = materialFactory->CreateAndSetSolidColorTexture(material, "BaseTexture", JColor(0.0f, 0.0f, 1.0f, 1.0f));
-	if (materialTexture == nullptr)
+	const std::string texturePath = get_Engine_Res_Path() + "\\texture";
+	baseColorTexture = materialFactory->CreateAndSetTextureFromFile(material, "BaseTexture", texturePath + "\\Base_color.png");
+	normalTexture = materialFactory->CreateAndSetTextureFromFile(material, "NormalTexture", texturePath + "\\normal.png");
+	roughnessTexture = materialFactory->CreateAndSetTextureFromFile(material, "RoughnessTexture", texturePath + "\\roughness.png");
+	metallicTexture = materialFactory->CreateAndSetTextureFromFile(material, "MetallicTexture", texturePath + "\\metallic.png");
+	if (baseColorTexture == nullptr || normalTexture == nullptr || roughnessTexture == nullptr || metallicTexture == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: material texture creation failed." << std::endl;
+		std::cerr << "JScenePanel::Init failed: PBR texture creation failed." << std::endl;
 		return;
 	}
 
@@ -185,7 +218,11 @@ void JScenePanel::Init()
 	Engine::JScene::TransformData cameraTransformData{};
 	cameraTransformData.position = { 0.0f, 0.0f, -8.0f };
 	_cameraTransform = scene->AddTransform(_cameraEntity, cameraTransformData);
-	_camera = scene->AddCamera(_cameraEntity, _cameraTransform, 800.0f / 600.0f);
+	const uint32 initialWidth = getClientWidth(_mainWindow);
+	const uint32 initialHeight = getClientHeight(_mainWindow);
+	_viewportWidth = initialWidth;
+	_viewportHeight = initialHeight;
+	_camera = scene->AddCamera(_cameraEntity, _cameraTransform, static_cast<float>(initialWidth) / static_cast<float>(initialHeight));
 	if (!_camera.IsValid())
 	{
 		std::cerr << "JScenePanel::Init failed: camera creation failed." << std::endl;
@@ -234,7 +271,7 @@ void JScenePanel::Init()
 	_planeTransform = scene->AddTransform(_planeEntity);
 	_planeRenderObject = scene->AddRenderObject(_planeEntity, _planeTransform, planeMaterial->instanceID, planeMesh, true);
 
-	std::string meshPath = get_Engine_Mesh_Path() + "\\Car.fbx";
+	std::string meshPath = get_Engine_Mesh_Path() + "\\Cup.fbx";
 	std::cout << "Loading mesh: " << meshPath << std::endl;
 
 	JFBXLoader fbxLoader;
@@ -246,7 +283,9 @@ void JScenePanel::Init()
 	}
 
 	_carEntity = scene->CreateEntity();
-	_carTransform = scene->AddTransform(_carEntity);
+	Engine::JScene::TransformData cupTransformData{};
+	cupTransformData.pitch = 1.507f;
+	_carTransform = scene->AddTransform(_carEntity, cupTransformData);
 	_carRenderObject = scene->AddRenderObject(_carEntity, _carTransform, material->instanceID, mesh, false);
 
 	renderServer->SyncScene(*scene);
@@ -279,14 +318,32 @@ void JScenePanel::Update()
 		return;
 	}
 
+	const uint32 clientWidth = getClientWidth(_mainWindow);
+	const uint32 clientHeight = getClientHeight(_mainWindow);
+	if (clientWidth != _viewportWidth || clientHeight != _viewportHeight)
+	{
+		_viewportWidth = clientWidth;
+		_viewportHeight = clientHeight;
+		if (swapChain != nullptr)
+		{
+			swapChain->Resize(clientWidth, clientHeight);
+		}
+
+		Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+		if (cameraData != nullptr)
+		{
+			cameraData->aspectRatio = static_cast<float>(clientWidth) / static_cast<float>(clientHeight);
+		}
+	}
+
 	updateCamera(FIXED_DELTA_TIME);
 	renderServer->MarkCameraDirty(_camera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
 	updateCameraInfoPanel();
 
-	Render::JViewport viewport = { 0, 0, 800, 600, 0, 1 };
-	D3D12_RECT rect = CD3DX12_RECT(0, 0, 800, 600);
+	Render::JViewport viewport = { 0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight), 0, 1 };
+	D3D12_RECT rect = CD3DX12_RECT(0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight));
 
 	Engine::JRenderer::FrameDesc frameDesc;
 	if (!renderServer->BuildFrameDesc(*scene, swapChain->GetRenderTarget(), JColors::DarkGray, viewport, rect, frameDesc))
@@ -475,3 +532,7 @@ void JScenePanel::updateCameraInfoPanel()
 }
 
 J_EDITOR_END
+
+
+
+

@@ -36,7 +36,10 @@ private:
 	Engine::JMesh* planeMesh = nullptr;
 	Render::JConstantBuffer* perFrameBuffer = nullptr;
 	Render::JConstantBuffer* materialBuffer = nullptr;
-	Render::JTexture* materialTexture = nullptr;
+	Render::JTexture* baseColorTexture = nullptr;
+	Render::JTexture* normalTexture = nullptr;
+	Render::JTexture* roughnessTexture = nullptr;
+	Render::JTexture* metallicTexture = nullptr;
 	Engine::JEntityHandle _cameraEntity = {};
 	Engine::JEntityHandle _lightEntity = {};
 	Engine::JEntityHandle _planeEntity = {};
@@ -55,8 +58,19 @@ private:
 	HWND _cameraInfoWindow = nullptr;
 	HWND _cameraInfoText = nullptr;
 	HWND _mainWindow = nullptr;
+	uint32 _viewportWidth = 0;
+	uint32 _viewportHeight = 0;
 };
 
 J_EDITOR_END
 
 #endif
+
+
+
+
+
+
+
+
+

@@ -102,51 +102,57 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData)
 			const ofbx::GeometryPartition::Polygon& polygon = partition.polygons[pi];
 			const uint32_t triCount = ofbx::triangulate(geom, polygon, triIndices.data());
 
-			for (uint32_t t = 0; t < triCount; ++t)
+			// FBX(right-handed, Y-up) → DirectX(left-handed, Y-up) 좌표계 변환.
+			// z 부호 반전 + 삼각형 winding 역전을 함께 적용해야 텍스처가 좌우 반전 없이 표시된다.
+			for (uint32_t t = 0; t + 2 < triCount; t += 3)
 			{
-				const int vi = triIndices[t];
-
-				const ofbx::Vec3 pos = positions.get(vi);
-				parsingData.positions.push_back(static_cast<float>(pos.x) * s_scaleFactor);
-				parsingData.positions.push_back(static_cast<float>(pos.y) * s_scaleFactor);
-				parsingData.positions.push_back(static_cast<float>(pos.z) * s_scaleFactor);
-				parsingData.positions.push_back(1.0f);
-
-				if (hasNormals)
+				const int triangle[3] = { triIndices[t], triIndices[t + 2], triIndices[t + 1] };
+				for (int k = 0; k < 3; ++k)
 				{
-					const ofbx::Vec3 n = normals.get(vi);
-					parsingData.normals.push_back(static_cast<float>(n.x));
-					parsingData.normals.push_back(static_cast<float>(n.y));
-					parsingData.normals.push_back(static_cast<float>(n.z));
-				}
+					const int vi = triangle[k];
 
-				if (hasUVs)
-				{
-					const ofbx::Vec2 uv = uvs.get(vi);
-					parsingData.texcoords.push_back(static_cast<float>(uv.x));
-					parsingData.texcoords.push_back(static_cast<float>(uv.y));
-				}
+					const ofbx::Vec3 pos = positions.get(vi);
+					parsingData.positions.push_back(static_cast<float>(pos.x) * s_scaleFactor);
+					parsingData.positions.push_back(static_cast<float>(pos.y) * s_scaleFactor);
+					parsingData.positions.push_back(static_cast<float>(-pos.z) * s_scaleFactor);
+					parsingData.positions.push_back(1.0f);
 
-				if (hasColors)
-				{
-					const ofbx::Vec4 c = colors.get(vi);
-					parsingData.colors.push_back(static_cast<float>(c.x));
-					parsingData.colors.push_back(static_cast<float>(c.y));
-					parsingData.colors.push_back(static_cast<float>(c.z));
-					parsingData.colors.push_back(static_cast<float>(c.w));
-				}
+					if (hasNormals)
+					{
+						const ofbx::Vec3 n = normals.get(vi);
+						parsingData.normals.push_back(static_cast<float>(n.x));
+						parsingData.normals.push_back(static_cast<float>(n.y));
+						parsingData.normals.push_back(static_cast<float>(-n.z));
+					}
 
-				if (hasTangents)
-				{
-					const ofbx::Vec3 tan = tangents.get(vi);
-					parsingData.tangents.push_back(static_cast<float>(tan.x));
-					parsingData.tangents.push_back(static_cast<float>(tan.y));
-					parsingData.tangents.push_back(static_cast<float>(tan.z));
-					parsingData.tangents.push_back(0.0f);
-				}
+					if (hasUVs)
+					{
+						const ofbx::Vec2 uv = uvs.get(vi);
+						parsingData.texcoords.push_back(static_cast<float>(uv.x));
+						parsingData.texcoords.push_back(1.0f - static_cast<float>(uv.y));
+					}
 
-				const uint32_t localIndex = static_cast<uint32_t>(parsingData.positions.size() / 4) - 1;
-				parsingData.indices.push_back(localIndex);
+					if (hasColors)
+					{
+						const ofbx::Vec4 c = colors.get(vi);
+						parsingData.colors.push_back(static_cast<float>(c.x));
+						parsingData.colors.push_back(static_cast<float>(c.y));
+						parsingData.colors.push_back(static_cast<float>(c.z));
+						parsingData.colors.push_back(static_cast<float>(c.w));
+					}
+
+					if (hasTangents)
+					{
+						const ofbx::Vec3 tan = tangents.get(vi);
+						parsingData.tangents.push_back(static_cast<float>(tan.x));
+						parsingData.tangents.push_back(static_cast<float>(tan.y));
+						parsingData.tangents.push_back(static_cast<float>(-tan.z));
+						parsingData.tangents.push_back(0.0f);
+					}
+
+					const uint32_t localIndex = static_cast<uint32_t>(parsingData.positions.size() / 4) - 1;
+					parsingData.indices.push_back(localIndex);
+				}
 			}
 		}
 

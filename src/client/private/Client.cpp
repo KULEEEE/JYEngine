@@ -58,9 +58,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MSG msg;
 
     //SetSize
-    s_WindowInfo.width = 800;
-    s_WindowInfo.height = 600;
+    s_WindowInfo.width = 1920;
+    s_WindowInfo.height = 1080;
     s_WindowInfo.windowed = true;
+    RECT clientRect{};
+    if (GetClientRect(s_WindowInfo.hwnd, &clientRect))
+    {
+        s_WindowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
+        s_WindowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
+    }
 
     //SwapChain Create
     J::Render::JSwapChain* swapChain = new J::Render::JSwapChain();
@@ -146,8 +152,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // ?∏Ïä§?¥Ïä§ ?∏Îì§???ÑÏó≠ Î≥Ä?òÏóê ?Ä?•Ìï©?àÎã§.
 
+   RECT windowRect = { 0, 0, 1920, 1080 };
+   AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+      CW_USEDEFAULT, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -158,6 +166,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    UpdateWindow(hWnd);
 
    s_WindowInfo.hwnd = hWnd;
+   RECT clientRect{};
+   if (GetClientRect(hWnd, &clientRect))
+   {
+      s_WindowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
+      s_WindowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
+   }
 
    return TRUE;
 }
@@ -229,3 +243,9 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return (INT_PTR)FALSE;
 }
+
+
+
+
+
+

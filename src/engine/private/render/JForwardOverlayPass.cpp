@@ -1,6 +1,7 @@
 #include "engine/render/JForwardOverlayPass.h"
 
 #include "engine/render/JCommandQueue.h"
+#include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderDB.h"
@@ -20,7 +21,8 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 		return;
 	}
 
-	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0, false);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = context.gBuffer != nullptr ? context.gBuffer->GetDSVHandle() : D3D12_CPU_DESCRIPTOR_HANDLE{};
+	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0, context.gBuffer != nullptr ? &dsvHandle : nullptr, false, false);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 	RenderDrawItems(context, frameDesc.transparentDrawItems);

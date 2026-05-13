@@ -54,6 +54,11 @@ Render::JTexture* JMaterialFactory::CreateSolidColorTexture(const JColor& color)
 	return _renderContext != nullptr ? _renderContext->CreateSolidColorTexture(color) : nullptr;
 }
 
+Render::JTexture* JMaterialFactory::CreateTextureFromFile(const std::string& path) const
+{
+	return _renderContext != nullptr ? _renderContext->CreateTextureFromFile(path) : nullptr;
+}
+
 Render::JConstantBuffer* JMaterialFactory::CreateAndSetConstantBuffer(JMaterial* material, const std::string& name, void* data, size_t size) const
 {
 	if (material == nullptr)
@@ -77,6 +82,21 @@ Render::JTexture* JMaterialFactory::CreateAndSetSolidColorTexture(JMaterial* mat
 	}
 
 	Render::JTexture* texture = CreateSolidColorTexture(color);
+	if (texture != nullptr)
+	{
+		material->SetTexture(name, texture);
+	}
+	return texture;
+}
+
+Render::JTexture* JMaterialFactory::CreateAndSetTextureFromFile(JMaterial* material, const std::string& name, const std::string& path) const
+{
+	if (material == nullptr)
+	{
+		return nullptr;
+	}
+
+	Render::JTexture* texture = CreateTextureFromFile(path);
 	if (texture != nullptr)
 	{
 		material->SetTexture(name, texture);

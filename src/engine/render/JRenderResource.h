@@ -13,7 +13,9 @@ struct JMeshResource
 	Render::JIndexBuffer* indexBufferResource = nullptr;
 	vector<D3D12_VERTEX_BUFFER_VIEW> soaBuffers;
 	D3D12_INDEX_BUFFER_VIEW indexBuffer;
-	size_t indexSize;
+	size_t indexSize = 0;
+	bool hasNormals = false;
+	bool hasTexcoords = false;
 };
 J_ENGINE_END
 
