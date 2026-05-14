@@ -273,7 +273,11 @@ bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTar
 
 		JRenderer::DrawItem drawItem;
 		drawItem.entity = slot.data.entity;
-		drawItem.transform = slot.data.transform;
+		drawItem.transform = scene.GetTransformHandle(slot.data.entity);
+		if (!drawItem.transform.IsValid())
+		{
+			continue;
+		}
 		drawItem.renderObject = { static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation };
 		drawItem.materialID = slot.data.materialID;
 		drawItem.mesh = slot.data.mesh;

@@ -3,7 +3,7 @@
 #define __J_SCENE_PANEL_H__
 
 #include "client/editor/JEditorPanel.h"
-#include "client/editor/JSceneBuilder.h"
+#include "client/editor/JSceneManager.h"
 #include "engine/core/JEngineContext.h"
 #include "engine/scene/JScene.h"
 
@@ -14,7 +14,7 @@ J_EDITOR_BEGIN
 class JScenePanel : public JEditorPanel
 {
 public:
-	JScenePanel() = default;
+	explicit JScenePanel(JSceneManager* sceneManager);
 	~JScenePanel() override;
 
 	void Init() override;
@@ -26,7 +26,7 @@ private:
 	const Engine::JScene* getScene() const;
 	void updateSceneCamera(float deltaTime);
 	
-	JSceneBuildResult _sceneBuild;
+	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
 	Engine::JLightHandle _light = {};
 	bool _isMouseLookActive = false;

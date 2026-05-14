@@ -1,0 +1,48 @@
+#pragma once
+#ifndef __J_ASSET_MANAGER_H__
+#define __J_ASSET_MANAGER_H__
+
+#include "engine/precompile.h"
+#include "engine/scene/JSceneData.h"
+#include "engine/render/JMaterialFactory.h"
+#include "engine/asset/JMaterial.h"
+#include "engine/asset/JMesh.h"
+
+J_EDITOR_BEGIN
+
+class JAssetManager
+{
+public:
+	struct MaterialBundle
+	{
+		std::shared_ptr<Engine::JMaterial> material;
+		std::vector<std::shared_ptr<Render::JConstantBuffer>> constantBuffers;
+		std::vector<std::shared_ptr<Render::JTexture>> textures;
+	};
+
+	explicit JAssetManager(Engine::JMaterialFactory* materialFactory = nullptr);
+
+	void Initialize(Engine::JMaterialFactory* materialFactory);
+
+	std::shared_ptr<MaterialBundle> AcquireMaterialBundle(const Engine::JSceneMaterialData& materialData);
+	std::shared_ptr<Engine::JMesh> AcquireMesh(const Engine::JSceneMeshData& meshData);
+
+private:
+	static std::string resolveResourcePath(const std::string& path);
+	static std::string makeMaterialKey(const Engine::JSceneMaterialData& materialData);
+	static std::string makeMeshKey(const Engine::JSceneMeshData& meshData);
+	static std::string makeTextureKey(const std::string& path);
+
+	static std::shared_ptr<Render::JConstantBuffer> adoptConstantBuffer(Render::JConstantBuffer* buffer);
+	static std::shared_ptr<Render::JTexture> adoptTexture(Render::JTexture* texture);
+	static std::shared_ptr<Engine::JMesh> adoptMesh(Engine::JMesh* mesh);
+
+	Engine::JMaterialFactory* _materialFactory = nullptr;
+	std::unordered_map<size_t, std::weak_ptr<MaterialBundle>> _materialCache;
+	std::unordered_map<size_t, std::weak_ptr<Engine::JMesh>> _meshCache;
+	std::unordered_map<size_t, std::weak_ptr<Render::JTexture>> _textureCache;
+};
+
+J_EDITOR_END
+
+#endif

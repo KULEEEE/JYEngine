@@ -8,6 +8,7 @@
 #include "engine/asset/JMesh.h"
 #include "engine/render/JRenderDefinition.h"
 
+#include "client/editor/JAssetManager.h"
 /*#include "engine/render/JMaterialFactory.h"*/ namespace J { namespace Engine { class JMaterialFactory; } }
 /*#include "engine/render/JRenderServer.h"*/ namespace J { namespace Engine { class JRenderServer; } }
 
@@ -15,6 +16,7 @@ J_EDITOR_BEGIN
 
 struct JSceneBuildContext
 {
+	JAssetManager* assetManager = nullptr;
 	Engine::JMaterialFactory* materialFactory = nullptr;
 	Engine::JRenderServer* renderServer = nullptr;
 	float cameraAspectRatio = 1.0f;
@@ -33,10 +35,11 @@ public:
 	void Release(Engine::JRenderServer* renderServer);
 
 	std::unique_ptr<Engine::JScene> scene;
-	std::vector<std::unique_ptr<Engine::JMaterial>> materials;
-	std::vector<std::unique_ptr<Engine::JMesh>> meshes;
-	std::vector<std::unique_ptr<Render::JConstantBuffer>> constantBuffers;
-	std::vector<std::unique_ptr<Render::JTexture>> textures;
+	std::vector<std::shared_ptr<Engine::JMaterial>> materials;
+	std::vector<std::shared_ptr<Engine::JMesh>> meshes;
+	std::vector<std::shared_ptr<Render::JConstantBuffer>> constantBuffers;
+	std::vector<std::shared_ptr<Render::JTexture>> textures;
+	std::vector<std::shared_ptr<JAssetManager::MaterialBundle>> materialBundles;
 
 	std::unordered_map<std::string, uint32> materialIDs;
 	std::unordered_map<std::string, Engine::JEntityHandle> entities;

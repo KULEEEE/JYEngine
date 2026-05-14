@@ -61,7 +61,7 @@ void JCameraSystem::SetRotate(JScene& scene, JCameraHandle camera, float x, floa
 		return;
 	}
 
-	JScene::TransformData* transform = scene.GetTransform(cameraData->transform);
+	JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
 	if (transform == nullptr)
 	{
 		return;
@@ -78,7 +78,7 @@ void JCameraSystem::SetPosition(JScene& scene, JCameraHandle camera, float x, fl
 		return;
 	}
 
-	JScene::TransformData* transform = scene.GetTransform(cameraData->transform);
+	JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
 	if (transform == nullptr)
 	{
 		return;
@@ -95,7 +95,7 @@ XMMATRIX JCameraSystem::GetViewMatrix(const JScene& scene, JCameraHandle camera)
 		return XMMatrixIdentity();
 	}
 
-	const JScene::TransformData* transform = scene.GetTransform(cameraData->transform);
+	const JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
 	if (transform == nullptr)
 	{
 		return XMMatrixIdentity();

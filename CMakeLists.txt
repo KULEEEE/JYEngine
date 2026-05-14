@@ -87,6 +87,7 @@ target_include_directories(Client PRIVATE
 
 # Client에 Engine을 명시적으로 종속시키고, 링크
 target_link_libraries(Client PRIVATE Engine)
+target_link_libraries(Client PRIVATE shell32.lib)
 add_dependencies(Client Engine)
 
 # 리소스 복사

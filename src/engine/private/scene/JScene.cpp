@@ -47,6 +47,7 @@ JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::strin
 	data.active = true;
 	const JEntityHandle entity = _entities.Add(data);
 	_entityMetadata.resize(_entities.GetSlots().size());
+	_entityTransformLookup.resize(_entities.GetSlots().size());
 
 	const std::string resolvedStableID = stableID.empty() ? GenerateStableID() : stableID;
 	SetEntityMetadata(entity, resolvedStableID, name, tags);
@@ -146,6 +147,11 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 	}
 
 	const JTransformHandle transform = _transforms.Add(data);
+	if (entity.index >= _entityTransformLookup.size())
+	{
+		_entityTransformLookup.resize(entity.index + 1);
+	}
+	_entityTransformLookup[entity.index] = transform;
 	AddEntityComponentMask(entity, JSceneComponentMask::Transform);
 	return transform;
 }
@@ -159,7 +165,6 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 
 	CameraData data;
 	data.entity = entity;
-	data.transform = transform;
 	data.aspectRatio = aspectRatio;
 	data.nearP = nearP;
 	data.farP = farP;
@@ -173,31 +178,29 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	return handle;
 }
 
-JLightHandle JScene::AddLight(JEntityHandle entity, JTransformHandle transform, const LightData& data)
+JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 {
-	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
+	if (!_entities.IsValid(entity) || GetTransform(entity) == nullptr)
 	{
 		return {};
 	}
 
 	LightData lightData = data;
 	lightData.entity = entity;
-	lightData.transform = transform;
 	const JLightHandle light = _lights.Add(lightData);
 	AddEntityComponentMask(entity, JSceneComponentMask::Light);
 	return light;
 }
 
-JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent)
+JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent)
 {
-	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
+	if (!_entities.IsValid(entity) || GetTransform(entity) == nullptr)
 	{
 		return {};
 	}
 
 	RenderObjectData data;
 	data.entity = entity;
-	data.transform = transform;
 	data.materialID = materialID;
 	data.mesh = mesh;
 	data.transparent = transparent;
@@ -224,6 +227,38 @@ JScene::TransformData* JScene::GetTransform(JTransformHandle handle)
 const JScene::TransformData* JScene::GetTransform(JTransformHandle handle) const
 {
 	return _transforms.Get(handle);
+}
+
+JScene::TransformData* JScene::GetTransform(JEntityHandle entity)
+{
+	if (!_entities.IsValid(entity) || entity.index >= _entityTransformLookup.size())
+	{
+		return nullptr;
+	}
+
+	const JTransformHandle transform = _entityTransformLookup[entity.index];
+	return _transforms.Get(transform);
+}
+
+const JScene::TransformData* JScene::GetTransform(JEntityHandle entity) const
+{
+	if (!_entities.IsValid(entity) || entity.index >= _entityTransformLookup.size())
+	{
+		return nullptr;
+	}
+
+	const JTransformHandle transform = _entityTransformLookup[entity.index];
+	return _transforms.Get(transform);
+}
+
+JTransformHandle JScene::GetTransformHandle(JEntityHandle entity) const
+{
+	if (!_entities.IsValid(entity) || entity.index >= _entityTransformLookup.size())
+	{
+		return {};
+	}
+
+	return _entityTransformLookup[entity.index];
 }
 
 JScene::CameraData* JScene::GetCamera(JCameraHandle handle)

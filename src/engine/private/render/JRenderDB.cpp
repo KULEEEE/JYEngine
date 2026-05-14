@@ -248,7 +248,7 @@ void JRenderDB::SyncLights(const JScene& scene)
 			continue;
 		}
 
-		const JScene::TransformData* transform = scene.GetTransform(slot.data.transform);
+		const JScene::TransformData* transform = scene.GetTransform(slot.data.entity);
 		if (transform == nullptr)
 		{
 			continue;

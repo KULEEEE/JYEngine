@@ -1,6 +1,5 @@
 #include "client/editor/JSceneBuilder.h"
 
-#include "client/editor/JFBXLoader.h"
 #include "engine/render/JMaterialFactory.h"
 #include "engine/render/JRenderServer.h"
 
@@ -14,46 +13,6 @@ namespace
 	{
 		XMFLOAT4X4 viewProjection;
 	};
-
-	struct MaterialConstants
-	{
-		JVec4 baseColor;
-		float roughness = 0.5f;
-		float metallic = 1.0f;
-		JVec2 padding = {};
-	};
-
-	std::string resolveResourcePath(const std::string& path)
-	{
-		const std::filesystem::path sourcePath(path);
-		if (sourcePath.is_absolute())
-		{
-			return sourcePath.string();
-		}
-
-		return (std::filesystem::path(get_Engine_Res_Path()) / sourcePath).string();
-	}
-
-	Engine::JMesh* createPlaneMesh(const Engine::JSceneMeshPlaneData& planeData)
-	{
-		const float size = planeData.size;
-		const float y = planeData.y;
-
-		std::vector<float> positions =
-		{
-			-size, y, -size, 1.0f,
-			 size, y, -size, 1.0f,
-			 size, y,  size, 1.0f,
-			-size, y,  size, 1.0f,
-		};
-
-		std::vector<uint32> indices = { 0, 1, 2, 0, 2, 3 };
-
-		Engine::JMesh* mesh = new Engine::JMesh();
-		mesh->SetPositions(std::move(positions));
-		mesh->SetIndices(std::move(indices));
-		return mesh;
-	}
 
 	Engine::JScene::TransformData toRuntimeTransform(const Engine::JSceneTransformData& source)
 	{
@@ -74,15 +33,15 @@ void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
 			renderServer->UnregisterCamera(camera);
 		}
 
-		for (const std::unique_ptr<Engine::JMaterial>& material : materials)
+		for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : materialBundles)
 		{
-			if (material != nullptr)
+			if (bundle != nullptr && bundle->material != nullptr)
 			{
-				renderServer->UnregisterMaterial(material->instanceID);
+				renderServer->UnregisterMaterial(bundle->material->instanceID);
 			}
 		}
 
-		for (const std::unique_ptr<Engine::JMesh>& mesh : meshes)
+		for (const std::shared_ptr<Engine::JMesh>& mesh : meshes)
 		{
 			if (mesh != nullptr)
 			{
@@ -105,6 +64,7 @@ void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
 	materials.clear();
 	constantBuffers.clear();
 	textures.clear();
+	materialBundles.clear();
 	meshes.clear();
 }
 
@@ -129,7 +89,14 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		std::cerr << "JSceneBuilder::Build failed: per-frame buffer creation failed." << std::endl;
 		return false;
 	}
-	result.constantBuffers.emplace_back(perFrameBuffer);
+	result.constantBuffers.emplace_back(perFrameBuffer, [](Render::JConstantBuffer* ptr)
+	{
+		if (ptr != nullptr)
+		{
+			ptr->Destroy();
+			delete ptr;
+		}
+	});
 
 	std::unordered_map<std::string, Engine::JMaterial*> materialLookup;
 	for (const Engine::JSceneMaterialData& materialData : sceneData.materials)
@@ -148,51 +115,36 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			return false;
 		}
 
-		Engine::JMaterial* material = context.materialFactory->CreateMaterial(resolveResourcePath(materialData.shaderPath), materialData.enableAlphaBlend);
-		if (material == nullptr)
+		if (context.assetManager == nullptr)
+		{
+			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
+			result.Release(context.renderServer);
+			return false;
+		}
+
+		std::shared_ptr<JAssetManager::MaterialBundle> materialBundle = context.assetManager->AcquireMaterialBundle(materialData);
+		if (!materialBundle || !materialBundle->material)
 		{
 			std::cerr << "JSceneBuilder::Build failed: material creation failed: " << materialData.id << std::endl;
 			result.Release(context.renderServer);
 			return false;
 		}
-		material->SetName(!materialData.name.empty() ? materialData.name : materialData.id);
-		material->SetConstantBuffer("PerFrame", perFrameBuffer);
 
-		if (materialData.constants.enabled)
+		materialBundle->material->SetConstantBuffer("PerFrame", perFrameBuffer);
+
+		context.renderServer->RegisterMaterial(materialBundle->material.get());
+		result.materialIDs[materialData.id] = materialBundle->material->instanceID;
+		materialLookup[materialData.id] = materialBundle->material.get();
+		result.materialBundles.emplace_back(materialBundle);
+		result.materials.emplace_back(materialBundle->material);
+		for (const std::shared_ptr<Render::JConstantBuffer>& constantBuffer : materialBundle->constantBuffers)
 		{
-			MaterialConstants materialConstants{};
-			materialConstants.baseColor = materialData.constants.baseColor;
-			materialConstants.roughness = materialData.constants.roughness;
-			materialConstants.metallic = materialData.constants.metallic;
-
-			Render::JConstantBuffer* materialBuffer = context.materialFactory->CreateAndSetConstantBuffer(material, "PerMaterial", &materialConstants, sizeof(materialConstants));
-			if (materialBuffer == nullptr)
-			{
-				delete material;
-				std::cerr << "JSceneBuilder::Build failed: material constant buffer creation failed: " << materialData.id << std::endl;
-				result.Release(context.renderServer);
-				return false;
-			}
-			result.constantBuffers.emplace_back(materialBuffer);
+			result.constantBuffers.emplace_back(constantBuffer);
 		}
-
-		for (const Engine::JSceneMaterialTextureData& textureData : materialData.textures)
+		for (const std::shared_ptr<Render::JTexture>& texture : materialBundle->textures)
 		{
-			Render::JTexture* texture = context.materialFactory->CreateAndSetTextureFromFile(material, textureData.name, resolveResourcePath(textureData.path));
-			if (texture == nullptr)
-			{
-				delete material;
-				std::cerr << "JSceneBuilder::Build failed: texture creation failed: " << textureData.path << std::endl;
-				result.Release(context.renderServer);
-				return false;
-			}
 			result.textures.emplace_back(texture);
 		}
-
-		context.renderServer->RegisterMaterial(material);
-		result.materialIDs[materialData.id] = material->instanceID;
-		materialLookup[materialData.id] = material;
-		result.materials.emplace_back(material);
 	}
 
 	context.renderServer->Sync();
@@ -214,27 +166,22 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			return false;
 		}
 
-		Engine::JMesh* mesh = nullptr;
-		if (meshData.type == Engine::JSceneMeshType::Plane)
+		if (context.assetManager == nullptr)
 		{
-			mesh = createPlaneMesh(meshData.plane);
-		}
-		else
-		{
-			const std::string meshPath = resolveResourcePath(meshData.path);
-			std::cout << "Loading mesh: " << meshPath << std::endl;
-			JFBXLoader fbxLoader;
-			mesh = fbxLoader.LoadFBX(meshPath.c_str());
+			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
+			result.Release(context.renderServer);
+			return false;
 		}
 
-		if (mesh == nullptr)
+		std::shared_ptr<Engine::JMesh> mesh = context.assetManager->AcquireMesh(meshData);
+		if (!mesh)
 		{
 			std::cerr << "JSceneBuilder::Build failed: mesh creation failed: " << meshData.id << std::endl;
 			result.Release(context.renderServer);
 			return false;
 		}
 
-		meshLookup[meshData.id] = mesh;
+		meshLookup[meshData.id] = mesh.get();
 		result.meshes.emplace_back(mesh);
 	}
 
@@ -322,7 +269,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			lightData.color = entityData.light.color;
 			lightData.intensity = entityData.light.intensity;
 
-			Engine::JLightHandle light = result.scene->AddLight(entity, transform, lightData);
+			Engine::JLightHandle light = result.scene->AddLight(entity, lightData);
 			if (!light.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: light creation failed: " << entityData.stableID << std::endl;
@@ -357,7 +304,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 
 			Engine::JRenderObjectHandle renderObject = result.scene->AddRenderObject(
 				entity,
-				transform,
 				materialIter->second,
 				meshIter->second,
 				entityData.renderObject.transparent);

@@ -1,6 +1,5 @@
 #include "client/editor/JScenePanel.h"
 
-#include "engine/scene/JSceneSerializer.h"
 #include "engine/render/JSwapChain.h"
 #include "engine/render/JRenderDefinition.h"
 #include "engine/render/JRenderDB.h"
@@ -89,15 +88,17 @@ namespace
 		{
 			return 1080u;
 		}
-		return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
+	return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
 	}
+}
+
+JScenePanel::JScenePanel(JSceneManager* sceneManager)
+	: _sceneManager(sceneManager)
+{
 }
 
 JScenePanel::~JScenePanel()
 {
-	J::Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr;
-	_sceneBuild.Release(renderServer);
-
 	if (_cameraInfoWindow != nullptr)
 	{
 		DestroyWindow(_cameraInfoWindow);
@@ -108,12 +109,12 @@ JScenePanel::~JScenePanel()
 
 Engine::JScene* JScenePanel::getScene()
 {
-	return _sceneBuild.GetScene();
+	return _sceneManager != nullptr ? _sceneManager->GetScene() : nullptr;
 }
 
 const Engine::JScene* JScenePanel::getScene() const
 {
-	return _sceneBuild.GetScene();
+	return _sceneManager != nullptr ? _sceneManager->GetScene() : nullptr;
 }
 
 void JScenePanel::Init()
@@ -124,11 +125,9 @@ void JScenePanel::Init()
 		_mainWindow = GetForegroundWindow();
 	}
 
-	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
-	Engine::JMaterialFactory* materialFactory = GetEngine()->GetMaterialFactory();
-	if (renderServer == nullptr || materialFactory == nullptr)
+	if (_sceneManager == nullptr)
 	{
-		std::cerr << "JScenePanel::Init failed: render server or material factory is null." << std::endl;
+		std::cerr << "JScenePanel::Init failed: scene manager is null." << std::endl;
 		return;
 	}
 
@@ -137,41 +136,18 @@ void JScenePanel::Init()
 	_viewportWidth = initialWidth;
 	_viewportHeight = initialHeight;
 
-	JSceneBuildContext buildContext;
-	buildContext.materialFactory = materialFactory;
-	buildContext.renderServer = renderServer;
-	buildContext.cameraAspectRatio = static_cast<float>(initialWidth) / static_cast<float>(initialHeight);
-
-	Engine::JSceneData sceneData;
-	const std::filesystem::path scenePath = std::filesystem::path(get_Engine_Res_Path()) / "scene" / "sample.jscene.json";
-	if (!Engine::JSceneSerializer::LoadFromFile(scenePath, sceneData))
-	{
-		std::cerr << "JScenePanel::Init failed: scene JSON load failed: " << scenePath.string() << std::endl;
-		return;
-	}
-
-	if (!JSceneBuilder::Build(sceneData, buildContext, _sceneBuild))
-	{
-		std::cerr << "JScenePanel::Init failed: scene build failed." << std::endl;
-		return;
-	}
-
-	_sceneCamera = _sceneBuild.primaryCamera;
-	_light = _sceneBuild.firstLight;
-
 	Engine::JScene* scene = getScene();
+	_sceneCamera = _sceneManager->GetPrimaryCamera();
+	_light = _sceneManager->GetFirstLight();
 	if (scene == nullptr || !_sceneCamera.IsValid())
 	{
 		std::cerr << "JScenePanel::Init failed: scene or camera is invalid." << std::endl;
-		_sceneBuild.Release(renderServer);
 		return;
 	}
 
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
-	if (cameraData == nullptr)
+	if (scene->GetCamera(_sceneCamera) == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
-		_sceneBuild.Release(renderServer);
 		return;
 	}
 
@@ -296,7 +272,7 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 		return;
 	}
 
-	Engine::JScene::TransformData* transformData = scene->GetTransform(cameraData->transform);
+	Engine::JScene::TransformData* transformData = scene->GetTransform(cameraData->entity);
 	if (transformData == nullptr)
 	{
 		return;
@@ -445,7 +421,7 @@ void JScenePanel::updateCameraInfoPanel()
 	}
 
 	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
-	const Engine::JScene::TransformData* transformData = cameraData != nullptr ? scene->GetTransform(cameraData->transform) : nullptr;
+	const Engine::JScene::TransformData* transformData = cameraData != nullptr ? scene->GetTransform(cameraData->entity) : nullptr;
 	if (transformData == nullptr)
 	{
 		return;
@@ -473,7 +449,7 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"Far: " << cameraData->farP << L"\n\n";
 
 	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
-	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->transform) : nullptr;
+	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->entity) : nullptr;
 	stream << L"Scene Light\n";
 	if (lightData != nullptr && lightTransformData != nullptr)
 	{

@@ -85,7 +85,6 @@ public:
 	struct CameraData
 	{
 		JEntityHandle entity = {};
-		JTransformHandle transform = {};
 		float aspectRatio = 1.0f;
 		float farP = 1000.f;
 		float nearP = 0.5f;
@@ -95,7 +94,6 @@ public:
 	struct LightData
 	{
 		JEntityHandle entity = {};
-		JTransformHandle transform = {};
 		JVec3 color = { 1.0f, 1.0f, 1.0f };
 		float intensity = 1.0f;
 		bool active = true;
@@ -104,7 +102,6 @@ public:
 	struct RenderObjectData
 	{
 		JEntityHandle entity = {};
-		JTransformHandle transform = {};
 		uint32 materialID = 0;
 		const JMesh* mesh = nullptr;
 		bool visible = true;
@@ -129,8 +126,8 @@ public:
 	JEntityHandle CreateEntity(const std::string& stableID = "", const std::string& name = "", const std::vector<std::string>& tags = {});
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
-	JLightHandle AddLight(JEntityHandle entity, JTransformHandle transform, const LightData& data = {});
-	JRenderObjectHandle AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent = false);
+	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
+	JRenderObjectHandle AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false);
 
 	bool SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags = {});
 	void SetEntityName(JEntityHandle entity, const std::string& name);
@@ -145,6 +142,9 @@ public:
 	const EntityData* GetEntity(JEntityHandle handle) const;
 	TransformData* GetTransform(JTransformHandle handle);
 	const TransformData* GetTransform(JTransformHandle handle) const;
+	TransformData* GetTransform(JEntityHandle entity);
+	const TransformData* GetTransform(JEntityHandle entity) const;
+	JTransformHandle GetTransformHandle(JEntityHandle entity) const;
 	CameraData* GetCamera(JCameraHandle handle);
 	const CameraData* GetCamera(JCameraHandle handle) const;
 	LightData* GetLight(JLightHandle handle);
@@ -168,6 +168,7 @@ private:
 	LightPool _lights;
 	RenderObjectPool _renderObjects;
 	std::vector<JEntityMetadata> _entityMetadata;
+	std::vector<JTransformHandle> _entityTransformLookup;
 	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
 	JCameraHandle _primaryCamera = {};
 	uint32 _nextStableID = 1;
