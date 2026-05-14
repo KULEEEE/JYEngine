@@ -24,12 +24,10 @@ public:
 private:
 	Engine::JScene* getScene();
 	const Engine::JScene* getScene() const;
-	void updateCamera(float deltaTime);
-	void updateCameraInfoPanel();
-	void createCameraInfoPanel();
-
+	void updateSceneCamera(float deltaTime);
+	
 	JSceneBuildResult _sceneBuild;
-	Engine::JCameraHandle _camera = {};
+	Engine::JCameraHandle _sceneCamera = {};
 	Engine::JLightHandle _light = {};
 	bool _isMouseLookActive = false;
 	POINT _lastMousePosition = {};
@@ -41,6 +39,10 @@ private:
 	HWND _mainWindow = nullptr;
 	uint32 _viewportWidth = 0;
 	uint32 _viewportHeight = 0;
+
+	void updateCameraInfoPanel();
+	void createCameraInfoPanel();
+
 };
 
 J_EDITOR_END

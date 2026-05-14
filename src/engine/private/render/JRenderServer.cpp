@@ -3,18 +3,12 @@
 #include "engine/render/JGraphicResource.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/render/JMaterialResource.h"
+#include "engine/scene/JCameraSystem.h"
+#include "engine/scene/JTransformSystem.h"
+#include "engine/scene/JLightSystem.h"
+#include "engine/scene/JRenderObjectSystem.h"
 
 J_ENGINE_BEGIN
-
-namespace
-{
-	XMMATRIX makeWorldMatrix(const JScene::TransformData& transform)
-	{
-		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.pitch, transform.yaw, 0.0f);
-		const XMMATRIX translation = XMMatrixTranslation(transform.position.x, transform.position.y, transform.position.z);
-		return rotation * translation;
-	}
-}
 
 uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
 {
@@ -213,13 +207,15 @@ void JRenderServer::SyncScene(const JScene& scene)
 				continue;
 			}
 
-			const JScene::CameraData* cameraData = scene.GetCamera(record.camera);
-			if (cameraData == nullptr)
+			if (scene.GetCamera(record.camera) == nullptr)
 			{
 				break;
 			}
 
-			const XMMATRIX viewProjection = scene.GetCameraViewMatrix(record.camera) * scene.GetCameraProjectionMatrix(record.camera);
+			const JCameraSystem* cameraSystem = JCameraSystem::Get();
+			const XMMATRIX viewProjection = cameraSystem != nullptr
+				? cameraSystem->GetViewMatrix(scene, record.camera) * cameraSystem->GetProjectionMatrix(scene, record.camera)
+				: XMMatrixIdentity();
 			_renderDB.SyncCamera(record.camera, viewProjection, record.perFrameBuffer);
 			break;
 		}
@@ -227,23 +223,20 @@ void JRenderServer::SyncScene(const JScene& scene)
 
 	_dirtyCameraKeys.clear();
 
-	for (const JScene::RenderObjectSlot& slot : scene.GetRenderObjectSlots())
+	if (const JTransformSystem* transformSystem = JTransformSystem::Get())
 	{
-		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.mesh == nullptr)
-		{
-			continue;
-		}
-
-		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
-
-		const JScene::TransformData* transform = scene.GetTransform(slot.data.transform);
-		if (transform != nullptr)
-		{
-			_renderDB.SyncTransform(slot.data.transform, makeWorldMatrix(*transform));
-		}
+		transformSystem->SyncRenderDB(scene, _renderDB);
 	}
 
-	_renderDB.SyncLights(scene);
+	if (const JRenderObjectSystem* renderObjectSystem = JRenderObjectSystem::Get())
+	{
+		renderObjectSystem->SyncRenderDB(scene, _renderDB);
+	}
+
+	if (const JLightSystem* lightSystem = JLightSystem::Get())
+	{
+		lightSystem->SyncRenderDB(scene, _renderDB);
+	}
 }
 
 bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const

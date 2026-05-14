@@ -77,9 +77,9 @@ public:
 
 	struct TransformData
 	{
-		JVec3 position = { 0.0f, 0.0f, 0.0f };
-		float yaw = 0.0f;
-		float pitch = 0.0f;
+		JVec3 translation = { 0.0f, 0.0f, 0.0f };
+		JVec3 rotation = { 0.0f, 0.0f, 0.0f };
+		JVec3 scale = { 1.0f, 1.0f, 1.0f };
 	};
 
 	struct CameraData
@@ -157,11 +157,6 @@ public:
 	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras.GetSlots(); }
 	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
 	const std::vector<RenderObjectSlot>& GetRenderObjectSlots() const { return _renderObjects.GetSlots(); }
-
-	void RotateCamera(JCameraHandle camera, float yawDelta, float pitchDelta);
-	void MoveCameraLocal(JCameraHandle camera, float forward, float right, float up, float deltaTime);
-	XMMATRIX GetCameraViewMatrix(JCameraHandle camera) const;
-	XMMATRIX GetCameraProjectionMatrix(JCameraHandle camera) const;
 
 private:
 	std::string GenerateStableID();

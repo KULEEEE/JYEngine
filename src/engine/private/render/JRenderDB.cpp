@@ -255,7 +255,7 @@ void JRenderDB::SyncLights(const JScene& scene)
 		}
 
 		constants.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
-		constants.positionCount = JVec4(transform->position.x, transform->position.y, transform->position.z, 1.0f);
+		constants.positionCount = JVec4(transform->translation.x, transform->translation.y, transform->translation.z, 1.0f);
 		lightCount = 1;
 		break;
 	}

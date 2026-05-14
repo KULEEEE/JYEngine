@@ -31,6 +31,7 @@ add_library(Engine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 
 target_include_directories(Engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 # DirectX 라이브러리를 직접 이름으로 지정

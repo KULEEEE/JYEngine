@@ -24,6 +24,7 @@ add_library(Engine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 target_include_directories(Engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${DX12_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party
 )
 
 # DirectX 라이브러리 링크 (.lib 확장자 추가)

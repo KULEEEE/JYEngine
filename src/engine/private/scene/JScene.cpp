@@ -20,34 +20,6 @@ namespace
 		}
 		return hash;
 	}
-
-	XMVECTOR getForward(float yaw, float pitch)
-	{
-		const float cosPitch = cosf(pitch);
-		return XMVector3Normalize(XMVectorSet(
-			sinf(yaw) * cosPitch,
-			sinf(pitch),
-			cosf(yaw) * cosPitch,
-			0.0f));
-	}
-
-	XMVECTOR getForwardXZ(float yaw)
-	{
-		return XMVector3Normalize(XMVectorSet(sinf(yaw), 0.0f, cosf(yaw), 0.0f));
-	}
-
-	XMVECTOR getRight(float yaw)
-	{
-		const XMVECTOR worldUp = XMVectorSet(0, 1, 0, 0);
-		return XMVector3Normalize(XMVector3Cross(worldUp, getForwardXZ(yaw)));
-	}
-
-	XMVECTOR getUp(float yaw, float pitch)
-	{
-		const XMVECTOR forward = getForward(yaw, pitch);
-		const XMVECTOR right = getRight(yaw);
-		return XMVector3Normalize(XMVector3Cross(forward, right));
-	}
 }
 
 std::string JScene::GenerateStableID()
@@ -280,80 +252,6 @@ JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle)
 const JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle) const
 {
 	return _renderObjects.Get(handle);
-}
-
-void JScene::RotateCamera(JCameraHandle camera, float yawDelta, float pitchDelta)
-{
-	CameraData* cameraData = GetCamera(camera);
-	if (cameraData == nullptr)
-	{
-		return;
-	}
-
-	TransformData* transform = GetTransform(cameraData->transform);
-	if (transform == nullptr)
-	{
-		return;
-	}
-
-	transform->yaw += yawDelta * cameraData->rotateSpeed;
-	transform->pitch += pitchDelta * cameraData->rotateSpeed;
-}
-
-void JScene::MoveCameraLocal(JCameraHandle camera, float forward, float right, float up, float deltaTime)
-{
-	CameraData* cameraData = GetCamera(camera);
-	if (cameraData == nullptr)
-	{
-		return;
-	}
-
-	TransformData* transform = GetTransform(cameraData->transform);
-	if (transform == nullptr)
-	{
-		return;
-	}
-
-	const XMVECTOR forwardVector = getForward(transform->yaw, transform->pitch);
-	const XMVECTOR rightVector = getRight(transform->yaw);
-	const XMVECTOR upVector = getUp(transform->yaw, transform->pitch);
-
-	XMVECTOR position = XMVectorSet(transform->position.x, transform->position.y, transform->position.z, 1.0f);
-	position += forwardVector * (forward * cameraData->moveSpeed * deltaTime);
-	position += rightVector * (right * cameraData->moveSpeed * deltaTime);
-	position += upVector * (up * cameraData->moveSpeed * deltaTime);
-
-	XMFLOAT3 outPosition;
-	XMStoreFloat3(&outPosition, position);
-	transform->position = { outPosition.x, outPosition.y, outPosition.z };
-}
-
-XMMATRIX JScene::GetCameraViewMatrix(JCameraHandle camera) const
-{
-	const CameraData* cameraData = GetCamera(camera);
-	if (cameraData == nullptr)
-	{
-		return XMMatrixIdentity();
-	}
-
-	const TransformData* transform = GetTransform(cameraData->transform);
-	if (transform == nullptr)
-	{
-		return XMMatrixIdentity();
-	}
-
-	const XMVECTOR position = XMVectorSet(transform->position.x, transform->position.y, transform->position.z, 1.0f);
-	const XMVECTOR forward = getForward(transform->yaw, transform->pitch);
-	const XMVECTOR up = getUp(transform->yaw, transform->pitch);
-	return XMMatrixLookAtLH(position, position + forward, up);
-}
-
-XMMATRIX JScene::GetCameraProjectionMatrix(JCameraHandle camera) const
-{
-	const CameraData* cameraData = GetCamera(camera);
-	return cameraData != nullptr
-		? XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, 0.1f, 1000.0f)
-		: XMMatrixIdentity();
 }
 
 J_ENGINE_END

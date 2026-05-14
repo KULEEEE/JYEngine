@@ -1,6 +1,6 @@
 #include "client/editor/JScenePanel.h"
 
-#include "client/editor/JSampleSceneData.h"
+#include "engine/scene/JSceneSerializer.h"
 #include "engine/render/JSwapChain.h"
 #include "engine/render/JRenderDefinition.h"
 #include "engine/render/JRenderDB.h"
@@ -42,6 +42,34 @@ namespace
 		}
 
 		return degrees;
+	}
+
+	XMVECTOR getForward(float yaw, float pitch)
+	{
+		const float cosPitch = cosf(pitch);
+		return XMVector3Normalize(XMVectorSet(
+			sinf(yaw) * cosPitch,
+			sinf(pitch),
+			cosf(yaw) * cosPitch,
+			0.0f));
+	}
+
+	XMVECTOR getForwardXZ(float yaw)
+	{
+		return XMVector3Normalize(XMVectorSet(sinf(yaw), 0.0f, cosf(yaw), 0.0f));
+	}
+
+	XMVECTOR getRight(float yaw)
+	{
+		const XMVECTOR worldUp = XMVectorSet(0, 1, 0, 0);
+		return XMVector3Normalize(XMVector3Cross(worldUp, getForwardXZ(yaw)));
+	}
+
+	XMVECTOR getUp(float yaw, float pitch)
+	{
+		const XMVECTOR forward = getForward(yaw, pitch);
+		const XMVECTOR right = getRight(yaw);
+		return XMVector3Normalize(XMVector3Cross(forward, right));
 	}
 
 	uint32 getClientWidth(HWND hwnd)
@@ -114,25 +142,32 @@ void JScenePanel::Init()
 	buildContext.renderServer = renderServer;
 	buildContext.cameraAspectRatio = static_cast<float>(initialWidth) / static_cast<float>(initialHeight);
 
-	const Engine::JSceneData sceneData = MakeSampleSceneData();
+	Engine::JSceneData sceneData;
+	const std::filesystem::path scenePath = std::filesystem::path(get_Engine_Res_Path()) / "scene" / "sample.jscene.json";
+	if (!Engine::JSceneSerializer::LoadFromFile(scenePath, sceneData))
+	{
+		std::cerr << "JScenePanel::Init failed: scene JSON load failed: " << scenePath.string() << std::endl;
+		return;
+	}
+
 	if (!JSceneBuilder::Build(sceneData, buildContext, _sceneBuild))
 	{
 		std::cerr << "JScenePanel::Init failed: scene build failed." << std::endl;
 		return;
 	}
 
-	_camera = _sceneBuild.primaryCamera;
+	_sceneCamera = _sceneBuild.primaryCamera;
 	_light = _sceneBuild.firstLight;
 
 	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_camera.IsValid())
+	if (scene == nullptr || !_sceneCamera.IsValid())
 	{
 		std::cerr << "JScenePanel::Init failed: scene or camera is invalid." << std::endl;
 		_sceneBuild.Release(renderServer);
 		return;
 	}
 
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 	if (cameraData == nullptr)
 	{
 		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
@@ -164,7 +199,7 @@ void JScenePanel::Update()
 	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	Engine::JScene* scene = getScene();
-	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || !_camera.IsValid())
+	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || !_sceneCamera.IsValid())
 	{
 		std::cerr << "JScenePanel::Update skipped: render resources are not ready." << std::endl;
 		_isReady = false;
@@ -182,7 +217,7 @@ void JScenePanel::Update()
 			swapChain->Resize(clientWidth, clientHeight);
 		}
 
-		Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+		Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 		if (cameraData != nullptr)
 		{
 			cameraData->aspectRatio = static_cast<float>(clientWidth) / static_cast<float>(clientHeight);
@@ -198,8 +233,8 @@ void JScenePanel::Update()
 	_lastUpdateTime = now;
 	deltaTime = std::clamp(deltaTime, 0.0f, MAX_FRAME_DELTA_TIME);
 
-	updateCamera(deltaTime);
-	renderServer->MarkCameraDirty(_camera);
+	updateSceneCamera(deltaTime);
+	renderServer->MarkCameraDirty(_sceneCamera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
 	updateCameraInfoPanel();
@@ -236,22 +271,22 @@ void JScenePanel::OnMouseWheel(short delta)
 	_editorCameraMoveSpeed = std::clamp(_editorCameraMoveSpeed, CAMERA_SPEED_MIN, CAMERA_SPEED_MAX);
 
 	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_camera.IsValid())
+	if (scene == nullptr || !_sceneCamera.IsValid())
 	{
 		return;
 	}
 
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 	if (cameraData != nullptr)
 	{
 		cameraData->moveSpeed = _editorCameraMoveSpeed;
 	}
 }
 
-void JScenePanel::updateCamera(float deltaTime)
+void JScenePanel::updateSceneCamera(float deltaTime)
 {
 	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_camera.IsValid())
+	if (scene == nullptr || !_sceneCamera.IsValid())
 	{
 		return;
 	}
@@ -262,8 +297,14 @@ void JScenePanel::updateCamera(float deltaTime)
 		return;
 	}
 
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 	if (cameraData == nullptr)
+	{
+		return;
+	}
+
+	Engine::JScene::TransformData* transformData = scene->GetTransform(cameraData->transform);
+	if (transformData == nullptr)
 	{
 		return;
 	}
@@ -315,11 +356,35 @@ void JScenePanel::updateCamera(float deltaTime)
 		_isMouseLookActive = false;
 	}
 
-	cameraData->moveSpeed = _editorCameraMoveSpeed * moveSpeedMultiplier;
-	scene->RotateCamera(_camera, yawInput, pitchInput);
-	scene->MoveCameraLocal(_camera, forwardInput, rightInput, upInput, deltaTime);
-	cameraData->moveSpeed = _editorCameraMoveSpeed;
+	const float moveSpeed = _editorCameraMoveSpeed * moveSpeedMultiplier;
+	XMFLOAT3 newRotation = {
+		transformData->rotation.x,
+		transformData->rotation.y,
+		transformData->rotation.z
+	};
+	newRotation.y += yawInput * cameraData->rotateSpeed;
+	newRotation.x += pitchInput * cameraData->rotateSpeed;
+
+	const XMVECTOR forwardVector = getForward(newRotation.y, newRotation.x);
+	const XMVECTOR rightVector = getRight(newRotation.y);
+	const XMVECTOR upVector = getUp(newRotation.y, newRotation.x);
+	XMVECTOR position = XMVectorSet(transformData->translation.x, transformData->translation.y, transformData->translation.z, 1.0f);
+	position += forwardVector * (forwardInput * moveSpeed * deltaTime);
+	position += rightVector * (rightInput * moveSpeed * deltaTime);
+	position += upVector * (upInput * moveSpeed * deltaTime);
+
+	XMFLOAT3 newPosition;
+	XMStoreFloat3(&newPosition, position);
+
+	Engine::JCameraSystem* cameraSystem = GetEngine()->GetCameraSystem();
+	if (cameraSystem != nullptr)
+	{
+		cameraSystem->SetRotate(*scene, _sceneCamera, newRotation.x, newRotation.y, newRotation.z);
+		cameraSystem->SetPosition(*scene, _sceneCamera, newPosition.x, newPosition.y, newPosition.z);
+	}
 }
+
+#pragma region Debug Panel
 
 void JScenePanel::createCameraInfoPanel()
 {
@@ -374,7 +439,7 @@ void JScenePanel::createCameraInfoPanel()
 void JScenePanel::updateCameraInfoPanel()
 {
 	Engine::JScene* scene = getScene();
-	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || scene == nullptr || !_camera.IsValid())
+	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || scene == nullptr || !_sceneCamera.IsValid())
 	{
 		return;
 	}
@@ -386,7 +451,7 @@ void JScenePanel::updateCameraInfoPanel()
 		SetWindowPos(_cameraInfoWindow, HWND_TOPMOST, mainRect.right + 16, mainRect.top, 360, 460, SWP_NOACTIVATE);
 	}
 
-	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_camera);
+	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 	const Engine::JScene::TransformData* transformData = cameraData != nullptr ? scene->GetTransform(cameraData->transform) : nullptr;
 	if (transformData == nullptr)
 	{
@@ -395,14 +460,18 @@ void JScenePanel::updateCameraInfoPanel()
 
 	std::wostringstream stream;
 	stream << std::fixed << std::setprecision(2);
-	stream << L"World Position\n";
-	stream << L"X: " << transformData->position.x << L"\n";
-	stream << L"Y: " << transformData->position.y << L"\n";
-	stream << L"Z: " << transformData->position.z << L"\n\n";
+	stream << L"World Translate\n";
+	stream << L"X: " << transformData->translation.x << L"\n";
+	stream << L"Y: " << transformData->translation.y << L"\n";
+	stream << L"Z: " << transformData->translation.z << L"\n\n";
 	stream << L"World Rotation\n";
-	stream << L"Pitch(X): " << wrapDegrees(toDegrees(transformData->pitch)) << L"\n";
-	stream << L"Yaw(Y): " << wrapDegrees(toDegrees(transformData->yaw)) << L"\n";
-	stream << L"Roll(Z): 0.00\n\n";
+	stream << L"X: " << wrapDegrees(toDegrees(transformData->rotation.x)) << L"\n";
+	stream << L"Y: " << wrapDegrees(toDegrees(transformData->rotation.y)) << L"\n";
+	stream << L"Z: " << wrapDegrees(toDegrees(transformData->rotation.z)) << L"\n\n";
+	stream << L"World Scale\n";
+	stream << L"X: " << transformData->scale.x << L"\n";
+	stream << L"Y: " << transformData->scale.y << L"\n";
+	stream << L"Z: " << transformData->scale.z << L"\n\n";
 	stream << L"Editor Camera\n";
 	stream << L"Move Speed: " << cameraData->moveSpeed << L"\n";
 	stream << L"Base Speed: " << _editorCameraMoveSpeed << L"\n\n";
@@ -414,9 +483,9 @@ void JScenePanel::updateCameraInfoPanel()
 	{
 		stream << L"Count: 1\n";
 		stream << L"Pos: "
-			<< lightTransformData->position.x << L", "
-			<< lightTransformData->position.y << L", "
-			<< lightTransformData->position.z << L"\n";
+			<< lightTransformData->translation.x << L", "
+			<< lightTransformData->translation.y << L", "
+			<< lightTransformData->translation.z << L"\n";
 		stream << L"Color: "
 			<< lightData->color.x << L", "
 			<< lightData->color.y << L", "
@@ -448,5 +517,7 @@ void JScenePanel::updateCameraInfoPanel()
 
 	SetWindowTextW(_cameraInfoText, stream.str().c_str());
 }
+
+#pragma endregion
 
 J_EDITOR_END

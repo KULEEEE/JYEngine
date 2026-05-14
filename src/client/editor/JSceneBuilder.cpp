@@ -58,9 +58,9 @@ namespace
 	Engine::JScene::TransformData toRuntimeTransform(const Engine::JSceneTransformData& source)
 	{
 		Engine::JScene::TransformData transform{};
-		transform.position = source.position;
-		transform.yaw = source.yaw;
-		transform.pitch = source.pitch;
+		transform.translation = source.translation;
+		transform.rotation = source.rotation;
+		transform.scale = source.scale;
 		return transform;
 	}
 }

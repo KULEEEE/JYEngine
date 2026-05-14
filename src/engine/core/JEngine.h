@@ -11,6 +11,10 @@
 #include "engine/render/JRenderServer.h"
 #include "engine/render/JRenderer.h"
 #include "engine/render/JMaterialFactory.h"
+#include "engine/scene/JCameraSystem.h"
+#include "engine/scene/JTransformSystem.h"
+#include "engine/scene/JLightSystem.h"
+#include "engine/scene/JRenderObjectSystem.h"
 
 J_ENGINE_BEGIN
 
@@ -29,6 +33,10 @@ public:
 	JRenderServer* GetRenderServer() { return _renderServer; }
 	JRenderer* GetRenderer() { return _renderer; }
 	JMaterialFactory* GetMaterialFactory() { return _materialFactory; }
+	JCameraSystem* GetCameraSystem() { return _cameraSystem; }
+	JTransformSystem* GetTransformSystem() { return _transformSystem; }
+	JLightSystem* GetLightSystem() { return _lightSystem; }
+	JRenderObjectSystem* GetRenderObjectSystem() { return _renderObjectSystem; }
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
@@ -42,6 +50,10 @@ private:
 	JRenderServer* _renderServer = nullptr;
 	JRenderer* _renderer = nullptr;
 	JMaterialFactory* _materialFactory = nullptr;
+	JCameraSystem* _cameraSystem = nullptr;
+	JTransformSystem* _transformSystem = nullptr;
+	JLightSystem* _lightSystem = nullptr;
+	JRenderObjectSystem* _renderObjectSystem = nullptr;
 };
 
 J_ENGINE_END

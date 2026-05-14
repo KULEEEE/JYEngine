@@ -53,9 +53,9 @@ struct JSceneMeshData
 
 struct JSceneTransformData
 {
-	JVec3 position = { 0.0f, 0.0f, 0.0f };
-	float yaw = 0.0f;
-	float pitch = 0.0f;
+	JVec3 translation = { 0.0f, 0.0f, 0.0f };
+	JVec3 rotation = { 0.0f, 0.0f, 0.0f };
+	JVec3 scale = { 1.0f, 1.0f, 1.0f };
 };
 
 struct JSceneCameraData
