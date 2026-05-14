@@ -110,9 +110,14 @@ XMMATRIX JCameraSystem::GetViewMatrix(const JScene& scene, JCameraHandle camera)
 XMMATRIX JCameraSystem::GetProjectionMatrix(const JScene& scene, JCameraHandle camera) const
 {
 	const JScene::CameraData* cameraData = scene.GetCamera(camera);
-	return cameraData != nullptr
-		? XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, 0.1f, 1000.0f)
-		: XMMatrixIdentity();
+	if (cameraData == nullptr)
+	{
+		return XMMatrixIdentity();
+	}
+
+	const float nearPlane = std::max(0.001f, cameraData->nearP);
+	const float farPlane = std::max(nearPlane + 0.001f, cameraData->farP);
+	return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, nearPlane, farPlane);
 }
 
 J_ENGINE_END

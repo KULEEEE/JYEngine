@@ -150,7 +150,7 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 	return transform;
 }
 
-JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio)
+JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio, float nearP, float farP)
 {
 	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
 	{
@@ -161,6 +161,8 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	data.entity = entity;
 	data.transform = transform;
 	data.aspectRatio = aspectRatio;
+	data.nearP = nearP;
+	data.farP = farP;
 
 	const JCameraHandle handle = _cameras.Add(data);
 	if (!_primaryCamera.IsValid())

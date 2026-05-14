@@ -174,7 +174,6 @@ void JScenePanel::Init()
 		_sceneBuild.Release(renderServer);
 		return;
 	}
-	_editorCameraMoveSpeed = cameraData->moveSpeed;
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -275,12 +274,6 @@ void JScenePanel::OnMouseWheel(short delta)
 	{
 		return;
 	}
-
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
-	if (cameraData != nullptr)
-	{
-		cameraData->moveSpeed = _editorCameraMoveSpeed;
-	}
 }
 
 void JScenePanel::updateSceneCamera(float deltaTime)
@@ -362,8 +355,8 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 		transformData->rotation.y,
 		transformData->rotation.z
 	};
-	newRotation.y += yawInput * cameraData->rotateSpeed;
-	newRotation.x += pitchInput * cameraData->rotateSpeed;
+	newRotation.y += yawInput;
+	newRotation.x += pitchInput;
 
 	const XMVECTOR forwardVector = getForward(newRotation.y, newRotation.x);
 	const XMVECTOR rightVector = getRight(newRotation.y);
@@ -473,8 +466,11 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"Y: " << transformData->scale.y << L"\n";
 	stream << L"Z: " << transformData->scale.z << L"\n\n";
 	stream << L"Editor Camera\n";
-	stream << L"Move Speed: " << cameraData->moveSpeed << L"\n";
 	stream << L"Base Speed: " << _editorCameraMoveSpeed << L"\n\n";
+	stream << L"Projection\n";
+	stream << L"Aspect: " << cameraData->aspectRatio << L"\n";
+	stream << L"Near: " << cameraData->nearP << L"\n";
+	stream << L"Far: " << cameraData->farP << L"\n\n";
 
 	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
 	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->transform) : nullptr;

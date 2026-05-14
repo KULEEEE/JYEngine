@@ -62,8 +62,8 @@ struct JSceneCameraData
 {
 	bool active = true;
 	bool primary = false;
-	float moveSpeed = 0.1f;
-	float rotateSpeed = 1.0f;
+	float nearP = 0.5f;
+	float farP = 1000.0f;
 };
 
 struct JSceneLightData

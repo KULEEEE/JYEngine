@@ -279,7 +279,12 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 				return false;
 			}
 
-			Engine::JCameraHandle camera = result.scene->AddCamera(entity, transform, context.cameraAspectRatio);
+			Engine::JCameraHandle camera = result.scene->AddCamera(
+				entity,
+				transform,
+				context.cameraAspectRatio,
+				entityData.camera.nearP,
+				entityData.camera.farP);
 			Engine::JScene::CameraData* cameraData = result.scene->GetCamera(camera);
 			if (!camera.IsValid() || cameraData == nullptr)
 			{
@@ -289,8 +294,9 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			}
 
 			cameraData->active = entityData.camera.active;
-			cameraData->moveSpeed = entityData.camera.moveSpeed;
-			cameraData->rotateSpeed = entityData.camera.rotateSpeed;
+			cameraData->nearP = entityData.camera.nearP;
+			cameraData->farP = entityData.camera.farP;
+		
 			result.cameras[entityKey] = camera;
 			result.registeredCameras.push_back(camera);
 			context.renderServer->RegisterCamera(camera, perFrameBuffer);

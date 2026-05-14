@@ -208,8 +208,8 @@ namespace
 			const json& camera = value.at("camera");
 			data.camera.active = camera.value("active", data.camera.active);
 			data.camera.primary = camera.value("primary", data.camera.primary);
-			data.camera.moveSpeed = camera.value("moveSpeed", data.camera.moveSpeed);
-			data.camera.rotateSpeed = camera.value("rotateSpeed", data.camera.rotateSpeed);
+			data.camera.nearP = camera.value("nearP", data.camera.nearP);
+			data.camera.farP = camera.value("farP", data.camera.farP);
 		}
 
 		if (value.contains("light") && value.at("light").is_object())
@@ -268,8 +268,8 @@ namespace
 			{
 				{ "active", data.camera.active },
 				{ "primary", data.camera.primary },
-				{ "moveSpeed", data.camera.moveSpeed },
-				{ "rotateSpeed", data.camera.rotateSpeed },
+				{ "nearP", data.camera.nearP },
+				{ "farP", data.camera.farP },
 			};
 		}
 

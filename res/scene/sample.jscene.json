@@ -58,8 +58,8 @@
       "camera": {
         "active": true,
         "primary": true,
-        "moveSpeed": 6.0,
-        "rotateSpeed": 1.0
+        "nearP": 0.1,
+        "farP": 1000.0
       }
     },
     {

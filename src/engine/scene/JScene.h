@@ -86,9 +86,9 @@ public:
 	{
 		JEntityHandle entity = {};
 		JTransformHandle transform = {};
-		float moveSpeed = 0.1f;
-		float rotateSpeed = 1.0f;
 		float aspectRatio = 1.0f;
+		float farP = 1000.f;
+		float nearP = 0.5f;
 		bool active = true;
 	};
 
@@ -128,7 +128,7 @@ public:
 
 	JEntityHandle CreateEntity(const std::string& stableID = "", const std::string& name = "", const std::vector<std::string>& tags = {});
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
-	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f);
+	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, JTransformHandle transform, const LightData& data = {});
 	JRenderObjectHandle AddRenderObject(JEntityHandle entity, JTransformHandle transform, uint32 materialID, const JMesh* mesh, bool transparent = false);
 
