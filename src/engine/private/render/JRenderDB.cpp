@@ -104,6 +104,11 @@ JTransformResource& JRenderDB::GetOrCreateTransformResource(JTransformHandle tra
 	return _transformResources.back().resource;
 }
 
+JLightResource& JRenderDB::GetOrCreateLightResource()
+{
+	return _lightResource;
+}
+
 uint32 JRenderDB::FindTransformResourceIndex(JTransformHandle transform) const
 {
 	const auto iter = _transformIndexMap.find(MakeTransformKey(transform));
@@ -144,6 +149,16 @@ const JTransformResource* JRenderDB::FindTransformResource(JTransformHandle tran
 {
 	const uint32 index = FindTransformResourceIndex(transform);
 	return index == static_cast<uint32>(-1) ? nullptr : &_transformResources[index].resource;
+}
+
+JLightResource* JRenderDB::FindLightResource()
+{
+	return &_lightResource;
+}
+
+const JLightResource* JRenderDB::FindLightResource() const
+{
+	return &_lightResource;
 }
 
 JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh)
@@ -206,6 +221,37 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 	}
 
 	_renderContext->UpdateConstantBuffer(resource.perObjectBuffer, &constants, sizeof(constants));
+}
+
+void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
+{
+	if (_renderContext == nullptr)
+	{
+		return;
+	}
+
+	JLightResource& resource = GetOrCreateLightResource();
+	resource.lightCount = snapshot.lightCount;
+	resource.colorIntensity = snapshot.colorIntensity;
+	resource.positionCount = snapshot.positionCount;
+
+	struct LightConstants
+	{
+		JVec4 colorIntensity;
+		JVec4 positionCount;
+	};
+
+	LightConstants constants{};
+	constants.colorIntensity = snapshot.colorIntensity;
+	constants.positionCount = snapshot.positionCount;
+
+	if (resource.lightBuffer == nullptr)
+	{
+		resource.lightBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
+		return;
+	}
+
+	_renderContext->UpdateConstantBuffer(resource.lightBuffer, &constants, sizeof(constants));
 }
 
 JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
@@ -355,6 +401,8 @@ void JRenderDB::Clear()
 	{
 		delete record.resource.perObjectBuffer;
 	}
+	delete _lightResource.lightBuffer;
+	_lightResource.lightBuffer = nullptr;
 
 	_meshResources.clear();
 	_materialResources.clear();

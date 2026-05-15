@@ -4,6 +4,7 @@
 
 #include "engine/precompile.h"
 #include "engine/render/JRenderDB.h"
+#include "engine/render/JRenderSnapshot.h"
 #include "engine/scene/JScene.h"
 #include "engine/render/JRenderer.h"
 
@@ -30,6 +31,7 @@ public:
 	};
 
 	JRenderServer() = default;
+	~JRenderServer();
 
 	JRenderDB& GetRenderDB() { return _renderDB; }
 	const JRenderDB& GetRenderDB() const { return _renderDB; }
@@ -43,7 +45,7 @@ public:
 	void Sync();
 	void SyncScene(const JScene& scene);
 
-	bool BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
+	bool BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
 
 	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
@@ -56,6 +58,8 @@ private:
 	static uint64 MakeCameraKey(JCameraHandle camera);
 
 	JRenderDB _renderDB;
+	JFrameSnapshot _frameSnapshot;
+	JCameraHandle _primaryCamera = {};
 	std::vector<MaterialRecord> _materials;
 	std::unordered_map<uint32, uint32> _materialIndexMap;
 	std::vector<uint32> _dirtyMaterialIDs;

@@ -9,7 +9,6 @@
 /*#include "engine/render/JRenderContext.h"*/ namespace J { namespace Render { class JRenderContext; } }
 /*#include "engine/render/JRenderDB.h"*/ namespace J { namespace Engine { class JRenderDB; } }
 /*#include "engine/render/JGBuffer.h"*/ namespace J { namespace Engine { class JGBuffer; } }
-/*#include "engine/scene/JLightSystem.h"*/ namespace J { namespace Engine { class JLightSystem; } }
 
 J_ENGINE_BEGIN
 
@@ -19,7 +18,6 @@ struct JRenderPassContext
 	Render::JRenderContext* renderContext = nullptr;
 	JRenderDB* renderDB = nullptr;
 	JGBuffer* gBuffer = nullptr;
-	JLightSystem* lightSystem = nullptr;
 };
 
 struct JRenderPassStats

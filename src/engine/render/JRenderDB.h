@@ -5,6 +5,7 @@
 #include "engine/precompile.h"
 #include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderResource.h"
+#include "engine/render/JRenderSnapshot.h"
 #include "engine/scene/JScene.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
@@ -46,12 +47,15 @@ public:
 	const JCameraResource* FindCameraResource(JCameraHandle camera) const;
 	JTransformResource* FindTransformResource(JTransformHandle transform);
 	const JTransformResource* FindTransformResource(JTransformHandle transform) const;
+	JLightResource* FindLightResource();
+	const JLightResource* FindLightResource() const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
+	void SyncLight(const JLightSnapshot& snapshot);
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
 	void RemoveMaterialResource(uint32 materialID);
 	void RemoveCameraResource(JCameraHandle camera);
@@ -65,6 +69,7 @@ private:
 	JMaterialResource& GetOrCreateMaterialResource(uint32 materialID);
 	JCameraResource& GetOrCreateCameraResource(JCameraHandle camera);
 	JTransformResource& GetOrCreateTransformResource(JTransformHandle transform);
+	JLightResource& GetOrCreateLightResource();
 	uint32 FindMaterialResourceIndex(uint32 materialID) const;
 	uint32 FindCameraResourceIndex(JCameraHandle camera) const;
 	uint32 FindTransformResourceIndex(JTransformHandle transform) const;
@@ -78,6 +83,7 @@ private:
 	std::unordered_map<uint64, uint32> _cameraIndexMap;
 	std::vector<TransformResourceRecord> _transformResources;
 	std::unordered_map<uint64, uint32> _transformIndexMap;
+	JLightResource _lightResource;
 	std::unordered_map<const JMesh*, JMeshResource> _meshResources;
 };
 

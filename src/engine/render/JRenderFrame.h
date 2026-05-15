@@ -28,7 +28,6 @@ struct JFrameDesc
 	JColor clearColor = JColors::DarkGray;
 	Render::JViewport viewport = {};
 	D3D12_RECT scissorRect = {};
-	std::vector<JLightHandle> lights;
 	std::vector<JDrawItem> opaqueDrawItems;
 	std::vector<JDrawItem> transparentDrawItems;
 };

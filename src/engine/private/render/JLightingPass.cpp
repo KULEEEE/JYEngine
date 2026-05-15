@@ -3,9 +3,9 @@
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
+#include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderContext.h"
 #include "engine/render/JRenderTarget.h"
-#include "engine/scene/JLightSystem.h"
 #include "engine/asset/JShader.h"
 
 #include <iostream>
@@ -76,7 +76,7 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
 	Render::JGraphicResource graphicResource(_shader);
-	const JLightResource* lightResource = context.lightSystem != nullptr ? context.lightSystem->GetLightResource() : nullptr;
+	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;
 	if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer);

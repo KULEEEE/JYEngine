@@ -3,16 +3,91 @@
 #include "engine/render/JGraphicResource.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/render/JMaterialResource.h"
-#include "engine/scene/JCameraSystem.h"
-#include "engine/scene/JTransformSystem.h"
-#include "engine/scene/JLightSystem.h"
-#include "engine/scene/JRenderObjectSystem.h"
+
+#include <algorithm>
 
 J_ENGINE_BEGIN
+
+namespace
+{
+	XMVECTOR getForward(float yaw, float pitch)
+	{
+		const float cosPitch = cosf(pitch);
+		return XMVector3Normalize(XMVectorSet(
+			sinf(yaw) * cosPitch,
+			sinf(pitch),
+			cosf(yaw) * cosPitch,
+			0.0f));
+	}
+
+	XMVECTOR getForwardXZ(float yaw)
+	{
+		return XMVector3Normalize(XMVectorSet(sinf(yaw), 0.0f, cosf(yaw), 0.0f));
+	}
+
+	XMVECTOR getRight(float yaw)
+	{
+		const XMVECTOR worldUp = XMVectorSet(0, 1, 0, 0);
+		return XMVector3Normalize(XMVector3Cross(worldUp, getForwardXZ(yaw)));
+	}
+
+	XMVECTOR getUp(float yaw, float pitch)
+	{
+		const XMVECTOR forward = getForward(yaw, pitch);
+		const XMVECTOR right = getRight(yaw);
+		return XMVector3Normalize(XMVector3Cross(forward, right));
+	}
+
+	XMMATRIX makeWorldMatrix(const JScene::TransformData& transform)
+	{
+		const XMMATRIX scale = XMMatrixScaling(transform.scale.x, transform.scale.y, transform.scale.z);
+		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+		const XMMATRIX translation = XMMatrixTranslation(transform.translation.x, transform.translation.y, transform.translation.z);
+		return scale * rotation * translation;
+	}
+
+	XMMATRIX makeViewMatrix(const JScene& scene, JCameraHandle camera)
+	{
+		const JScene::CameraData* cameraData = scene.GetCamera(camera);
+		if (cameraData == nullptr)
+		{
+			return XMMatrixIdentity();
+		}
+
+		const JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
+		if (!transformHandle.IsValid())
+		{
+			return XMMatrixIdentity();
+		}
+
+		const JScene::TransformData transform = scene.GetTransform(transformHandle);
+		const XMVECTOR position = XMVectorSet(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
+		const XMVECTOR forward = getForward(transform.rotation.y, transform.rotation.x);
+		const XMVECTOR up = getUp(transform.rotation.y, transform.rotation.x);
+		return XMMatrixLookAtLH(position, position + forward, up);
+	}
+
+	XMMATRIX makeProjectionMatrix(const JScene& scene, JCameraHandle camera)
+	{
+		const JScene::CameraData* cameraData = scene.GetCamera(camera);
+		if (cameraData == nullptr)
+		{
+			return XMMatrixIdentity();
+		}
+
+		const float nearPlane = std::max(0.001f, cameraData->nearP);
+		const float farPlane = std::max(nearPlane + 0.001f, cameraData->farP);
+		return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, nearPlane, farPlane);
+	}
+}
 
 uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
 {
 	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
+}
+
+JRenderServer::~JRenderServer()
+{
 }
 
 uint32 JRenderServer::FindMaterialIndex(uint32 materialID) const
@@ -198,6 +273,12 @@ void JRenderServer::Sync()
 
 void JRenderServer::SyncScene(const JScene& scene)
 {
+	_primaryCamera = scene.GetPrimaryCamera();
+	_frameSnapshot.cameras.clear();
+	_frameSnapshot.transforms.clear();
+	_frameSnapshot.lights.clear();
+	_frameSnapshot.renderObjects.clear();
+
 	for (uint64 cameraKey : _dirtyCameraKeys)
 	{
 		for (const CameraRecord& record : _cameras)
@@ -212,10 +293,8 @@ void JRenderServer::SyncScene(const JScene& scene)
 				break;
 			}
 
-			const JCameraSystem* cameraSystem = JCameraSystem::Get();
-			const XMMATRIX viewProjection = cameraSystem != nullptr
-				? cameraSystem->GetViewMatrix(scene, record.camera) * cameraSystem->GetProjectionMatrix(scene, record.camera)
-				: XMMatrixIdentity();
+			const XMMATRIX viewProjection = makeViewMatrix(scene, record.camera) * makeProjectionMatrix(scene, record.camera);
+			_frameSnapshot.cameras.push_back({ record.camera, viewProjection, record.perFrameBuffer });
 			_renderDB.SyncCamera(record.camera, viewProjection, record.perFrameBuffer);
 			break;
 		}
@@ -223,45 +302,21 @@ void JRenderServer::SyncScene(const JScene& scene)
 
 	_dirtyCameraKeys.clear();
 
-	if (const JTransformSystem* transformSystem = JTransformSystem::Get())
+	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
+	for (const JTransformPool::SlotType& slot : transformSlots)
 	{
-		transformSystem->SyncRenderDB(scene, _renderDB);
-	}
-
-	if (const JRenderObjectSystem* renderObjectSystem = JRenderObjectSystem::Get())
-	{
-		renderObjectSystem->SyncRenderDB(scene, _renderDB);
-	}
-
-	if (const JLightSystem* lightSystem = JLightSystem::Get())
-	{
-		lightSystem->SyncRenderDB(scene);
-	}
-}
-
-bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
-{
-	const JCameraHandle primaryCamera = scene.GetPrimaryCamera();
-	if (!primaryCamera.IsValid())
-	{
-		return false;
-	}
-
-	outFrameDesc = {};
-	outFrameDesc.camera = primaryCamera;
-	outFrameDesc.renderTarget = renderTarget;
-	outFrameDesc.clearColor = clearColor;
-	outFrameDesc.viewport = viewport;
-	outFrameDesc.scissorRect = scissorRect;
-
-	for (const JScene::LightSlot& lightSlot : scene.GetLightSlots())
-	{
-		if (!lightSlot.active || !lightSlot.data.active)
+		if (!slot.active)
 		{
 			continue;
 		}
 
-		outFrameDesc.lights.push_back({ static_cast<uint32>(&lightSlot - scene.GetLightSlots().data()), lightSlot.generation });
+		const JTransformHandle transformHandle = {
+			static_cast<uint32>(&slot - transformSlots.data()),
+			slot.generation
+		};
+		const XMMATRIX world = makeWorldMatrix(scene.GetTransform(transformHandle));
+		_frameSnapshot.transforms.push_back({ transformHandle, world });
+		_renderDB.SyncTransform(transformHandle, world);
 	}
 
 	for (const JScene::RenderObjectSlot& slot : scene.GetRenderObjectSlots())
@@ -271,17 +326,74 @@ bool JRenderServer::BuildFrameDesc(const JScene& scene, JRenderTarget* renderTar
 			continue;
 		}
 
-		JRenderer::DrawItem drawItem;
-		drawItem.entity = slot.data.entity;
-		drawItem.transform = scene.GetTransformHandle(slot.data.entity);
-		if (!drawItem.transform.IsValid())
+		_frameSnapshot.renderObjects.push_back({
+			slot.data.entity,
+			scene.GetTransformHandle(slot.data.entity),
+			{ static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation },
+			slot.data.materialID,
+			slot.data.mesh,
+			slot.data.transparent,
+			slot.data.visible,
+			slot.data.active
+		});
+		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
+	}
+
+	{
+		JLightSnapshot snapshot{};
+		for (const JScene::LightSlot& slot : scene.GetLightSlots())
+		{
+			if (!slot.active || !slot.data.active)
+			{
+				continue;
+			}
+
+			const JTransformHandle transformHandle = scene.GetTransformHandle(slot.data.entity);
+			if (!transformHandle.IsValid())
+			{
+				continue;
+			}
+
+			const JScene::TransformData transform = scene.GetTransform(transformHandle);
+			snapshot.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
+			snapshot.positionCount = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
+			snapshot.lightCount = 1;
+			break;
+		}
+
+		_frameSnapshot.lights.push_back(snapshot);
+		_renderDB.SyncLight(snapshot);
+	}
+}
+
+bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
+{
+	if (!_primaryCamera.IsValid())
+	{
+		return false;
+	}
+
+	outFrameDesc = {};
+	outFrameDesc.camera = _primaryCamera;
+	outFrameDesc.renderTarget = renderTarget;
+	outFrameDesc.clearColor = clearColor;
+	outFrameDesc.viewport = viewport;
+	outFrameDesc.scissorRect = scissorRect;
+
+	for (const JRenderObjectSnapshot& snapshot : _frameSnapshot.renderObjects)
+	{
+		if (!snapshot.active || !snapshot.visible || snapshot.mesh == nullptr)
 		{
 			continue;
 		}
-		drawItem.renderObject = { static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation };
-		drawItem.materialID = slot.data.materialID;
-		drawItem.mesh = slot.data.mesh;
-		drawItem.transparent = slot.data.transparent;
+
+		JRenderer::DrawItem drawItem;
+		drawItem.entity = snapshot.entity;
+		drawItem.transform = snapshot.transform;
+		drawItem.renderObject = snapshot.renderObject;
+		drawItem.materialID = snapshot.materialID;
+		drawItem.mesh = snapshot.mesh;
+		drawItem.transparent = snapshot.transparent;
 
 		if (drawItem.transparent)
 		{

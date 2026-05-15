@@ -4,7 +4,6 @@
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderDB.h"
-#include "engine/scene/JLightSystem.h"
 #include "engine/asset/JShader.h"
 
 #include <iostream>
@@ -72,13 +71,13 @@ void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, const JD
 		return;
 	}
 
-	const JRenderDB::TransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
+	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
 	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
 	}
 
-	const JLightResource* lightResource = context.lightSystem != nullptr ? context.lightSystem->GetLightResource() : nullptr;
+	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;
 	if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
 	{
 		if (graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer))

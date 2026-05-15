@@ -218,7 +218,7 @@ void JScenePanel::Update()
 	D3D12_RECT rect = CD3DX12_RECT(0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight));
 
 	Engine::JRenderer::FrameDesc frameDesc;
-	if (!renderServer->BuildFrameDesc(*scene, swapChain->GetRenderTarget(), JColors::DarkGray, viewport, rect, frameDesc))
+	if (!renderServer->BuildFrameDesc(swapChain->GetRenderTarget(), JColors::DarkGray, viewport, rect, frameDesc))
 	{
 		std::cerr << "JScenePanel::Update skipped: failed to build frame description." << std::endl;
 		return;
@@ -347,12 +347,8 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 	XMFLOAT3 newPosition;
 	XMStoreFloat3(&newPosition, position);
 
-	Engine::JCameraSystem* cameraSystem = GetEngine()->GetCameraSystem();
-	if (cameraSystem != nullptr)
-	{
-		cameraSystem->SetRotate(*scene, _sceneCamera, newRotation.x, newRotation.y, newRotation.z);
-		cameraSystem->SetPosition(*scene, _sceneCamera, newPosition.x, newPosition.y, newPosition.z);
-	}
+	scene->SetTransformRotation(transformHandle, { newRotation.x, newRotation.y, newRotation.z });
+	scene->SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
 #pragma region Debug Panel
@@ -472,24 +468,6 @@ void JScenePanel::updateCameraInfoPanel()
 	else
 	{
 		stream << L"Count: 0\n\n";
-	}
-
-	const Engine::JLightSystem* lightSystem = GetEngine() != nullptr ? GetEngine()->GetLightSystem() : nullptr;
-	const Engine::JLightResource* lightResource = lightSystem != nullptr ? lightSystem->GetLightResource() : nullptr;
-	stream << L"RenderDB Light\n";
-	if (lightResource != nullptr)
-	{
-		stream << L"GPU Buffer: " << (lightResource->lightBuffer != nullptr ? L"Ready" : L"Null") << L"\n";
-		stream << L"Count: " << lightResource->lightCount << L"\n";
-		stream << L"Pos: "
-			<< lightResource->positionCount.x << L", "
-			<< lightResource->positionCount.y << L", "
-			<< lightResource->positionCount.z << L"\n";
-		stream << L"Intensity: " << lightResource->colorIntensity.w;
-	}
-	else
-	{
-		stream << L"Unavailable";
 	}
 
 	SetWindowTextW(_cameraInfoText, stream.str().c_str());

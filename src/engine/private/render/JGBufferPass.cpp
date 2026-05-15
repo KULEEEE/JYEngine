@@ -21,7 +21,7 @@ namespace
 			return false;
 		}
 
-		const JRenderDB::TransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
+		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
 		if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 		{
 			graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);

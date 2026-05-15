@@ -9,7 +9,6 @@
 #include "engine/render/JGBufferPass.h"
 #include "engine/render/JLightingPass.h"
 #include "engine/render/JForwardOverlayPass.h"
-#include "engine/scene/JLightSystem.h"
 
 #include <iostream>
 
@@ -110,7 +109,7 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	}
 	EnsureGBuffer(frameDesc);
 
-	const JRenderDB::CameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.camera);
+	const JCameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.camera);
 	if (cameraResource == nullptr || cameraResource->perFrameBuffer == nullptr)
 	{
 		std::cerr << "JRenderer::Render skipped: camera resource is not ready." << std::endl;
@@ -126,7 +125,6 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	context.renderContext = _renderContext;
 	context.renderDB = _renderDB;
 	context.gBuffer = _gBuffer.get();
-	context.lightSystem = JLightSystem::Get();
 
 	for (const std::unique_ptr<JRenderPass>& pass : _passes)
 	{

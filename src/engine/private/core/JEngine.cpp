@@ -29,28 +29,12 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 	_renderer = new JRenderer();
 	_renderer->Initialize(_cmdQueue, _renderContext, &_renderServer->GetRenderDB());
 	_materialFactory = new JMaterialFactory(_renderContext);
-	_cameraSystem = new JCameraSystem();
-	_transformSystem = new JTransformSystem();
-	_lightSystem = new JLightSystem();
-	_renderObjectSystem = new JRenderObjectSystem();
 }
 
 void JEngine::destroy()
 {
 	delete _materialFactory;
 	_materialFactory = nullptr;
-
-	delete _cameraSystem;
-	_cameraSystem = nullptr;
-
-	delete _transformSystem;
-	_transformSystem = nullptr;
-
-	delete _lightSystem;
-	_lightSystem = nullptr;
-
-	delete _renderObjectSystem;
-	_renderObjectSystem = nullptr;
 
 	delete _renderer;
 	_renderer = nullptr;
