@@ -44,6 +44,13 @@ void JAssetManager::Initialize(Engine::JMaterialFactory* materialFactory)
 	_materialFactory = materialFactory;
 }
 
+void JAssetManager::Clear()
+{
+	_materialCache.clear();
+	_meshCache.clear();
+	_textureCache.clear();
+}
+
 std::string JAssetManager::resolveResourcePath(const std::string& path)
 {
 	const std::filesystem::path sourcePath(path);
@@ -198,6 +205,18 @@ std::shared_ptr<JAssetManager::MaterialBundle> JAssetManager::AcquireMaterialBun
 	return bundle;
 }
 
+bool JAssetManager::HasMaterialBundle(const Engine::JSceneMaterialData& materialData) const
+{
+	const size_t key = std::hash<std::string>{}(makeMaterialKey(materialData));
+	const auto cachedIter = _materialCache.find(key);
+	if (cachedIter == _materialCache.end())
+	{
+		return false;
+	}
+
+	return !cachedIter->second.expired();
+}
+
 std::shared_ptr<Engine::JMesh> JAssetManager::AcquireMesh(const Engine::JSceneMeshData& meshData)
 {
 	const size_t key = std::hash<std::string>{}(makeMeshKey(meshData));
@@ -244,6 +263,30 @@ std::shared_ptr<Engine::JMesh> JAssetManager::AcquireMesh(const Engine::JSceneMe
 
 	_meshCache[key] = mesh;
 	return mesh;
+}
+
+bool JAssetManager::HasMesh(const Engine::JSceneMeshData& meshData) const
+{
+	const size_t key = std::hash<std::string>{}(makeMeshKey(meshData));
+	const auto cachedIter = _meshCache.find(key);
+	if (cachedIter == _meshCache.end())
+	{
+		return false;
+	}
+
+	return !cachedIter->second.expired();
+}
+
+bool JAssetManager::HasTexture(const std::string& path) const
+{
+	const size_t key = std::hash<std::string>{}(makeTextureKey(path));
+	const auto cachedIter = _textureCache.find(key);
+	if (cachedIter == _textureCache.end())
+	{
+		return false;
+	}
+
+	return !cachedIter->second.expired();
 }
 
 J_EDITOR_END

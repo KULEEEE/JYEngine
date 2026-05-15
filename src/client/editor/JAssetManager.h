@@ -23,9 +23,13 @@ public:
 	explicit JAssetManager(Engine::JMaterialFactory* materialFactory = nullptr);
 
 	void Initialize(Engine::JMaterialFactory* materialFactory);
+	void Clear();
 
 	std::shared_ptr<MaterialBundle> AcquireMaterialBundle(const Engine::JSceneMaterialData& materialData);
 	std::shared_ptr<Engine::JMesh> AcquireMesh(const Engine::JSceneMeshData& meshData);
+	bool HasMaterialBundle(const Engine::JSceneMaterialData& materialData) const;
+	bool HasMesh(const Engine::JSceneMeshData& meshData) const;
+	bool HasTexture(const std::string& path) const;
 
 private:
 	static std::string resolveResourcePath(const std::string& path);
