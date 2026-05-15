@@ -34,6 +34,11 @@ target_include_directories(Engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
+target_compile_options(Engine PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+    $<$<COMPILE_LANGUAGE:C>:/utf-8>
+)
+
 # DirectX 라이브러리를 직접 이름으로 지정
 target_link_libraries(Engine PUBLIC
     d3d12.lib
@@ -85,6 +90,11 @@ target_include_directories(Client PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+target_compile_options(Client PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+    $<$<COMPILE_LANGUAGE:C>:/utf-8>
+)
+
 # Client에 Engine을 명시적으로 종속시키고, 링크
 target_link_libraries(Client PRIVATE Engine)
 target_link_libraries(Client PRIVATE shell32.lib)
@@ -121,6 +131,10 @@ add_executable(Benchmark ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
 
 target_include_directories(Benchmark PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/benchmark
+)
+
+target_compile_options(Benchmark PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
 )
 
 set_target_properties(Benchmark PROPERTIES

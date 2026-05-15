@@ -43,7 +43,7 @@ void JShader::CompileShader()
 #endif
 
 	// vertex shader
-	std::string name = "vMain"; // TODO: ?∞Î°ú ?åÏã±?¥ÏÑú ?ªÏñ¥?§Ïûê
+	std::string name = "vMain"; // TODO: ? ?? ??
 	std::string version = "vs_5_0";
 	
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -55,7 +55,7 @@ void JShader::CompileShader()
 	}
 
 	// pixel shader
-	name = "pMain"; // TODO: ?∞Î°ú ?åÏã±?¥ÏÑú ?ªÏñ¥?§Ïûê
+	name = "pMain"; // TODO: ? ?? ??
 	version = "ps_5_0";
 
 	if (FAILED(::D3DCompileFromFile(_path.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE
@@ -121,7 +121,7 @@ void JShader::CompileShader()
 				}
 				default:
 				{
-					// Íµ¨ÌòÑ ?ÑÏöî
+					//  ?
 				}
 				}
 			}

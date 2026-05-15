@@ -545,7 +545,7 @@ public:
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC& pipelineDesc = pipeline->pipelineDesc;
 
-		// ??Î∂ÄÎ∂ÑÏ? ?òÏ§ë??shader?êÏÑú Í∞Ä?∏Ïò§?ÑÎ°ù ?¥Ïïº??
+		// ??? ???shader? ?? ???
 		D3D12_INPUT_ELEMENT_DESC positionDesc[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
@@ -639,7 +639,7 @@ public:
 		// 1. Add Root Parameters for Constant Buffers
 		for (const auto& cb : bindingInfo.cBuffers) {
 			CD3DX12_ROOT_PARAMETER rootParam;
-			rootParam.InitAsConstantBufferView(cb.slot); // Í∞??ÅÏàò Î≤ÑÌçºÎ•?Í∞úÎ≥Ñ Î£®Ìä∏ ?åÎùºÎØ∏ÌÑ∞Î°?Ï∂îÍ?
+			rootParam.InitAsConstantBufferView(cb.slot); // ?? ?  ???
 			rootParameters.push_back(rootParam);
 		}
 
@@ -669,7 +669,7 @@ public:
 			samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 			staticSamplers.push_back(samplerDesc);
 		}
-		// 4. Î£®Ìä∏ ?úÎ™Ö ?ùÏÑ±
+		// 4.  ? ?
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init(static_cast<UINT>(rootParameters.size()), rootParameters.data(), static_cast<UINT>(staticSamplers.size()), staticSamplers.empty() ? nullptr : staticSamplers.data(), D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 

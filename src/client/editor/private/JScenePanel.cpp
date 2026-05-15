@@ -84,10 +84,10 @@ namespace
 	uint32 getClientHeight(HWND hwnd)
 	{
 		RECT rect{};
-		if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
-		{
-			return 1080u;
-		}
+	if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
+	{
+		return 1080u;
+	}
 	return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
 	}
 }
@@ -272,11 +272,13 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 		return;
 	}
 
-	Engine::JScene::TransformData* transformData = scene->GetTransform(cameraData->entity);
-	if (transformData == nullptr)
+	const Engine::JTransformHandle transformHandle = scene->GetTransformHandle(cameraData->entity);
+	if (!transformHandle.IsValid())
 	{
 		return;
 	}
+
+	const Engine::JScene::TransformData transformData = scene->GetTransform(transformHandle);
 
 	float yawInput = 0.0f;
 	float pitchInput = 0.0f;
@@ -327,9 +329,9 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 
 	const float moveSpeed = _editorCameraMoveSpeed * moveSpeedMultiplier;
 	XMFLOAT3 newRotation = {
-		transformData->rotation.x,
-		transformData->rotation.y,
-		transformData->rotation.z
+		transformData.rotation.x,
+		transformData.rotation.y,
+		transformData.rotation.z
 	};
 	newRotation.y += yawInput;
 	newRotation.x += pitchInput;
@@ -337,7 +339,7 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 	const XMVECTOR forwardVector = getForward(newRotation.y, newRotation.x);
 	const XMVECTOR rightVector = getRight(newRotation.y);
 	const XMVECTOR upVector = getUp(newRotation.y, newRotation.x);
-	XMVECTOR position = XMVectorSet(transformData->translation.x, transformData->translation.y, transformData->translation.z, 1.0f);
+	XMVECTOR position = XMVectorSet(transformData.translation.x, transformData.translation.y, transformData.translation.z, 1.0f);
 	position += forwardVector * (forwardInput * moveSpeed * deltaTime);
 	position += rightVector * (rightInput * moveSpeed * deltaTime);
 	position += upVector * (upInput * moveSpeed * deltaTime);
@@ -421,26 +423,28 @@ void JScenePanel::updateCameraInfoPanel()
 	}
 
 	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
-	const Engine::JScene::TransformData* transformData = cameraData != nullptr ? scene->GetTransform(cameraData->entity) : nullptr;
-	if (transformData == nullptr)
+	const Engine::JTransformHandle transformHandle = cameraData != nullptr ? scene->GetTransformHandle(cameraData->entity) : Engine::JTransformHandle{};
+	if (!transformHandle.IsValid())
 	{
 		return;
 	}
 
+	const Engine::JScene::TransformData transformData = scene->GetTransform(transformHandle);
+
 	std::wostringstream stream;
 	stream << std::fixed << std::setprecision(2);
 	stream << L"World Translate\n";
-	stream << L"X: " << transformData->translation.x << L"\n";
-	stream << L"Y: " << transformData->translation.y << L"\n";
-	stream << L"Z: " << transformData->translation.z << L"\n\n";
+	stream << L"X: " << transformData.translation.x << L"\n";
+	stream << L"Y: " << transformData.translation.y << L"\n";
+	stream << L"Z: " << transformData.translation.z << L"\n\n";
 	stream << L"World Rotation\n";
-	stream << L"X: " << wrapDegrees(toDegrees(transformData->rotation.x)) << L"\n";
-	stream << L"Y: " << wrapDegrees(toDegrees(transformData->rotation.y)) << L"\n";
-	stream << L"Z: " << wrapDegrees(toDegrees(transformData->rotation.z)) << L"\n\n";
+	stream << L"X: " << wrapDegrees(toDegrees(transformData.rotation.x)) << L"\n";
+	stream << L"Y: " << wrapDegrees(toDegrees(transformData.rotation.y)) << L"\n";
+	stream << L"Z: " << wrapDegrees(toDegrees(transformData.rotation.z)) << L"\n\n";
 	stream << L"World Scale\n";
-	stream << L"X: " << transformData->scale.x << L"\n";
-	stream << L"Y: " << transformData->scale.y << L"\n";
-	stream << L"Z: " << transformData->scale.z << L"\n\n";
+	stream << L"X: " << transformData.scale.x << L"\n";
+	stream << L"Y: " << transformData.scale.y << L"\n";
+	stream << L"Z: " << transformData.scale.z << L"\n\n";
 	stream << L"Editor Camera\n";
 	stream << L"Base Speed: " << _editorCameraMoveSpeed << L"\n\n";
 	stream << L"Projection\n";
@@ -449,15 +453,16 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"Far: " << cameraData->farP << L"\n\n";
 
 	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
-	const Engine::JScene::TransformData* lightTransformData = lightData != nullptr ? scene->GetTransform(lightData->entity) : nullptr;
+	const Engine::JTransformHandle lightTransformHandle = lightData != nullptr ? scene->GetTransformHandle(lightData->entity) : Engine::JTransformHandle{};
 	stream << L"Scene Light\n";
-	if (lightData != nullptr && lightTransformData != nullptr)
+	if (lightData != nullptr && lightTransformHandle.IsValid())
 	{
+		const Engine::JScene::TransformData lightTransformData = scene->GetTransform(lightTransformHandle);
 		stream << L"Count: 1\n";
 		stream << L"Pos: "
-			<< lightTransformData->translation.x << L", "
-			<< lightTransformData->translation.y << L", "
-			<< lightTransformData->translation.z << L"\n";
+			<< lightTransformData.translation.x << L", "
+			<< lightTransformData.translation.y << L", "
+			<< lightTransformData.translation.z << L"\n";
 		stream << L"Color: "
 			<< lightData->color.x << L", "
 			<< lightData->color.y << L", "

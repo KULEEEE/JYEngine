@@ -4,50 +4,15 @@
 
 #include "engine/precompile.h"
 #include "engine/core/JPool.h"
-
+#include "engine/scene/JSceneHandle.h"
+#include "engine/scene/JComponentLayoutDefinition.h"
+#include "engine/scene/JCameraPool.h"
+#include "engine/scene/JLightPool.h"
+#include "engine/scene/JRenderObjectPool.h"
+#include "engine/scene/JTransformPool.h"
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 
 J_ENGINE_BEGIN
-
-struct JEntityHandle
-{
-	uint32 index = static_cast<uint32>(-1);
-	uint32 generation = 0;
-
-	bool IsValid() const { return index != static_cast<uint32>(-1); }
-};
-
-struct JTransformHandle
-{
-	uint32 index = static_cast<uint32>(-1);
-	uint32 generation = 0;
-
-	bool IsValid() const { return index != static_cast<uint32>(-1); }
-};
-
-struct JCameraHandle
-{
-	uint32 index = static_cast<uint32>(-1);
-	uint32 generation = 0;
-
-	bool IsValid() const { return index != static_cast<uint32>(-1); }
-};
-
-struct JLightHandle
-{
-	uint32 index = static_cast<uint32>(-1);
-	uint32 generation = 0;
-
-	bool IsValid() const { return index != static_cast<uint32>(-1); }
-};
-
-struct JRenderObjectHandle
-{
-	uint32 index = static_cast<uint32>(-1);
-	uint32 generation = 0;
-
-	bool IsValid() const { return index != static_cast<uint32>(-1); }
-};
 
 enum class JSceneComponentMask : uint32
 {
@@ -75,48 +40,18 @@ public:
 		bool active = true;
 	};
 
-	struct TransformData
-	{
-		JVec3 translation = { 0.0f, 0.0f, 0.0f };
-		JVec3 rotation = { 0.0f, 0.0f, 0.0f };
-		JVec3 scale = { 1.0f, 1.0f, 1.0f };
-	};
-
-	struct CameraData
-	{
-		JEntityHandle entity = {};
-		float aspectRatio = 1.0f;
-		float farP = 1000.f;
-		float nearP = 0.5f;
-		bool active = true;
-	};
-
-	struct LightData
-	{
-		JEntityHandle entity = {};
-		JVec3 color = { 1.0f, 1.0f, 1.0f };
-		float intensity = 1.0f;
-		bool active = true;
-	};
-
-	struct RenderObjectData
-	{
-		JEntityHandle entity = {};
-		uint32 materialID = 0;
-		const JMesh* mesh = nullptr;
-		bool visible = true;
-		bool transparent = false;
-		bool active = true;
-	};
+	using TransformData = JTransformComponents;
+	using CameraData = JCameraComponents;
+	using LightData = JLightComponents;
+	using RenderObjectData = JRenderObjectComponents;
 
 	using EntityPool = JPool<JEntityHandle, EntityData>;
-	using TransformPool = JPool<JTransformHandle, TransformData>;
-	using CameraPool = JPool<JCameraHandle, CameraData>;
-	using LightPool = JPool<JLightHandle, LightData>;
-	using RenderObjectPool = JPool<JRenderObjectHandle, RenderObjectData>;
+	using TransformSlot = JTransformPool::SlotType;
+	using CameraPool = JCameraPool;
+	using LightPool = JLightPool;
+	using RenderObjectPool = JRenderObjectPool;
 
 	using EntitySlot = EntityPool::SlotType;
-	using TransformSlot = TransformPool::SlotType;
 	using CameraSlot = CameraPool::SlotType;
 	using LightSlot = LightPool::SlotType;
 	using RenderObjectSlot = RenderObjectPool::SlotType;
@@ -140,10 +75,28 @@ public:
 
 	EntityData* GetEntity(JEntityHandle handle);
 	const EntityData* GetEntity(JEntityHandle handle) const;
-	TransformData* GetTransform(JTransformHandle handle);
-	const TransformData* GetTransform(JTransformHandle handle) const;
-	TransformData* GetTransform(JEntityHandle entity);
-	const TransformData* GetTransform(JEntityHandle entity) const;
+	TransformData GetTransform(JTransformHandle handle) const;
+	TransformData GetTransform(JEntityHandle entity) const;
+	void SetTransform(JTransformHandle handle, const TransformData& data);
+	void SetTransform(JEntityHandle entity, const TransformData& data);
+	void SetTransformTranslation(JTransformHandle handle, const JVec3& value);
+	void SetTransformTranslation(JEntityHandle entity, const JVec3& value);
+	void SetTransformRotation(JTransformHandle handle, const JVec3& value);
+	void SetTransformRotation(JEntityHandle entity, const JVec3& value);
+	void SetTransformScale(JTransformHandle handle, const JVec3& value);
+	void SetTransformScale(JEntityHandle entity, const JVec3& value);
+	JVec3* GetTransformTranslation(JTransformHandle handle);
+	const JVec3* GetTransformTranslation(JTransformHandle handle) const;
+	JVec3* GetTransformTranslation(JEntityHandle entity);
+	const JVec3* GetTransformTranslation(JEntityHandle entity) const;
+	JVec3* GetTransformRotation(JTransformHandle handle);
+	const JVec3* GetTransformRotation(JTransformHandle handle) const;
+	JVec3* GetTransformRotation(JEntityHandle entity);
+	const JVec3* GetTransformRotation(JEntityHandle entity) const;
+	JVec3* GetTransformScale(JTransformHandle handle);
+	const JVec3* GetTransformScale(JTransformHandle handle) const;
+	JVec3* GetTransformScale(JEntityHandle entity);
+	const JVec3* GetTransformScale(JEntityHandle entity) const;
 	JTransformHandle GetTransformHandle(JEntityHandle entity) const;
 	CameraData* GetCamera(JCameraHandle handle);
 	const CameraData* GetCamera(JCameraHandle handle) const;
@@ -163,7 +116,7 @@ private:
 	void AddEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
 
 	EntityPool _entities;
-	TransformPool _transforms;
+	JTransformPool _transforms;
 	CameraPool _cameras;
 	LightPool _lights;
 	RenderObjectPool _renderObjects;

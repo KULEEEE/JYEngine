@@ -146,7 +146,7 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 		return {};
 	}
 
-	const JTransformHandle transform = _transforms.Add(data);
+	const JTransformHandle transform = _transforms.Add(entity, data);
 	if (entity.index >= _entityTransformLookup.size())
 	{
 		_entityTransformLookup.resize(entity.index + 1);
@@ -169,7 +169,7 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	data.nearP = nearP;
 	data.farP = farP;
 
-	const JCameraHandle handle = _cameras.Add(data);
+	const JCameraHandle handle = _cameras.Add(entity, data);
 	if (!_primaryCamera.IsValid())
 	{
 		_primaryCamera = handle;
@@ -180,21 +180,21 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 
 JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 {
-	if (!_entities.IsValid(entity) || GetTransform(entity) == nullptr)
+	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
 	{
 		return {};
 	}
 
 	LightData lightData = data;
 	lightData.entity = entity;
-	const JLightHandle light = _lights.Add(lightData);
+	const JLightHandle light = _lights.Add(entity, lightData);
 	AddEntityComponentMask(entity, JSceneComponentMask::Light);
 	return light;
 }
 
 JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent)
 {
-	if (!_entities.IsValid(entity) || GetTransform(entity) == nullptr)
+	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
 	{
 		return {};
 	}
@@ -204,7 +204,7 @@ JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materia
 	data.materialID = materialID;
 	data.mesh = mesh;
 	data.transparent = transparent;
-	const JRenderObjectHandle renderObject = _renderObjects.Add(data);
+	const JRenderObjectHandle renderObject = _renderObjects.Add(entity, data);
 	AddEntityComponentMask(entity, JSceneComponentMask::RenderObject);
 	return renderObject;
 }
@@ -219,36 +219,144 @@ const JScene::EntityData* JScene::GetEntity(JEntityHandle handle) const
 	return _entities.Get(handle);
 }
 
-JScene::TransformData* JScene::GetTransform(JTransformHandle handle)
+JScene::TransformData JScene::GetTransform(JTransformHandle handle) const
 {
 	return _transforms.Get(handle);
 }
 
-const JScene::TransformData* JScene::GetTransform(JTransformHandle handle) const
-{
-	return _transforms.Get(handle);
-}
-
-JScene::TransformData* JScene::GetTransform(JEntityHandle entity)
+JScene::TransformData JScene::GetTransform(JEntityHandle entity) const
 {
 	if (!_entities.IsValid(entity) || entity.index >= _entityTransformLookup.size())
 	{
-		return nullptr;
+		return {};
 	}
 
 	const JTransformHandle transform = _entityTransformLookup[entity.index];
 	return _transforms.Get(transform);
 }
 
-const JScene::TransformData* JScene::GetTransform(JEntityHandle entity) const
+void JScene::SetTransform(JTransformHandle handle, const TransformData& data)
 {
-	if (!_entities.IsValid(entity) || entity.index >= _entityTransformLookup.size())
-	{
-		return nullptr;
-	}
+	_transforms.Set(handle, data);
+}
 
-	const JTransformHandle transform = _entityTransformLookup[entity.index];
-	return _transforms.Get(transform);
+void JScene::SetTransform(JEntityHandle entity, const TransformData& data)
+{
+	if (JTransformHandle transform = GetTransformHandle(entity); transform.IsValid())
+	{
+		_transforms.Set(transform, data);
+	}
+}
+
+void JScene::SetTransformTranslation(JTransformHandle handle, const JVec3& value)
+{
+	_transforms.SetTranslation(handle, value);
+}
+
+void JScene::SetTransformTranslation(JEntityHandle entity, const JVec3& value)
+{
+	if (JTransformHandle transform = GetTransformHandle(entity); transform.IsValid())
+	{
+		_transforms.SetTranslation(transform, value);
+	}
+}
+
+void JScene::SetTransformRotation(JTransformHandle handle, const JVec3& value)
+{
+	_transforms.SetRotation(handle, value);
+}
+
+void JScene::SetTransformRotation(JEntityHandle entity, const JVec3& value)
+{
+	if (JTransformHandle transform = GetTransformHandle(entity); transform.IsValid())
+	{
+		_transforms.SetRotation(transform, value);
+	}
+}
+
+void JScene::SetTransformScale(JTransformHandle handle, const JVec3& value)
+{
+	_transforms.SetScale(handle, value);
+}
+
+void JScene::SetTransformScale(JEntityHandle entity, const JVec3& value)
+{
+	if (JTransformHandle transform = GetTransformHandle(entity); transform.IsValid())
+	{
+		_transforms.SetScale(transform, value);
+	}
+}
+
+JVec3* JScene::GetTransformTranslation(JTransformHandle handle)
+{
+	return _transforms.GetTranslation(handle);
+}
+
+const JVec3* JScene::GetTransformTranslation(JTransformHandle handle) const
+{
+	return _transforms.GetTranslation(handle);
+}
+
+JVec3* JScene::GetTransformTranslation(JEntityHandle entity)
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetTranslation(_entityTransformLookup[entity.index])
+		: nullptr;
+}
+
+const JVec3* JScene::GetTransformTranslation(JEntityHandle entity) const
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetTranslation(_entityTransformLookup[entity.index])
+		: nullptr;
+}
+
+JVec3* JScene::GetTransformRotation(JTransformHandle handle)
+{
+	return _transforms.GetRotation(handle);
+}
+
+const JVec3* JScene::GetTransformRotation(JTransformHandle handle) const
+{
+	return _transforms.GetRotation(handle);
+}
+
+JVec3* JScene::GetTransformRotation(JEntityHandle entity)
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetRotation(_entityTransformLookup[entity.index])
+		: nullptr;
+}
+
+const JVec3* JScene::GetTransformRotation(JEntityHandle entity) const
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetRotation(_entityTransformLookup[entity.index])
+		: nullptr;
+}
+
+JVec3* JScene::GetTransformScale(JTransformHandle handle)
+{
+	return _transforms.GetScale(handle);
+}
+
+const JVec3* JScene::GetTransformScale(JTransformHandle handle) const
+{
+	return _transforms.GetScale(handle);
+}
+
+JVec3* JScene::GetTransformScale(JEntityHandle entity)
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetScale(_entityTransformLookup[entity.index])
+		: nullptr;
+}
+
+const JVec3* JScene::GetTransformScale(JEntityHandle entity) const
+{
+	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
+		? _transforms.GetScale(_entityTransformLookup[entity.index])
+		: nullptr;
 }
 
 JTransformHandle JScene::GetTransformHandle(JEntityHandle entity) const

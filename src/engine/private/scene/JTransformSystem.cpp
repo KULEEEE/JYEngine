@@ -34,8 +34,8 @@ XMMATRIX JTransformSystem::MakeWorldMatrix(const JScene::TransformData& transfor
 
 void JTransformSystem::SyncRenderDB(const JScene& scene, JRenderDB& renderDB) const
 {
-	const std::vector<JScene::TransformSlot>& slots = scene.GetTransformSlots();
-	for (const JScene::TransformSlot& slot : slots)
+	const std::vector<JTransformPool::SlotType>& slots = scene.GetTransformSlots();
+	for (const JTransformPool::SlotType& slot : slots)
 	{
 		if (!slot.active)
 		{
@@ -46,7 +46,7 @@ void JTransformSystem::SyncRenderDB(const JScene& scene, JRenderDB& renderDB) co
 			static_cast<uint32>(&slot - slots.data()),
 			slot.generation
 		};
-		renderDB.SyncTransform(transformHandle, MakeWorldMatrix(slot.data));
+		renderDB.SyncTransform(transformHandle, MakeWorldMatrix(scene.GetTransform(transformHandle)));
 	}
 }
 

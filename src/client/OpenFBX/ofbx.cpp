@@ -1897,7 +1897,7 @@ struct CameraImpl : public Camera
 				fieldOfView =  2.0 * atan(sqrt(filmWidth * filmWidth + filmHeight * filmHeight) / (2.0 * focalLength)) * 180.0 / OFBX_PI;
 				return;
 			case Camera::ApertureMode::FOCALLENGTH:
-				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / OFBX_PI; // Same as vertical ¯\_(ツ)_/¯
+				fieldOfView =  2.0 * atan(filmHeight / (2.0 * focalLength)) * 180.0 / OFBX_PI; // Same as vertical \_()_/
 				return;
 			default:
 				fieldOfView =  60.0;

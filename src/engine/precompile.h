@@ -70,12 +70,12 @@ struct JVec2 {
 	JVec2(JVec2&&) = default;
 	JVec2& operator=(JVec2&&) = default;
 
-	// float 배열로의 암시적 타입 변환을 위한 연산자 오버로딩
+	// float       
 	operator float* () {
 		return &x;
 	}
 
-	// const 버전
+	// const 
 	operator const float* () const {
 		return &x;
 	}
@@ -93,12 +93,12 @@ struct JVec3 {
 	JVec3(JVec3&&) = default;
 	JVec3& operator=(JVec3&&) = default;
 
-	// float 배열로의 암시적 타입 변환을 위한 연산자 오버로딩
+	// float       
 	operator float* () {
 		return &x;
 	}
 
-	// const 버전
+	// const 
 	operator const float* () const {
 		return &x;
 	}
@@ -116,12 +116,12 @@ struct JVec4 {
 	JVec4(JVec4&&) = default;
 	JVec4& operator=(JVec4&&) = default;
 
-	// float 배열로의 암시적 타입 변환을 위한 연산자 오버로딩
+	// float       
 	operator float* () {
 		return &x;
 	}
 
-	// const 버전
+	// const 
 	operator const float* () const {
 		return &x;
 	}
@@ -141,12 +141,12 @@ struct JColor {
 
 	JColor(const JVec4& vec4) : r(vec4.x), g(vec4.y), b(vec4.z), a(vec4.w) {}
 
-	// float 배열로의 암시적 타입 변환을 위한 연산자 오버로딩
+	// float       
 	operator float* () {
 		return &r;
 	}
 
-	// const 버전
+	// const 
 	operator const float* () const {
 		return &r;
 	}

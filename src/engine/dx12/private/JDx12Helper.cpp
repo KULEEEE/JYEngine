@@ -13,8 +13,8 @@ JDx12Helper::JDx12Helper(ComPtr<ID3D12Device> device)
 	rtvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvDesc.NodeMask = 0;
 
-	// 같은 종류의 데이터끼리 배열로 관리
-	// RTV 목록 : [ ] [ ]
+	//     
+	// RTV  : [ ] [ ]
 	device->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(&_rtvHeap));
 
 	_rtvHeapSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

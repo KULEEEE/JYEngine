@@ -248,14 +248,16 @@ void JRenderDB::SyncLights(const JScene& scene)
 			continue;
 		}
 
-		const JScene::TransformData* transform = scene.GetTransform(slot.data.entity);
-		if (transform == nullptr)
+		const JTransformHandle transformHandle = scene.GetTransformHandle(slot.data.entity);
+		if (!transformHandle.IsValid())
 		{
 			continue;
 		}
 
+		const JScene::TransformData transform = scene.GetTransform(transformHandle);
+
 		constants.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
-		constants.positionCount = JVec4(transform->translation.x, transform->translation.y, transform->translation.z, 1.0f);
+		constants.positionCount = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
 		lightCount = 1;
 		break;
 	}

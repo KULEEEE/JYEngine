@@ -20,7 +20,7 @@ private:
 
 	D3D12_CPU_DESCRIPTOR_HANDLE _rtvHeapBegin;
 
-	//TODO: 다른 Heap들도 추가
+	//TODO:  Heap 
 
 	int _rtvHeapSize = 0;
 	uint16 _rtvIndex = 0;

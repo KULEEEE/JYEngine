@@ -102,8 +102,8 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData)
 			const ofbx::GeometryPartition::Polygon& polygon = partition.polygons[pi];
 			const uint32_t triCount = ofbx::triangulate(geom, polygon, triIndices.data());
 
-			// FBX(right-handed, Y-up) → DirectX(left-handed, Y-up) 좌표계 변환.
-			// z 부호 반전 + 삼각형 winding 역전을 함께 적용해야 텍스처가 좌우 반전 없이 표시된다.
+			// FBX(right-handed, Y-up)  DirectX(left-handed, Y-up)  .
+			// z   +  winding        .
 			for (uint32_t t = 0; t + 2 < triCount; t += 3)
 			{
 				const int triangle[3] = { triIndices[t], triIndices[t + 2], triIndices[t + 1] };

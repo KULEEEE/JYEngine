@@ -61,13 +61,13 @@ void JCameraSystem::SetRotate(JScene& scene, JCameraHandle camera, float x, floa
 		return;
 	}
 
-	JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
-	if (transform == nullptr)
+	const JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
+	if (!transformHandle.IsValid())
 	{
 		return;
 	}
 
-	transform->rotation = { x, y, z };
+	scene.SetTransformRotation(transformHandle, { x, y, z });
 }
 
 void JCameraSystem::SetPosition(JScene& scene, JCameraHandle camera, float x, float y, float z)
@@ -78,13 +78,13 @@ void JCameraSystem::SetPosition(JScene& scene, JCameraHandle camera, float x, fl
 		return;
 	}
 
-	JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
-	if (transform == nullptr)
+	const JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
+	if (!transformHandle.IsValid())
 	{
 		return;
 	}
 
-	transform->translation = { x, y, z };
+	scene.SetTransformTranslation(transformHandle, { x, y, z });
 }
 
 XMMATRIX JCameraSystem::GetViewMatrix(const JScene& scene, JCameraHandle camera) const
@@ -95,15 +95,17 @@ XMMATRIX JCameraSystem::GetViewMatrix(const JScene& scene, JCameraHandle camera)
 		return XMMatrixIdentity();
 	}
 
-	const JScene::TransformData* transform = scene.GetTransform(cameraData->entity);
-	if (transform == nullptr)
+	const JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
+	if (!transformHandle.IsValid())
 	{
 		return XMMatrixIdentity();
 	}
 
-	const XMVECTOR position = XMVectorSet(transform->translation.x, transform->translation.y, transform->translation.z, 1.0f);
-	const XMVECTOR forward = getForward(transform->rotation.y, transform->rotation.x);
-	const XMVECTOR up = getUp(transform->rotation.y, transform->rotation.x);
+	const JScene::TransformData transform = scene.GetTransform(transformHandle);
+
+	const XMVECTOR position = XMVectorSet(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
+	const XMVECTOR forward = getForward(transform.rotation.y, transform.rotation.x);
+	const XMVECTOR up = getUp(transform.rotation.y, transform.rotation.x);
 	return XMMatrixLookAtLH(position, position + forward, up);
 }
 
