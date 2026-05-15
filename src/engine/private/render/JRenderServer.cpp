@@ -235,7 +235,7 @@ void JRenderServer::SyncScene(const JScene& scene)
 
 	if (const JLightSystem* lightSystem = JLightSystem::Get())
 	{
-		lightSystem->SyncRenderDB(scene, _renderDB);
+		lightSystem->SyncRenderDB(scene);
 	}
 }
 

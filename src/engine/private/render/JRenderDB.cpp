@@ -14,20 +14,6 @@ namespace
 	{
 		XMFLOAT4X4 world;
 	};
-
-	struct LightConstants
-	{
-		JVec4 colorIntensity;
-		JVec4 positionCount;
-	};
-
-	LightConstants MakeDefaultLightConstants()
-	{
-		LightConstants constants{};
-		constants.colorIntensity = JVec4(1.0f, 1.0f, 1.0f, 0.35f);
-		constants.positionCount = JVec4(0.0f, 4.0f, -4.0f, 0.0f);
-		return constants;
-	}
 }
 
 JRenderDB::~JRenderDB()
@@ -74,7 +60,7 @@ uint32 JRenderDB::FindMaterialResourceIndex(uint32 materialID) const
 	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JRenderDB::CameraResource& JRenderDB::GetOrCreateCameraResource(JCameraHandle camera)
+JCameraResource& JRenderDB::GetOrCreateCameraResource(JCameraHandle camera)
 {
 	const uint64 cameraKey = MakeCameraKey(camera);
 	const auto iter = _cameraIndexMap.find(cameraKey);
@@ -99,7 +85,7 @@ uint32 JRenderDB::FindCameraResourceIndex(JCameraHandle camera) const
 	return iter == _cameraIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JRenderDB::TransformResource& JRenderDB::GetOrCreateTransformResource(JTransformHandle transform)
+JTransformResource& JRenderDB::GetOrCreateTransformResource(JTransformHandle transform)
 {
 	const uint64 transformKey = MakeTransformKey(transform);
 	const auto iter = _transformIndexMap.find(transformKey);
@@ -136,38 +122,28 @@ const JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID) cons
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
-JRenderDB::CameraResource* JRenderDB::FindCameraResource(JCameraHandle camera)
+JCameraResource* JRenderDB::FindCameraResource(JCameraHandle camera)
 {
 	const uint32 index = FindCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
-const JRenderDB::CameraResource* JRenderDB::FindCameraResource(JCameraHandle camera) const
+const JCameraResource* JRenderDB::FindCameraResource(JCameraHandle camera) const
 {
 	const uint32 index = FindCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
-JRenderDB::TransformResource* JRenderDB::FindTransformResource(JTransformHandle transform)
+JTransformResource* JRenderDB::FindTransformResource(JTransformHandle transform)
 {
 	const uint32 index = FindTransformResourceIndex(transform);
 	return index == static_cast<uint32>(-1) ? nullptr : &_transformResources[index].resource;
 }
 
-const JRenderDB::TransformResource* JRenderDB::FindTransformResource(JTransformHandle transform) const
+const JTransformResource* JRenderDB::FindTransformResource(JTransformHandle transform) const
 {
 	const uint32 index = FindTransformResourceIndex(transform);
 	return index == static_cast<uint32>(-1) ? nullptr : &_transformResources[index].resource;
-}
-
-JRenderDB::LightResource* JRenderDB::GetLightResource()
-{
-	return &_lightResource;
-}
-
-const JRenderDB::LightResource* JRenderDB::GetLightResource() const
-{
-	return &_lightResource;
 }
 
 JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh)
@@ -204,7 +180,7 @@ void JRenderDB::SyncMaterial(const JMaterial& material)
 
 void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer)
 {
-	CameraResource& resource = GetOrCreateCameraResource(camera);
+	JCameraResource& resource = GetOrCreateCameraResource(camera);
 	resource.camera = camera;
 	resource.perFrameBuffer = perFrameBuffer;
 	XMStoreFloat4x4(&resource.viewProjection, XMMatrixTranspose(viewProjection));
@@ -217,7 +193,7 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 		return;
 	}
 
-	TransformResource& resource = GetOrCreateTransformResource(transform);
+	JTransformResource& resource = GetOrCreateTransformResource(transform);
 	resource.transform = transform;
 	XMStoreFloat4x4(&resource.world, XMMatrixTranspose(world));
 
@@ -230,48 +206,6 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 	}
 
 	_renderContext->UpdateConstantBuffer(resource.perObjectBuffer, &constants, sizeof(constants));
-}
-
-void JRenderDB::SyncLights(const JScene& scene)
-{
-	if (_renderContext == nullptr)
-	{
-		return;
-	}
-
-	LightConstants constants = MakeDefaultLightConstants();
-	uint32 lightCount = 0;
-	for (const JScene::LightSlot& slot : scene.GetLightSlots())
-	{
-		if (!slot.active || !slot.data.active)
-		{
-			continue;
-		}
-
-		const JTransformHandle transformHandle = scene.GetTransformHandle(slot.data.entity);
-		if (!transformHandle.IsValid())
-		{
-			continue;
-		}
-
-		const JScene::TransformData transform = scene.GetTransform(transformHandle);
-
-		constants.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
-		constants.positionCount = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
-		lightCount = 1;
-		break;
-	}
-
-	_lightResource.lightCount = lightCount;
-	_lightResource.colorIntensity = constants.colorIntensity;
-	_lightResource.positionCount = constants.positionCount;
-	if (_lightResource.lightBuffer == nullptr)
-	{
-		_lightResource.lightBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
-		return;
-	}
-
-	_renderContext->UpdateConstantBuffer(_lightResource.lightBuffer, &constants, sizeof(constants));
 }
 
 JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
@@ -421,9 +355,6 @@ void JRenderDB::Clear()
 	{
 		delete record.resource.perObjectBuffer;
 	}
-
-	delete _lightResource.lightBuffer;
-	_lightResource = {};
 
 	_meshResources.clear();
 	_materialResources.clear();

@@ -3,8 +3,7 @@
 #define __J_LIGHT_SYSTEM_H__
 
 #include "engine/scene/JScene.h"
-
-/*#include "engine/render/JRenderDB.h"*/ namespace J { namespace Engine { class JRenderDB; } }
+#include "engine/render/JRenderResource.h"
 
 J_ENGINE_BEGIN
 
@@ -19,10 +18,13 @@ public:
 
 	static JLightSystem* Get();
 
-	void SyncRenderDB(const JScene& scene, JRenderDB& renderDB) const;
+	void SyncRenderDB(const JScene& scene);
+	JLightResource* GetLightResource();
+	const JLightResource* GetLightResource() const;
 
 private:
 	static JLightSystem* s_Instance;
+	JLightResource _lightResource;
 };
 
 J_ENGINE_END

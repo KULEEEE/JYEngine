@@ -474,8 +474,8 @@ void JScenePanel::updateCameraInfoPanel()
 		stream << L"Count: 0\n\n";
 	}
 
-	const Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr;
-	const Engine::JRenderDB::LightResource* lightResource = renderServer != nullptr ? renderServer->GetRenderDB().GetLightResource() : nullptr;
+	const Engine::JLightSystem* lightSystem = GetEngine() != nullptr ? GetEngine()->GetLightSystem() : nullptr;
+	const Engine::JLightResource* lightResource = lightSystem != nullptr ? lightSystem->GetLightResource() : nullptr;
 	stream << L"RenderDB Light\n";
 	if (lightResource != nullptr)
 	{

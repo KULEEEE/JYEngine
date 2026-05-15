@@ -23,38 +23,16 @@ public:
 		JMaterialResource resource;
 	};
 
-	struct CameraResource
-	{
-		JCameraHandle camera = {};
-		XMFLOAT4X4 viewProjection = {};
-		Render::JConstantBuffer* perFrameBuffer = nullptr;
-	};
-
 	struct CameraResourceRecord
 	{
 		uint64 cameraKey = 0;
-		CameraResource resource;
-	};
-
-	struct TransformResource
-	{
-		JTransformHandle transform = {};
-		XMFLOAT4X4 world = {};
-		Render::JConstantBuffer* perObjectBuffer = nullptr;
+		JCameraResource resource;
 	};
 
 	struct TransformResourceRecord
 	{
 		uint64 transformKey = 0;
-		TransformResource resource;
-	};
-
-	struct LightResource
-	{
-		Render::JConstantBuffer* lightBuffer = nullptr;
-		JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
-		JVec4 positionCount = { 0.0f, 4.0f, -4.0f, 0.0f };
-		uint32 lightCount = 0;
+		JTransformResource resource;
 	};
 
 	JRenderDB() = default;
@@ -64,19 +42,16 @@ public:
 
 	JMaterialResource* FindMaterialResource(uint32 materialID);
 	const JMaterialResource* FindMaterialResource(uint32 materialID) const;
-	CameraResource* FindCameraResource(JCameraHandle camera);
-	const CameraResource* FindCameraResource(JCameraHandle camera) const;
-	TransformResource* FindTransformResource(JTransformHandle transform);
-	const TransformResource* FindTransformResource(JTransformHandle transform) const;
-	LightResource* GetLightResource();
-	const LightResource* GetLightResource() const;
+	JCameraResource* FindCameraResource(JCameraHandle camera);
+	const JCameraResource* FindCameraResource(JCameraHandle camera) const;
+	JTransformResource* FindTransformResource(JTransformHandle transform);
+	const JTransformResource* FindTransformResource(JTransformHandle transform) const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
-	void SyncLights(const JScene& scene);
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
 	void RemoveMaterialResource(uint32 materialID);
 	void RemoveCameraResource(JCameraHandle camera);
@@ -88,8 +63,8 @@ public:
 
 private:
 	JMaterialResource& GetOrCreateMaterialResource(uint32 materialID);
-	CameraResource& GetOrCreateCameraResource(JCameraHandle camera);
-	TransformResource& GetOrCreateTransformResource(JTransformHandle transform);
+	JCameraResource& GetOrCreateCameraResource(JCameraHandle camera);
+	JTransformResource& GetOrCreateTransformResource(JTransformHandle transform);
 	uint32 FindMaterialResourceIndex(uint32 materialID) const;
 	uint32 FindCameraResourceIndex(JCameraHandle camera) const;
 	uint32 FindTransformResourceIndex(JTransformHandle transform) const;
@@ -103,7 +78,6 @@ private:
 	std::unordered_map<uint64, uint32> _cameraIndexMap;
 	std::vector<TransformResourceRecord> _transformResources;
 	std::unordered_map<uint64, uint32> _transformIndexMap;
-	LightResource _lightResource;
 	std::unordered_map<const JMesh*, JMeshResource> _meshResources;
 };
 
