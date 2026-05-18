@@ -1,7 +1,10 @@
+static const int MAX_RENDER_LIGHTS = 8;
+
 cbuffer PerLights : register(b0)
 {
-    float4 LightColorIntensity;
-    float4 LightPositionCount;
+    float4 LightColorIntensities[MAX_RENDER_LIGHTS];
+    float4 LightPositions[MAX_RENDER_LIGHTS];
+    float4 LightInfo;
 };
 
 Texture2D GBufferAlbedo : register(t0);
@@ -70,26 +73,33 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
     float metallic = saturate(material.g);
 
     float3 viewDir = normalize(float3(0.0f, 0.25f, -1.0f));
-    float3 lightDir = normalize(LightPositionCount.xyz);
-    float3 halfVector = normalize(viewDir + lightDir);
-    float3 lightColor = LightColorIntensity.rgb * LightColorIntensity.a;
-    float ndotl = max(dot(normal, lightDir), 0.0f);
-
     float3 f0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-    float ndf = DistributionGGX(normal, halfVector, roughness);
-    float geometry = GeometrySmith(normal, viewDir, lightDir, roughness);
-    float3 fresnel = FresnelSchlick(max(dot(halfVector, viewDir), 0.0f), f0);
-
-    float3 numerator = ndf * geometry * fresnel;
-    float denominator = max(4.0f * max(dot(normal, viewDir), 0.0f) * ndotl, 0.0001f);
-    float3 specular = numerator / denominator;
-
-    float3 ks = fresnel;
-    float3 kd = (1.0f - ks) * (1.0f - metallic);
-    float3 direct = (kd * albedo / PI + specular) * lightColor * ndotl;
-    // 메탈 표면은 diffuse가 없으므로 ambient에도 (1 - metallic)을 곱해 묻힘을 막는다.
     float3 ambient = albedo * 0.08f * (1.0f - metallic);
-    float3 color = ambient + (LightPositionCount.w > 0.0f ? direct : 0.0f);
+    float3 direct = float3(0.0f, 0.0f, 0.0f);
+
+    int lightCount = min((int)LightInfo.x, MAX_RENDER_LIGHTS);
+    [loop]
+    for (int i = 0; i < lightCount; ++i)
+    {
+        float3 lightDir = normalize(LightPositions[i].xyz);
+        float3 halfVector = normalize(viewDir + lightDir);
+        float3 lightColor = LightColorIntensities[i].rgb * LightColorIntensities[i].a;
+        float ndotl = max(dot(normal, lightDir), 0.0f);
+
+        float ndf = DistributionGGX(normal, halfVector, roughness);
+        float geometry = GeometrySmith(normal, viewDir, lightDir, roughness);
+        float3 fresnel = FresnelSchlick(max(dot(halfVector, viewDir), 0.0f), f0);
+
+        float3 numerator = ndf * geometry * fresnel;
+        float denominator = max(4.0f * max(dot(normal, viewDir), 0.0f) * ndotl, 0.0001f);
+        float3 specular = numerator / denominator;
+
+        float3 ks = fresnel;
+        float3 kd = (1.0f - ks) * (1.0f - metallic);
+        direct += (kd * albedo / PI + specular) * lightColor * ndotl;
+    }
+
+    float3 color = ambient + direct;
 
     color = color / (color + 1.0f);
     color = pow(saturate(color), 1.0f / 2.2f);

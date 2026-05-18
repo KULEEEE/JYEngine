@@ -13,10 +13,13 @@ cbuffer PerObject : register(b2)
     matrix World;
 }
 
+static const int MAX_RENDER_LIGHTS = 8;
+
 cbuffer PerLights : register(b3)
 {
-    float4 LightColorIntensity;
-    float4 LightPositionCount;
+    float4 LightColorIntensities[MAX_RENDER_LIGHTS];
+    float4 LightPositions[MAX_RENDER_LIGHTS];
+    float4 LightInfo;
 }
 
 Texture2D BaseTexture : register(t0);
@@ -43,15 +46,21 @@ PS_INPUT vMain(VS_INPUT input)
 float4 pMain(PS_INPUT input) : SV_TARGET
 {
     float4 texColor = BaseTexture.Sample(LinearSampler, float2(0.5f, 0.5f));
-    float lightCount = LightPositionCount.w;
-    float3 lightVector = LightPositionCount.xyz - input.WorldPos;
-    float lightDistance = length(lightVector);
-    float distanceFalloff = saturate(1.0f - lightDistance / 10.0f);
-    float lightAmount = lightCount > 0.0f ? saturate(distanceFalloff * LightColorIntensity.a) : 0.0f;
     float3 baseColor = texColor.rgb * BaseColor.rgb;
-    float3 litColor = baseColor * (0.15f + lightAmount);
+    float3 litColor = baseColor * 0.15f;
 
-    // Temporary debug tint until normal-based lighting exists.
-    litColor += LightColorIntensity.rgb * (lightAmount * 0.35f);
+    int lightCount = min((int)LightInfo.x, MAX_RENDER_LIGHTS);
+    [loop]
+    for (int i = 0; i < lightCount; ++i)
+    {
+        float3 lightVector = LightPositions[i].xyz - input.WorldPos;
+        float lightDistance = length(lightVector);
+        float distanceFalloff = saturate(1.0f - lightDistance / 10.0f);
+        float lightAmount = saturate(distanceFalloff * LightColorIntensities[i].a);
+
+        // Temporary debug tint until normal-based lighting exists.
+        litColor += baseColor * lightAmount;
+        litColor += LightColorIntensities[i].rgb * (lightAmount * 0.35f);
+    }
     return float4(litColor, texColor.a * BaseColor.a);
 }

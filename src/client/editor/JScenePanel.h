@@ -8,6 +8,13 @@
 #include "engine/scene/JScene.h"
 
 #include <chrono>
+#include <memory>
+
+namespace J::Engine
+{
+	class JMaterial;
+	class JMesh;
+}
 
 J_EDITOR_BEGIN
 
@@ -24,11 +31,20 @@ public:
 private:
 	Engine::JScene* getScene();
 	const Engine::JScene* getScene() const;
+	void createEditorGrid();
 	void updateSceneCamera(float deltaTime);
+	void selectDefaultRenderObject();
+	void updateSelectedObject(float deltaTime);
 	
 	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
 	Engine::JLightHandle _light = {};
+	Engine::JRenderObjectHandle _selectedRenderObject = {};
+	Engine::JEntityHandle _selectedEntity = {};
+	Engine::JEntityHandle _editorGridEntity = {};
+	Engine::JRenderObjectHandle _editorGridRenderObject = {};
+	std::unique_ptr<Engine::JMaterial> _editorGridMaterial;
+	std::unique_ptr<Engine::JMesh> _editorGridMesh;
 	bool _isMouseLookActive = false;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;

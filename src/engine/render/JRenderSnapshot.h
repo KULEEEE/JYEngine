@@ -3,6 +3,7 @@
 #define __J_RENDER_SNAPSHOT_H__
 
 #include "engine/precompile.h"
+#include "engine/render/JRenderFrame.h"
 #include "engine/scene/JSceneHandle.h"
 
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
@@ -23,17 +24,20 @@ struct JTransformSnapshot
 	XMMATRIX world = XMMatrixIdentity();
 };
 
-struct JLightSnapshot
+struct JLightSnapshotItem
 {
 	JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
-	JVec4 positionCount = { 0.0f, 4.0f, -4.0f, 0.0f };
-	uint32 lightCount = 0;
+	JVec4 position = { 0.0f, 4.0f, -4.0f, 1.0f };
+};
+
+struct JLightSnapshot
+{
+	std::vector<JLightSnapshotItem> items;
 };
 
 struct JRenderObjectSnapshot
 {
 	JEntityHandle entity = {};
-	JTransformHandle transform = {};
 	JRenderObjectHandle renderObject = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
@@ -48,6 +52,8 @@ struct JFrameSnapshot
 	std::vector<JTransformSnapshot> transforms;
 	std::vector<JLightSnapshot> lights;
 	std::vector<JRenderObjectSnapshot> renderObjects;
+	std::vector<JDrawItem> opaqueDrawItems;
+	std::vector<JDrawItem> transparentDrawItems;
 };
 
 J_ENGINE_END

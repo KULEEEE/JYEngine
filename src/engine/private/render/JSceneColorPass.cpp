@@ -24,30 +24,30 @@ void JSceneColorPass::Execute(const JRenderPassContext& context, const JFrameDes
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	RenderDrawItems(context, frameDesc.opaqueDrawItems);
-	RenderDrawItems(context, frameDesc.transparentDrawItems);
+	RenderDrawItems(context, frameDesc.camera, frameDesc.opaqueDrawItems);
+	RenderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
 
 	context.commandQueue->EndRenderPass();
 }
 
-void JSceneColorPass::RenderDrawItems(const JRenderPassContext& context, const std::vector<JDrawItem>& drawItems)
+void JSceneColorPass::RenderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
 {
 	for (const JDrawItem& drawItem : drawItems)
 	{
-		RenderDrawItem(context, drawItem);
+		RenderDrawItem(context, camera, drawItem);
 	}
 }
 
-void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, const JDrawItem& drawItem)
+void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	if (drawItem.mesh == nullptr)
+	if (drawItem.meshResource == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		std::cerr << GetName() << " draw skipped: draw item mesh is null." << std::endl;
 		return;
 	}
 
-	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
+	const JMeshResource* meshResource = drawItem.meshResource;
 	if (meshResource == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
@@ -55,7 +55,7 @@ void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, const JD
 		return;
 	}
 
-	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
+	const JMaterialResource* materialResource = drawItem.materialResource;
 	if (materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
@@ -71,10 +71,16 @@ void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, const JD
 		return;
 	}
 
-	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
+	const JTransformResource* transformResource = drawItem.transformResource;
 	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
+	}
+
+	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
+	if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+	{
+		graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
 	}
 
 	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;

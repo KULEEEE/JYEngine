@@ -85,6 +85,8 @@ public:
 	void SetTransformRotation(JEntityHandle entity, const JVec3& value);
 	void SetTransformScale(JTransformHandle handle, const JVec3& value);
 	void SetTransformScale(JEntityHandle entity, const JVec3& value);
+	std::vector<uint32> ConsumeDirtyTransformIndices();
+	bool HasDirtyTransforms() const;
 	JVec3* GetTransformTranslation(JTransformHandle handle);
 	const JVec3* GetTransformTranslation(JTransformHandle handle) const;
 	JVec3* GetTransformTranslation(JEntityHandle entity);

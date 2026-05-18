@@ -4,6 +4,8 @@
 
 #include "engine/precompile.h"
 #include "engine/render/JRenderDefinition.h"
+#include "engine/render/JRenderResource.h"
+#include "engine/render/JMaterialResource.h"
 #include "engine/scene/JScene.h"
 
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
@@ -14,10 +16,12 @@ J_ENGINE_BEGIN
 struct JDrawItem
 {
 	JEntityHandle entity = {};
-	JTransformHandle transform = {};
 	JRenderObjectHandle renderObject = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
+	const JMeshResource* meshResource = nullptr;
+	const JMaterialResource* materialResource = nullptr;
+	const JTransformResource* transformResource = nullptr;
 	bool transparent = false;
 };
 

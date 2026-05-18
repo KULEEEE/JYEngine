@@ -27,6 +27,8 @@ struct JLightResource
 	Render::JConstantBuffer* lightBuffer = nullptr;
 	JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
 	JVec4 positionCount = { 0.0f, 4.0f, -4.0f, 0.0f };
+	std::vector<JVec4> colorIntensities;
+	std::vector<JVec4> positions;
 	uint32 lightCount = 0;
 };
 

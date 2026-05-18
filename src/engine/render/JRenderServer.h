@@ -9,7 +9,6 @@
 #include "engine/render/JRenderer.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
-/*#include "engine/render/JGraphicResource.h"*/ namespace J { namespace Render { class JGraphicResource; class JShader; } }
 /*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 
@@ -43,11 +42,9 @@ public:
 	void UnregisterCamera(JCameraHandle camera);
 	void MarkCameraDirty(JCameraHandle camera);
 	void Sync();
-	void SyncScene(const JScene& scene);
+	void SyncScene(JScene& scene);
 
 	bool BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
-
-	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:
 	uint32 FindMaterialIndex(uint32 materialID) const;

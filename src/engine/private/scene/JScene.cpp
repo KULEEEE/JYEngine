@@ -287,6 +287,16 @@ void JScene::SetTransformScale(JEntityHandle entity, const JVec3& value)
 	}
 }
 
+std::vector<uint32> JScene::ConsumeDirtyTransformIndices()
+{
+	return _transforms.ConsumeDirtyIndices();
+}
+
+bool JScene::HasDirtyTransforms() const
+{
+	return _transforms.HasDirty();
+}
+
 JVec3* JScene::GetTransformTranslation(JTransformHandle handle)
 {
 	return _transforms.GetTranslation(handle);

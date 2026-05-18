@@ -6,6 +6,8 @@
 #include "engine/render/JRenderServer.h"
 #include "engine/render/JRenderer.h"
 #include "engine/render/JMaterialFactory.h"
+#include "engine/asset/JMaterial.h"
+#include "engine/asset/JMesh.h"
 
 #include <iostream>
 #include <iomanip>
@@ -22,6 +24,9 @@ namespace
 	constexpr float CAMERA_SPEED_MAX = 100.0f;
 	constexpr float CAMERA_SPEED_STEP_MULTIPLIER = 1.2f;
 	constexpr float CAMERA_SPEED_SHIFT_MULTIPLIER = 4.0f;
+	constexpr float OBJECT_MOVE_SPEED = 2.0f;
+	constexpr float EDITOR_GRID_SIZE = 5000.0f;
+	constexpr float EDITOR_GRID_Y = -0.1f;
 
 	float toDegrees(float radians)
 	{
@@ -99,6 +104,14 @@ JScenePanel::JScenePanel(JSceneManager* sceneManager)
 
 JScenePanel::~JScenePanel()
 {
+	if (_editorGridMaterial != nullptr)
+	{
+		if (Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr)
+		{
+			renderServer->UnregisterMaterial(_editorGridMaterial->instanceID);
+		}
+	}
+
 	if (_cameraInfoWindow != nullptr)
 	{
 		DestroyWindow(_cameraInfoWindow);
@@ -150,6 +163,9 @@ void JScenePanel::Init()
 		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
 		return;
 	}
+
+	createEditorGrid();
+	selectDefaultRenderObject();
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -209,6 +225,7 @@ void JScenePanel::Update()
 	deltaTime = std::clamp(deltaTime, 0.0f, MAX_FRAME_DELTA_TIME);
 
 	updateSceneCamera(deltaTime);
+	updateSelectedObject(deltaTime);
 	renderServer->MarkCameraDirty(_sceneCamera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
@@ -250,6 +267,64 @@ void JScenePanel::OnMouseWheel(short delta)
 	{
 		return;
 	}
+}
+
+void JScenePanel::createEditorGrid()
+{
+	Engine::JScene* scene = getScene();
+	Engine::JEngine* engine = GetEngine();
+	if (scene == nullptr || engine == nullptr)
+	{
+		return;
+	}
+
+	if (_editorGridRenderObject.IsValid())
+	{
+		return;
+	}
+
+	Engine::JMaterialFactory* materialFactory = engine->GetMaterialFactory();
+	Engine::JRenderServer* renderServer = engine->GetRenderServer();
+	if (materialFactory == nullptr || renderServer == nullptr)
+	{
+		return;
+	}
+
+	const std::string gridShaderPath = (std::filesystem::path(get_Engine_Res_Path()) / "shader" / "grid.hlsl").string();
+	_editorGridMaterial.reset(materialFactory->CreateMaterial(gridShaderPath, true));
+	if (_editorGridMaterial == nullptr)
+	{
+		std::cerr << "JScenePanel::createEditorGrid failed: grid material creation failed." << std::endl;
+		return;
+	}
+
+	_editorGridMesh = std::make_unique<Engine::JMesh>();
+	_editorGridMesh->SetPositions({
+		-EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
+		 EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
+		 EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
+		-EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
+	});
+	_editorGridMesh->SetIndices({ 0, 1, 2, 0, 2, 3 });
+
+	_editorGridEntity = scene->CreateEntity("__editor_grid", "Editor Grid", { "editor_only" });
+	if (!_editorGridEntity.IsValid())
+	{
+		return;
+	}
+
+	Engine::JScene::TransformData transform{};
+	transform.translation = { 0.0f, 0.0f, 0.0f };
+	transform.rotation = { 0.0f, 0.0f, 0.0f };
+	transform.scale = { 1.0f, 1.0f, 1.0f };
+	scene->AddTransform(_editorGridEntity, transform);
+
+	renderServer->RegisterMaterial(_editorGridMaterial.get());
+	_editorGridRenderObject = scene->AddRenderObject(
+		_editorGridEntity,
+		_editorGridMaterial->instanceID,
+		_editorGridMesh.get(),
+		true);
 }
 
 void JScenePanel::updateSceneCamera(float deltaTime)
@@ -351,6 +426,66 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 	scene->SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
+void JScenePanel::selectDefaultRenderObject()
+{
+	Engine::JScene* scene = getScene();
+	if (scene == nullptr)
+	{
+		return;
+	}
+
+	const std::vector<Engine::JScene::RenderObjectSlot>& slots = scene->GetRenderObjectSlots();
+	for (const Engine::JScene::RenderObjectSlot& slot : slots)
+	{
+		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.transparent)
+		{
+			continue;
+		}
+
+		_selectedRenderObject = { static_cast<uint32>(&slot - slots.data()), slot.generation };
+		_selectedEntity = slot.data.entity;
+		return;
+	}
+}
+
+void JScenePanel::updateSelectedObject(float deltaTime)
+{
+	Engine::JScene* scene = getScene();
+	if (scene == nullptr || !_selectedEntity.IsValid() || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	{
+		return;
+	}
+
+	const Engine::JTransformHandle transformHandle = scene->GetTransformHandle(_selectedEntity);
+	if (!transformHandle.IsValid())
+	{
+		return;
+	}
+
+	float xInput = 0.0f;
+	float yInput = 0.0f;
+	float zInput = 0.0f;
+	if (GetAsyncKeyState('J') & 0x8000) xInput -= 1.0f;
+	if (GetAsyncKeyState('L') & 0x8000) xInput += 1.0f;
+	if (GetAsyncKeyState('U') & 0x8000) yInput += 1.0f;
+	if (GetAsyncKeyState('O') & 0x8000) yInput -= 1.0f;
+	if (GetAsyncKeyState('I') & 0x8000) zInput += 1.0f;
+	if (GetAsyncKeyState('K') & 0x8000) zInput -= 1.0f;
+
+	if (xInput == 0.0f && yInput == 0.0f && zInput == 0.0f)
+	{
+		return;
+	}
+
+	const float speedMultiplier = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ? 4.0f : 1.0f;
+	const float step = OBJECT_MOVE_SPEED * speedMultiplier * deltaTime;
+	Engine::JScene::TransformData transform = scene->GetTransform(transformHandle);
+	transform.translation.x += xInput * step;
+	transform.translation.y += yInput * step;
+	transform.translation.z += zInput * step;
+	scene->SetTransformTranslation(transformHandle, transform.translation);
+}
+
 #pragma region Debug Panel
 
 void JScenePanel::createCameraInfoPanel()
@@ -448,13 +583,44 @@ void JScenePanel::updateCameraInfoPanel()
 	stream << L"Near: " << cameraData->nearP << L"\n";
 	stream << L"Far: " << cameraData->farP << L"\n\n";
 
+	stream << L"Selected Object\n";
+	if (_selectedEntity.IsValid())
+	{
+		const Engine::JTransformHandle selectedTransformHandle = scene->GetTransformHandle(_selectedEntity);
+		if (selectedTransformHandle.IsValid())
+		{
+			const Engine::JScene::TransformData selectedTransform = scene->GetTransform(selectedTransformHandle);
+			stream << L"Move: J/L X, U/O Y, I/K Z\n";
+			stream << L"Pos: "
+				<< selectedTransform.translation.x << L", "
+				<< selectedTransform.translation.y << L", "
+				<< selectedTransform.translation.z << L"\n\n";
+		}
+		else
+		{
+			stream << L"Missing transform\n\n";
+		}
+	}
+	else
+	{
+		stream << L"None\n\n";
+	}
+
 	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
 	const Engine::JTransformHandle lightTransformHandle = lightData != nullptr ? scene->GetTransformHandle(lightData->entity) : Engine::JTransformHandle{};
 	stream << L"Scene Light\n";
 	if (lightData != nullptr && lightTransformHandle.IsValid())
 	{
 		const Engine::JScene::TransformData lightTransformData = scene->GetTransform(lightTransformHandle);
-		stream << L"Count: 1\n";
+		uint32 lightCount = 0;
+		for (const Engine::JScene::LightSlot& slot : scene->GetLightSlots())
+		{
+			if (slot.active && slot.data.active)
+			{
+				++lightCount;
+			}
+		}
+		stream << L"Count: " << lightCount << L"\n";
 		stream << L"Pos: "
 			<< lightTransformData.translation.x << L", "
 			<< lightTransformData.translation.y << L", "

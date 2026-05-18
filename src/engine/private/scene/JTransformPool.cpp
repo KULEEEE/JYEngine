@@ -16,6 +16,8 @@ JTransformHandle JTransformPool::Add(JEntityHandle entity, const JTransformCompo
 	_translations.push_back(data.translation);
 	_rotations.push_back(data.rotation);
 	_scales.push_back(data.scale);
+	_dirtyFlags.push_back(true);
+	_dirtyIndices.push_back(static_cast<uint32>(_slots.size() - 1));
 	return { static_cast<uint32>(_slots.size() - 1), slot.generation };
 }
 
@@ -84,6 +86,7 @@ void JTransformPool::SetTranslation(JTransformHandle handle, const JVec3& value)
 	if (JVec3* translation = GetTranslation(handle))
 	{
 		*translation = value;
+		markDirty(handle.index);
 	}
 }
 
@@ -92,6 +95,7 @@ void JTransformPool::SetRotation(JTransformHandle handle, const JVec3& value)
 	if (JVec3* rotation = GetRotation(handle))
 	{
 		*rotation = value;
+		markDirty(handle.index);
 	}
 }
 
@@ -100,7 +104,37 @@ void JTransformPool::SetScale(JTransformHandle handle, const JVec3& value)
 	if (JVec3* scale = GetScale(handle))
 	{
 		*scale = value;
+		markDirty(handle.index);
 	}
+}
+
+std::vector<uint32> JTransformPool::ConsumeDirtyIndices()
+{
+	std::vector<uint32> dirtyIndices = std::move(_dirtyIndices);
+	for (uint32 index : dirtyIndices)
+	{
+		if (index < _dirtyFlags.size())
+		{
+			_dirtyFlags[index] = false;
+		}
+	}
+	return dirtyIndices;
+}
+
+void JTransformPool::markDirty(uint32 index)
+{
+	if (index >= _dirtyFlags.size())
+	{
+		return;
+	}
+
+	if (_dirtyFlags[index])
+	{
+		return;
+	}
+
+	_dirtyFlags[index] = true;
+	_dirtyIndices.push_back(index);
 }
 
 J_ENGINE_END

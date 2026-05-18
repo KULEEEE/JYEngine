@@ -1,10 +1,6 @@
 #include "engine/render/JRenderServer.h"
 
-#include "engine/render/JGraphicResource.h"
 #include "engine/asset/JMaterial.h"
-#include "engine/render/JMaterialResource.h"
-
-#include <algorithm>
 
 J_ENGINE_BEGIN
 
@@ -271,13 +267,15 @@ void JRenderServer::Sync()
 	_dirtyMaterialIDs.clear();
 }
 
-void JRenderServer::SyncScene(const JScene& scene)
+void JRenderServer::SyncScene(JScene& scene)
 {
 	_primaryCamera = scene.GetPrimaryCamera();
 	_frameSnapshot.cameras.clear();
 	_frameSnapshot.transforms.clear();
 	_frameSnapshot.lights.clear();
 	_frameSnapshot.renderObjects.clear();
+	_frameSnapshot.opaqueDrawItems.clear();
+	_frameSnapshot.transparentDrawItems.clear();
 
 	for (uint64 cameraKey : _dirtyCameraKeys)
 	{
@@ -302,16 +300,23 @@ void JRenderServer::SyncScene(const JScene& scene)
 
 	_dirtyCameraKeys.clear();
 
+	const std::vector<uint32> dirtyTransformIndices = scene.ConsumeDirtyTransformIndices();
 	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
-	for (const JTransformPool::SlotType& slot : transformSlots)
+	for (uint32 transformIndex : dirtyTransformIndices)
 	{
+		if (transformIndex >= transformSlots.size())
+		{
+			continue;
+		}
+
+		const JTransformPool::SlotType& slot = transformSlots[transformIndex];
 		if (!slot.active)
 		{
 			continue;
 		}
 
 		const JTransformHandle transformHandle = {
-			static_cast<uint32>(&slot - transformSlots.data()),
+			transformIndex,
 			slot.generation
 		};
 		const XMMATRIX world = makeWorldMatrix(scene.GetTransform(transformHandle));
@@ -328,7 +333,6 @@ void JRenderServer::SyncScene(const JScene& scene)
 
 		_frameSnapshot.renderObjects.push_back({
 			slot.data.entity,
-			scene.GetTransformHandle(slot.data.entity),
 			{ static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation },
 			slot.data.materialID,
 			slot.data.mesh,
@@ -337,6 +341,40 @@ void JRenderServer::SyncScene(const JScene& scene)
 			slot.data.active
 		});
 		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
+	}
+
+	for (const JRenderObjectSnapshot& snapshot : _frameSnapshot.renderObjects)
+	{
+		if (!snapshot.active || !snapshot.visible || snapshot.mesh == nullptr)
+		{
+			continue;
+		}
+
+		const JTransformHandle transform = scene.GetTransformHandle(snapshot.entity);
+
+		JRenderer::DrawItem drawItem;
+		drawItem.entity = snapshot.entity;
+		drawItem.renderObject = snapshot.renderObject;
+		drawItem.materialID = snapshot.materialID;
+		drawItem.mesh = snapshot.mesh;
+		drawItem.meshResource = _renderDB.FindMeshResource(snapshot.mesh);
+		drawItem.materialResource = _renderDB.FindMaterialResource(snapshot.materialID);
+		drawItem.transformResource = _renderDB.FindTransformResource(transform);
+		drawItem.transparent = snapshot.transparent;
+
+		if (drawItem.meshResource == nullptr || drawItem.materialResource == nullptr || drawItem.transformResource == nullptr)
+		{
+			continue;
+		}
+
+		if (drawItem.transparent)
+		{
+			_frameSnapshot.transparentDrawItems.push_back(drawItem);
+		}
+		else
+		{
+			_frameSnapshot.opaqueDrawItems.push_back(drawItem);
+		}
 	}
 
 	{
@@ -355,10 +393,10 @@ void JRenderServer::SyncScene(const JScene& scene)
 			}
 
 			const JScene::TransformData transform = scene.GetTransform(transformHandle);
-			snapshot.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
-			snapshot.positionCount = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
-			snapshot.lightCount = 1;
-			break;
+			JLightSnapshotItem item{};
+			item.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
+			item.position = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
+			snapshot.items.push_back(item);
 		}
 
 		_frameSnapshot.lights.push_back(snapshot);
@@ -379,38 +417,10 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	outFrameDesc.clearColor = clearColor;
 	outFrameDesc.viewport = viewport;
 	outFrameDesc.scissorRect = scissorRect;
-
-	for (const JRenderObjectSnapshot& snapshot : _frameSnapshot.renderObjects)
-	{
-		if (!snapshot.active || !snapshot.visible || snapshot.mesh == nullptr)
-		{
-			continue;
-		}
-
-		JRenderer::DrawItem drawItem;
-		drawItem.entity = snapshot.entity;
-		drawItem.transform = snapshot.transform;
-		drawItem.renderObject = snapshot.renderObject;
-		drawItem.materialID = snapshot.materialID;
-		drawItem.mesh = snapshot.mesh;
-		drawItem.transparent = snapshot.transparent;
-
-		if (drawItem.transparent)
-		{
-			outFrameDesc.transparentDrawItems.push_back(drawItem);
-		}
-		else
-		{
-			outFrameDesc.opaqueDrawItems.push_back(drawItem);
-		}
-	}
+	outFrameDesc.opaqueDrawItems = _frameSnapshot.opaqueDrawItems;
+	outFrameDesc.transparentDrawItems = _frameSnapshot.transparentDrawItems;
 
 	return true;
-}
-
-bool JRenderServer::BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const
-{
-	return _renderDB.BuildGraphicResource(materialID, shader, outResource);
 }
 
 J_ENGINE_END

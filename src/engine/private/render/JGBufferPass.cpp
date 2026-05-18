@@ -14,17 +14,23 @@ J_ENGINE_BEGIN
 
 namespace
 {
-	bool buildDrawGraphicResource(const JRenderPassContext& context, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
+	bool buildDrawGraphicResource(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
 	{
 		if (!context.renderDB->BuildGraphicResource(drawItem.materialID, graphicResource.GetShader(), graphicResource))
 		{
 			return false;
 		}
 
-		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
+		const JTransformResource* transformResource = drawItem.transformResource;
 		if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 		{
 			graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
+		}
+
+		const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
+		if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+		{
+			graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
 		}
 
 		return true;
@@ -94,14 +100,14 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 
 	for (const JDrawItem& drawItem : frameDesc.opaqueDrawItems)
 	{
-		if (drawItem.mesh == nullptr)
+		if (drawItem.meshResource == nullptr)
 		{
 			++_lastStats.skippedDrawCount;
 			continue;
 		}
 
-		const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
-		const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
+		const JMeshResource* meshResource = drawItem.meshResource;
+		const JMaterialResource* materialResource = drawItem.materialResource;
 		if (meshResource == nullptr || materialResource == nullptr || !meshResource->hasNormals || !meshResource->hasTexcoords)
 		{
 			++_lastStats.skippedDrawCount;
@@ -109,7 +115,7 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 		}
 
 		Render::JGraphicResource graphicResource(_shader);
-		if (!buildDrawGraphicResource(context, drawItem, graphicResource))
+		if (!buildDrawGraphicResource(context, frameDesc.camera, drawItem, graphicResource))
 		{
 			++_lastStats.skippedDrawCount;
 			continue;

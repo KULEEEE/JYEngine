@@ -10,9 +10,18 @@ J_ENGINE_BEGIN
 
 namespace
 {
+	constexpr uint32 MAX_RENDER_LIGHTS = 8;
+
 	struct PerObjectConstants
 	{
 		XMFLOAT4X4 world;
+	};
+
+	struct LightConstants
+	{
+		JVec4 colorIntensities[MAX_RENDER_LIGHTS];
+		JVec4 positions[MAX_RENDER_LIGHTS];
+		JVec4 info;
 	};
 }
 
@@ -231,19 +240,33 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 	}
 
 	JLightResource& resource = GetOrCreateLightResource();
-	resource.lightCount = snapshot.lightCount;
-	resource.colorIntensity = snapshot.colorIntensity;
-	resource.positionCount = snapshot.positionCount;
+	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
+	resource.colorIntensities.clear();
+	resource.positions.clear();
+	resource.colorIntensities.reserve(resource.lightCount);
+	resource.positions.reserve(resource.lightCount);
 
-	struct LightConstants
+	for (uint32 i = 0; i < resource.lightCount; ++i)
 	{
-		JVec4 colorIntensity;
-		JVec4 positionCount;
-	};
+		const JLightSnapshotItem& item = snapshot.items[i];
+		resource.colorIntensities.push_back(item.colorIntensity);
+		resource.positions.push_back(item.position);
+	}
+
+	resource.colorIntensity = snapshot.items.empty()
+		? JVec4(1.0f, 1.0f, 1.0f, 0.0f)
+		: snapshot.items.front().colorIntensity;
+	resource.positionCount = snapshot.items.empty()
+		? JVec4(0.0f, 4.0f, -4.0f, 0.0f)
+		: JVec4(snapshot.items.front().position.x, snapshot.items.front().position.y, snapshot.items.front().position.z, static_cast<float>(resource.lightCount));
 
 	LightConstants constants{};
-	constants.colorIntensity = snapshot.colorIntensity;
-	constants.positionCount = snapshot.positionCount;
+	for (uint32 i = 0; i < resource.lightCount; ++i)
+	{
+		constants.colorIntensities[i] = resource.colorIntensities[i];
+		constants.positions[i] = resource.positions[i];
+	}
+	constants.info = JVec4(static_cast<float>(resource.lightCount), 0.0f, 0.0f, 0.0f);
 
 	if (resource.lightBuffer == nullptr)
 	{

@@ -33,16 +33,21 @@ public:
 	void SetTranslation(JTransformHandle handle, const JVec3& value);
 	void SetRotation(JTransformHandle handle, const JVec3& value);
 	void SetScale(JTransformHandle handle, const JVec3& value);
+	std::vector<uint32> ConsumeDirtyIndices();
+	bool HasDirty() const { return !_dirtyIndices.empty(); }
 
 	const std::vector<SlotType>& GetSlots() const { return _slots; }
 
 private:
 	uint32 findIndex(JTransformHandle handle) const;
+	void markDirty(uint32 index);
 
 	std::vector<SlotType> _slots;
 	std::vector<JVec3> _translations;
 	std::vector<JVec3> _rotations;
 	std::vector<JVec3> _scales;
+	std::vector<uint8> _dirtyFlags;
+	std::vector<uint32> _dirtyIndices;
 };
 
 J_ENGINE_END

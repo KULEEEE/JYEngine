@@ -25,28 +25,28 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0, context.gBuffer != nullptr ? &dsvHandle : nullptr, false, false);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
-	RenderDrawItems(context, frameDesc.transparentDrawItems);
+	RenderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
 	context.commandQueue->EndRenderPass();
 }
 
-void JForwardOverlayPass::RenderDrawItems(const JRenderPassContext& context, const std::vector<JDrawItem>& drawItems)
+void JForwardOverlayPass::RenderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
 {
 	for (const JDrawItem& drawItem : drawItems)
 	{
-		RenderDrawItem(context, drawItem);
+		RenderDrawItem(context, camera, drawItem);
 	}
 }
 
-void JForwardOverlayPass::RenderDrawItem(const JRenderPassContext& context, const JDrawItem& drawItem)
+void JForwardOverlayPass::RenderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	if (drawItem.mesh == nullptr)
+	if (drawItem.meshResource == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		return;
 	}
 
-	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
-	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
+	const JMeshResource* meshResource = drawItem.meshResource;
+	const JMaterialResource* materialResource = drawItem.materialResource;
 	if (meshResource == nullptr || materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
@@ -60,10 +60,16 @@ void JForwardOverlayPass::RenderDrawItem(const JRenderPassContext& context, cons
 		return;
 	}
 
-	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
+	const JTransformResource* transformResource = drawItem.transformResource;
 	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
+	}
+
+	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
+	if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+	{
+		graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
 	}
 
 	context.commandQueue->SetPipeline(materialResource->GetPipeline());
