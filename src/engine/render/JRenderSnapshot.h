@@ -23,23 +23,25 @@ struct JTransformSnapshot
 	XMMATRIX world = XMMatrixIdentity();
 };
 
-struct JLightSnapshotItem
-{
-	JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
-	JVec4 position = { 0.0f, 4.0f, -4.0f, 1.0f };
-};
-
 struct JLightSnapshot
 {
-	std::vector<JLightSnapshotItem> items;
+	struct Item
+	{
+		JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
+		JVec4 position = { 0.0f, 4.0f, -4.0f, 1.0f };
+	};
+
+	std::vector<Item> items;
 };
 
 struct JRenderObjectSnapshot
 {
 	JEntityHandle entity = {};
+	JTransformHandle transform = {};
 	JRenderObjectHandle renderObject = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
+	uint32 subMeshIndex = 0;
 	bool transparent = false;
 	bool visible = true;
 	bool active = true;

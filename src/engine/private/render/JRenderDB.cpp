@@ -82,6 +82,62 @@ namespace
 		resource.hasNormals = false;
 		resource.hasTexcoords = false;
 	}
+
+	void destroyMaterialResource(Render::JRenderContext* renderContext, JMaterialResource& resource)
+	{
+		for (JMaterialResource::ConstantBufferEntry& entry : resource.constantBuffers)
+		{
+			destroyConstantBuffer(renderContext, entry.buffer);
+		}
+
+		for (JMaterialResource::TextureEntry& entry : resource.textures)
+		{
+			if (entry.texture == nullptr)
+			{
+				continue;
+			}
+
+			if (renderContext != nullptr)
+			{
+				renderContext->DestroyTexture(entry.texture);
+			}
+			else
+			{
+				entry.texture->Destroy();
+				delete entry.texture;
+			}
+			entry.texture = nullptr;
+		}
+
+		if (resource.pipeline != nullptr)
+		{
+			if (renderContext != nullptr)
+			{
+				renderContext->DestroyPipeline(resource.pipeline);
+			}
+			else
+			{
+				delete resource.pipeline;
+			}
+			resource.pipeline = nullptr;
+		}
+
+		if (resource.shader != nullptr)
+		{
+			if (renderContext != nullptr)
+			{
+				renderContext->DestroyShader(resource.shader);
+			}
+			else
+			{
+				delete resource.shader;
+			}
+			resource.shader = nullptr;
+		}
+
+		resource.constantBuffers.clear();
+		resource.textures.clear();
+	}
 }
 
 JRenderDB::~JRenderDB()
@@ -243,20 +299,55 @@ const JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh) const
 
 void JRenderDB::SyncMaterial(const JMaterial& material)
 {
+	if (_renderContext == nullptr)
+	{
+		return;
+	}
+
 	JMaterialResource& resource = getOrCreateMaterialResource(material.instanceID);
-	resource.shader = material.GetShader();
-	resource.pipeline = material.GetPipeline();
-	resource.constantBuffers.clear();
-	resource.textures.clear();
+	destroyMaterialResource(_renderContext, resource);
+	resource.materialID = material.instanceID;
+	resource.shader = _renderContext->CreateShader(material.GetShaderPath());
+	if (resource.shader == nullptr)
+	{
+		return;
+	}
+
+	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled());
+	if (resource.pipeline == nullptr)
+	{
+		destroyMaterialResource(_renderContext, resource);
+		return;
+	}
 
 	for (const JMaterial::ConstantBufferParam& param : material.GetConstantBuffers())
 	{
-		resource.constantBuffers.push_back({ param.name, param.nameHash, param.buffer });
+		if (param.data.empty())
+		{
+			continue;
+		}
+
+		Render::JConstantBuffer* buffer = _renderContext->CreateConstantBuffer(
+			const_cast<uint8*>(param.data.data()),
+			param.data.size());
+		if (buffer != nullptr)
+		{
+			resource.constantBuffers.push_back({ param.name, param.nameHash, buffer });
+		}
 	}
 
 	for (const JMaterial::TextureParam& param : material.GetTextures())
 	{
-		resource.textures.push_back({ param.name, param.nameHash, param.texture });
+		if (param.path.empty())
+		{
+			continue;
+		}
+
+		Render::JTexture* texture = _renderContext->CreateTextureFromFile(param.path);
+		if (texture != nullptr)
+		{
+			resource.textures.push_back({ param.name, param.nameHash, texture });
+		}
 	}
 }
 
@@ -315,7 +406,7 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 	LightConstants constants{};
 	for (uint32 i = 0; i < resource.lightCount; ++i)
 	{
-		const JLightSnapshotItem& item = snapshot.items[i];
+		const JLightSnapshot::Item& item = snapshot.items[i];
 		constants.colorIntensities[i] = item.colorIntensity;
 		constants.positions[i] = item.position;
 	}
@@ -394,6 +485,8 @@ void JRenderDB::RemoveMaterialResource(uint32 materialID)
 	{
 		return;
 	}
+
+	destroyMaterialResource(_renderContext, _materialResources[index].resource);
 
 	const uint32 lastIndex = static_cast<uint32>(_materialResources.size() - 1);
 	if (index != lastIndex)
@@ -507,6 +600,11 @@ void JRenderDB::Clear()
 	for (auto& iter : _meshResources)
 	{
 		destroyMeshResource(_renderContext, iter.second);
+	}
+
+	for (MaterialResourceRecord& record : _materialResources)
+	{
+		destroyMaterialResource(_renderContext, record.resource);
 	}
 
 	for (TransformResourceRecord& record : _transformResources)

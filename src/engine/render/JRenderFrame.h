@@ -18,6 +18,7 @@ struct JDrawItem
 	JRenderObjectHandle renderObject = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
+	uint32 subMeshIndex = 0;
 	const JMeshResource* meshResource = nullptr;
 	const JMaterialResource* materialResource = nullptr;
 	const JTransformResource* transformResource = nullptr;

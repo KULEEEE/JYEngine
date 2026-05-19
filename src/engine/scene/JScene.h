@@ -43,7 +43,7 @@ public:
 	using TransformData = JTransformComponents;
 	using CameraData = JCameraComponents;
 	using LightData = JLightComponents;
-	using RenderObjectData = JRenderObjectComponents;
+	using RenderObjectData = JDrawComponent;
 
 	using EntityPool = JPool<JEntityHandle, EntityData>;
 	using TransformSlot = JTransformPool::SlotType;
@@ -62,7 +62,7 @@ public:
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
-	JRenderObjectHandle AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false);
+	JRenderObjectHandle AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false, uint32 subMeshIndex = 0);
 
 	bool SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags = {});
 	void SetEntityName(JEntityHandle entity, const std::string& name);

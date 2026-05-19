@@ -73,13 +73,14 @@ struct JSceneLightData
 	float intensity = 1.0f;
 };
 
-struct JSceneRenderObjectData
+struct JSceneMaterialComponentData
 {
 	bool active = true;
 	bool visible = true;
 	bool transparent = false;
 	std::string materialID;
 	std::string meshID;
+	uint32 subMeshIndex = 0;
 };
 
 struct JSceneEntityData
@@ -98,8 +99,8 @@ struct JSceneEntityData
 	bool hasLight = false;
 	JSceneLightData light;
 
-	bool hasRenderObject = false;
-	JSceneRenderObjectData renderObject;
+	bool hasMaterialComponent = false;
+	JSceneMaterialComponentData materialComponent;
 };
 
 struct JSceneData

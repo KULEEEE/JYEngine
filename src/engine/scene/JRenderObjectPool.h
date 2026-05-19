@@ -11,11 +11,11 @@ J_ENGINE_BEGIN
 class JRenderObjectPool
 {
 public:
-	using SlotType = JPool<JRenderObjectHandle, JRenderObjectComponents>::SlotType;
+	using SlotType = JPool<JRenderObjectHandle, JDrawComponent>::SlotType;
 
-	JRenderObjectHandle Add(JEntityHandle entity, const JRenderObjectComponents& data = {})
+	JRenderObjectHandle Add(JEntityHandle entity, const JDrawComponent& data = {})
 	{
-		JRenderObjectComponents resolved = data;
+		JDrawComponent resolved = data;
 		resolved.entity = entity;
 		return _pool.Add(resolved);
 	}
@@ -25,12 +25,12 @@ public:
 		return _pool.IsValid(handle);
 	}
 
-	JRenderObjectComponents* Get(JRenderObjectHandle handle)
+	JDrawComponent* Get(JRenderObjectHandle handle)
 	{
 		return _pool.Get(handle);
 	}
 
-	const JRenderObjectComponents* Get(JRenderObjectHandle handle) const
+	const JDrawComponent* Get(JRenderObjectHandle handle) const
 	{
 		return _pool.Get(handle);
 	}
@@ -46,7 +46,7 @@ public:
 	}
 
 private:
-	JPool<JRenderObjectHandle, JRenderObjectComponents> _pool;
+	JPool<JRenderObjectHandle, JDrawComponent> _pool;
 };
 
 J_ENGINE_END

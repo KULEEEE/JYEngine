@@ -16,8 +16,6 @@ public:
 	struct MaterialBundle
 	{
 		std::shared_ptr<Engine::JMaterial> material;
-		std::vector<std::shared_ptr<Render::JConstantBuffer>> constantBuffers;
-		std::vector<std::shared_ptr<Render::JTexture>> textures;
 	};
 
 	explicit JAssetManager(Engine::JMaterialFactory* materialFactory = nullptr);
@@ -37,14 +35,12 @@ private:
 	static std::string makeMeshKey(const Engine::JSceneMeshData& meshData);
 	static std::string makeTextureKey(const std::string& path);
 
-	static std::shared_ptr<Render::JConstantBuffer> adoptConstantBuffer(Render::JConstantBuffer* buffer);
-	static std::shared_ptr<Render::JTexture> adoptTexture(Render::JTexture* texture);
 	static std::shared_ptr<Engine::JMesh> adoptMesh(Engine::JMesh* mesh);
 
 	Engine::JMaterialFactory* _materialFactory = nullptr;
 	std::unordered_map<size_t, std::weak_ptr<MaterialBundle>> _materialCache;
 	std::unordered_map<size_t, std::weak_ptr<Engine::JMesh>> _meshCache;
-	std::unordered_map<size_t, std::weak_ptr<Render::JTexture>> _textureCache;
+	std::unordered_set<size_t> _knownTextureKeys;
 };
 
 J_EDITOR_END

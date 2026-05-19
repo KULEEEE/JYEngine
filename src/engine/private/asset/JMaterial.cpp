@@ -1,61 +1,71 @@
 #include "engine/asset/JMaterial.h"
 
-#include "engine/asset/JShader.h"
-
 J_ENGINE_BEGIN
 
-JMaterial::~JMaterial()
+void JMaterial::SetShaderPath(const std::string& shaderPath)
 {
-	delete _shader;
-	_shader = nullptr;
+	if (_shaderPath == shaderPath)
+	{
+		return;
+	}
 
-	delete _pipeline;
-	_pipeline = nullptr;
-}
-
-void JMaterial::SetShader(Render::JShader* shader)
-{
-	_shader = shader;
+	_shaderPath = shaderPath;
 	MarkDirty();
 }
 
-void JMaterial::SetPipeline(Render::JPipeline* pipeline)
+void JMaterial::SetAlphaBlendEnabled(bool enabled)
 {
-	_pipeline = pipeline;
+	if (_enableAlphaBlend == enabled)
+	{
+		return;
+	}
+
+	_enableAlphaBlend = enabled;
 	MarkDirty();
 }
 
-void JMaterial::SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer)
+void JMaterial::SetConstantBufferData(const std::string& name, const void* data, size_t size)
 {
+	if (data == nullptr || size == 0)
+	{
+		return;
+	}
+
 	const uint32 nameHash = JHashFunction::StrCrc32(name.c_str());
 	for (ConstantBufferParam& entry : _constantBuffers)
 	{
 		if (entry.nameHash == nameHash)
 		{
-			entry.buffer = buffer;
+			entry.data.resize(size);
+			memcpy(entry.data.data(), data, size);
 			MarkDirty();
 			return;
 		}
 	}
 
-	_constantBuffers.push_back({ name, nameHash, buffer });
+	ConstantBufferParam param;
+	param.name = name;
+	param.nameHash = nameHash;
+	param.data.resize(size);
+	memcpy(param.data.data(), data, size);
+	_constantBuffers.push_back(std::move(param));
 	MarkDirty();
 }
 
-void JMaterial::SetTexture(const std::string& name, Render::JTexture* texture)
+void JMaterial::SetTexturePath(const std::string& name, const std::string& path)
 {
 	const uint32 nameHash = JHashFunction::StrCrc32(name.c_str());
 	for (TextureParam& entry : _textures)
 	{
 		if (entry.nameHash == nameHash)
 		{
-			entry.texture = texture;
+			entry.path = path;
 			MarkDirty();
 			return;
 		}
 	}
 
-	_textures.push_back({ name, nameHash, texture });
+	_textures.push_back({ name, nameHash, path });
 	MarkDirty();
 }
 

@@ -350,12 +350,20 @@ void JRenderServer::SyncScene(JScene& scene)
 			continue;
 		}
 
+		const JTransformHandle transform = scene.GetTransformHandle(slot.data.entity);
+		if (!transform.IsValid())
+		{
+			continue;
+		}
+
 		activeMeshes.insert(slot.data.mesh);
 		_frameSnapshot.renderObjects.push_back({
 			slot.data.entity,
+			transform,
 			{ static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation },
 			slot.data.materialID,
 			slot.data.mesh,
+			slot.data.subMeshIndex,
 			slot.data.transparent,
 			slot.data.visible,
 			slot.data.active
@@ -370,16 +378,15 @@ void JRenderServer::SyncScene(JScene& scene)
 			continue;
 		}
 
-		const JTransformHandle transform = scene.GetTransformHandle(snapshot.entity);
-
 		JRenderer::DrawItem drawItem;
 		drawItem.entity = snapshot.entity;
 		drawItem.renderObject = snapshot.renderObject;
 		drawItem.materialID = snapshot.materialID;
 		drawItem.mesh = snapshot.mesh;
+		drawItem.subMeshIndex = snapshot.subMeshIndex;
 		drawItem.meshResource = _renderDB.FindMeshResource(snapshot.mesh);
 		drawItem.materialResource = _renderDB.FindMaterialResource(snapshot.materialID);
-		drawItem.transformResource = _renderDB.FindTransformResource(transform);
+		drawItem.transformResource = _renderDB.FindTransformResource(snapshot.transform);
 		drawItem.transparent = snapshot.transparent;
 
 		if (drawItem.meshResource == nullptr || drawItem.materialResource == nullptr || drawItem.transformResource == nullptr)
@@ -413,7 +420,7 @@ void JRenderServer::SyncScene(JScene& scene)
 			}
 
 			const JScene::TransformData transform = scene.GetTransform(transformHandle);
-			JLightSnapshotItem item{};
+			JLightSnapshot::Item item{};
 			item.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
 			item.position = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
 			snapshot.items.push_back(item);

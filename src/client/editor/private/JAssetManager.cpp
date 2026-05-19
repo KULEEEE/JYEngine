@@ -10,24 +10,6 @@ J_EDITOR_BEGIN
 namespace
 {
 	template<typename T>
-	std::shared_ptr<T> make_shared_resource(T* resource)
-	{
-		if (resource == nullptr)
-		{
-			return {};
-		}
-
-		return std::shared_ptr<T>(resource, [](T* ptr)
-		{
-			if (ptr != nullptr)
-			{
-				ptr->Destroy();
-				delete ptr;
-			}
-		});
-	}
-
-	template<typename T>
 	void append_value(std::ostringstream& oss, const T& value)
 	{
 		oss << value << ';';
@@ -48,7 +30,7 @@ void JAssetManager::Clear()
 {
 	_materialCache.clear();
 	_meshCache.clear();
-	_textureCache.clear();
+	_knownTextureKeys.clear();
 }
 
 std::string JAssetManager::resolveResourcePath(const std::string& path)
@@ -95,28 +77,6 @@ std::string JAssetManager::makeMeshKey(const Engine::JSceneMeshData& meshData)
 std::string JAssetManager::makeTextureKey(const std::string& path)
 {
 	return resolveResourcePath(path);
-}
-
-std::shared_ptr<Render::JConstantBuffer> JAssetManager::adoptConstantBuffer(Render::JConstantBuffer* buffer)
-{
-	if (buffer == nullptr)
-	{
-		return {};
-	}
-
-	return std::shared_ptr<Render::JConstantBuffer>(buffer, [](Render::JConstantBuffer* ptr)
-	{
-		if (ptr != nullptr)
-		{
-			ptr->Destroy();
-			delete ptr;
-		}
-	});
-}
-
-std::shared_ptr<Render::JTexture> JAssetManager::adoptTexture(Render::JTexture* texture)
-{
-	return make_shared_resource(texture);
 }
 
 std::shared_ptr<Engine::JMesh> JAssetManager::adoptMesh(Engine::JMesh* mesh)
@@ -168,37 +128,14 @@ std::shared_ptr<JAssetManager::MaterialBundle> JAssetManager::AcquireMaterialBun
 		constants.roughness = materialData.constants.roughness;
 		constants.metallic = materialData.constants.metallic;
 
-		Render::JConstantBuffer* materialBuffer = _materialFactory->CreateAndSetConstantBuffer(material.get(), "PerMaterial", &constants, sizeof(constants));
-		std::shared_ptr<Render::JConstantBuffer> sharedBuffer = adoptConstantBuffer(materialBuffer);
-		if (!sharedBuffer)
-		{
-			return {};
-		}
-		bundle->constantBuffers.emplace_back(std::move(sharedBuffer));
+		_materialFactory->SetConstantBufferData(material.get(), "PerMaterial", &constants, sizeof(constants));
 	}
 
 	for (const Engine::JSceneMaterialTextureData& textureData : materialData.textures)
 	{
 		const size_t textureKey = std::hash<std::string>{}(makeTextureKey(textureData.path));
-		std::shared_ptr<Render::JTexture> texture;
-		const auto textureIter = _textureCache.find(textureKey);
-		if (textureIter != _textureCache.end())
-		{
-			texture = textureIter->second.lock();
-		}
-
-		if (!texture)
-		{
-			texture = adoptTexture(_materialFactory->CreateTextureFromFile(resolveResourcePath(textureData.path)));
-			if (!texture)
-			{
-				return {};
-			}
-			_textureCache[textureKey] = texture;
-		}
-
-		material->SetTexture(textureData.name, texture.get());
-		bundle->textures.emplace_back(std::move(texture));
+		_knownTextureKeys.insert(textureKey);
+		_materialFactory->SetTexturePath(material.get(), textureData.name, resolveResourcePath(textureData.path));
 	}
 
 	_materialCache[key] = bundle;
@@ -280,13 +217,7 @@ bool JAssetManager::HasMesh(const Engine::JSceneMeshData& meshData) const
 bool JAssetManager::HasTexture(const std::string& path) const
 {
 	const size_t key = std::hash<std::string>{}(makeTextureKey(path));
-	const auto cachedIter = _textureCache.find(key);
-	if (cachedIter == _textureCache.end())
-	{
-		return false;
-	}
-
-	return !cachedIter->second.expired();
+	return _knownTextureKeys.find(key) != _knownTextureKeys.end();
 }
 
 J_EDITOR_END

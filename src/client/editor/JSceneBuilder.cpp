@@ -57,8 +57,6 @@ void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
 
 	scene.reset();
 	materials.clear();
-	constantBuffers.clear();
-	textures.clear();
 	materialBundles.clear();
 	meshes.clear();
 }
@@ -113,14 +111,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		materialLookup[materialData.id] = materialBundle->material.get();
 		result.materialBundles.emplace_back(materialBundle);
 		result.materials.emplace_back(materialBundle->material);
-		for (const std::shared_ptr<Render::JConstantBuffer>& constantBuffer : materialBundle->constantBuffers)
-		{
-			result.constantBuffers.emplace_back(constantBuffer);
-		}
-		for (const std::shared_ptr<Render::JTexture>& texture : materialBundle->textures)
-		{
-			result.textures.emplace_back(texture);
-		}
 	}
 
 	context.renderServer->Sync();
@@ -260,20 +250,20 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			}
 		}
 
-		if (entityData.hasRenderObject)
+		if (entityData.hasMaterialComponent)
 		{
 			if (!transform.IsValid())
 			{
-				std::cerr << "JSceneBuilder::Build failed: render object requires transform: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: material component requires transform: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
 
-			const auto meshIter = meshLookup.find(entityData.renderObject.meshID);
-			const auto materialIter = result.materialIDs.find(entityData.renderObject.materialID);
+			const auto meshIter = meshLookup.find(entityData.materialComponent.meshID);
+			const auto materialIter = result.materialIDs.find(entityData.materialComponent.materialID);
 			if (meshIter == meshLookup.end() || materialIter == result.materialIDs.end())
 			{
-				std::cerr << "JSceneBuilder::Build failed: render object asset reference is invalid: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: material component asset reference is invalid: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
@@ -282,18 +272,19 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 				entity,
 				materialIter->second,
 				meshIter->second,
-				entityData.renderObject.transparent);
+				entityData.materialComponent.transparent,
+				entityData.materialComponent.subMeshIndex);
 
 			Engine::JScene::RenderObjectData* renderObjectData = result.scene->GetRenderObject(renderObject);
 			if (!renderObject.IsValid() || renderObjectData == nullptr)
 			{
-				std::cerr << "JSceneBuilder::Build failed: render object creation failed: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: material component creation failed: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
 
-			renderObjectData->active = entityData.renderObject.active;
-			renderObjectData->visible = entityData.renderObject.visible;
+			renderObjectData->active = entityData.materialComponent.active;
+			renderObjectData->visible = entityData.materialComponent.visible;
 			result.renderObjects[entityKey] = renderObject;
 		}
 	}

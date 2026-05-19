@@ -192,7 +192,7 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	return light;
 }
 
-JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent)
+JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent, uint32 subMeshIndex)
 {
 	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
 	{
@@ -201,8 +201,9 @@ JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materia
 
 	RenderObjectData data;
 	data.entity = entity;
-	data.materialID = materialID;
 	data.mesh = mesh;
+	data.subMeshIndex = subMeshIndex;
+	data.materialID = materialID;
 	data.transparent = transparent;
 	const JRenderObjectHandle renderObject = _renderObjects.Add(entity, data);
 	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);

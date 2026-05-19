@@ -5,38 +5,32 @@
 #include "engine/core/JObject.h"
 #include "engine/core/JHashFunction.h"
 
-/*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
-/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JPipeline; } }
-
 J_ENGINE_BEGIN
 
 class JMaterial : public JObject
 {
 public:
-	~JMaterial() override;
-
 	struct ConstantBufferParam
 	{
 		std::string name;
 		uint32 nameHash = 0;
-		Render::JConstantBuffer* buffer = nullptr;
+		std::vector<uint8> data;
 	};
 
 	struct TextureParam
 	{
 		std::string name;
 		uint32 nameHash = 0;
-		Render::JTexture* texture = nullptr;
+		std::string path;
 	};
 
-	void SetShader(Render::JShader* shader);
-	Render::JShader* GetShader() const { return _shader; }
+	void SetShaderPath(const std::string& shaderPath);
+	const std::string& GetShaderPath() const { return _shaderPath; }
 
-	void SetPipeline(Render::JPipeline* pipeline);
-	Render::JPipeline* GetPipeline() const { return _pipeline; }
-
-	void SetConstantBuffer(const std::string& name, Render::JConstantBuffer* buffer);
-	void SetTexture(const std::string& name, Render::JTexture* texture);
+	void SetAlphaBlendEnabled(bool enabled);
+	bool IsAlphaBlendEnabled() const { return _enableAlphaBlend; }
+	void SetConstantBufferData(const std::string& name, const void* data, size_t size);
+	void SetTexturePath(const std::string& name, const std::string& path);
 
 	const std::vector<ConstantBufferParam>& GetConstantBuffers() const { return _constantBuffers; }
 	const std::vector<TextureParam>& GetTextures() const { return _textures; }
@@ -46,8 +40,8 @@ public:
 	bool IsDirty() const { return _dirty; }
 
 private:
-	Render::JShader* _shader = nullptr;
-	Render::JPipeline* _pipeline = nullptr;
+	std::string _shaderPath;
+	bool _enableAlphaBlend = false;
 	std::vector<ConstantBufferParam> _constantBuffers;
 	std::vector<TextureParam> _textures;
 	bool _dirty = true;

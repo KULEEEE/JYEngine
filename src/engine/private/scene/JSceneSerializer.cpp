@@ -224,15 +224,25 @@ namespace
 			data.light.intensity = light.value("intensity", data.light.intensity);
 		}
 
-		if (value.contains("renderObject") && value.at("renderObject").is_object())
+		const json* materialComponent = nullptr;
+		if (value.contains("materialComponent") && value.at("materialComponent").is_object())
 		{
-			data.hasRenderObject = true;
-			const json& renderObject = value.at("renderObject");
-			data.renderObject.active = renderObject.value("active", data.renderObject.active);
-			data.renderObject.visible = renderObject.value("visible", data.renderObject.visible);
-			data.renderObject.transparent = renderObject.value("transparent", data.renderObject.transparent);
-			data.renderObject.materialID = renderObject.value("materialID", data.renderObject.materialID);
-			data.renderObject.meshID = renderObject.value("meshID", data.renderObject.meshID);
+			materialComponent = &value.at("materialComponent");
+		}
+		else if (value.contains("renderObject") && value.at("renderObject").is_object())
+		{
+			materialComponent = &value.at("renderObject");
+		}
+
+		if (materialComponent != nullptr)
+		{
+			data.hasMaterialComponent = true;
+			data.materialComponent.active = materialComponent->value("active", data.materialComponent.active);
+			data.materialComponent.visible = materialComponent->value("visible", data.materialComponent.visible);
+			data.materialComponent.transparent = materialComponent->value("transparent", data.materialComponent.transparent);
+			data.materialComponent.materialID = materialComponent->value("materialID", data.materialComponent.materialID);
+			data.materialComponent.meshID = materialComponent->value("meshID", data.materialComponent.meshID);
+			data.materialComponent.subMeshIndex = materialComponent->value("subMeshIndex", data.materialComponent.subMeshIndex);
 		}
 
 		return data;
@@ -283,15 +293,16 @@ namespace
 			};
 		}
 
-		if (data.hasRenderObject)
+		if (data.hasMaterialComponent)
 		{
-			value["renderObject"] =
+			value["materialComponent"] =
 			{
-				{ "active", data.renderObject.active },
-				{ "visible", data.renderObject.visible },
-				{ "transparent", data.renderObject.transparent },
-				{ "materialID", data.renderObject.materialID },
-				{ "meshID", data.renderObject.meshID },
+				{ "active", data.materialComponent.active },
+				{ "visible", data.materialComponent.visible },
+				{ "transparent", data.materialComponent.transparent },
+				{ "materialID", data.materialComponent.materialID },
+				{ "meshID", data.materialComponent.meshID },
+				{ "subMeshIndex", data.materialComponent.subMeshIndex },
 			};
 		}
 
