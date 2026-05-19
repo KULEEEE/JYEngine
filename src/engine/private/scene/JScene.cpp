@@ -22,7 +22,7 @@ namespace
 	}
 }
 
-std::string JScene::GenerateStableID()
+std::string JScene::generateStableID()
 {
 	for (;;)
 	{
@@ -49,7 +49,7 @@ JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::strin
 	_entityMetadata.resize(_entities.GetSlots().size());
 	_entityTransformLookup.resize(_entities.GetSlots().size());
 
-	const std::string resolvedStableID = stableID.empty() ? GenerateStableID() : stableID;
+	const std::string resolvedStableID = stableID.empty() ? generateStableID() : stableID;
 	SetEntityMetadata(entity, resolvedStableID, name, tags);
 	return entity;
 }
@@ -61,7 +61,7 @@ bool JScene::SetEntityMetadata(JEntityHandle entity, const std::string& stableID
 		return false;
 	}
 
-	const std::string resolvedStableID = stableID.empty() ? GenerateStableID() : stableID;
+	const std::string resolvedStableID = stableID.empty() ? generateStableID() : stableID;
 	const uint64 stableIDHash = makeStableIDHash(resolvedStableID);
 	const auto existingIter = _stableIDLookup.find(stableIDHash);
 	if (existingIter != _stableIDLookup.end()
@@ -130,7 +130,7 @@ JEntityHandle JScene::FindEntityByStableID(const std::string& stableID) const
 	return metadata != nullptr && metadata->stableID == stableID ? iter->second : JEntityHandle{};
 }
 
-void JScene::AddEntityComponentMask(JEntityHandle entity, JSceneComponentMask component)
+void JScene::addEntityComponentMask(JEntityHandle entity, JSceneComponentMask component)
 {
 	JEntityMetadata* metadata = GetEntityMetadata(entity);
 	if (metadata != nullptr)
@@ -152,7 +152,7 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 		_entityTransformLookup.resize(entity.index + 1);
 	}
 	_entityTransformLookup[entity.index] = transform;
-	AddEntityComponentMask(entity, JSceneComponentMask::Transform);
+	addEntityComponentMask(entity, JSceneComponentMask::Transform);
 	return transform;
 }
 
@@ -174,7 +174,7 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	{
 		_primaryCamera = handle;
 	}
-	AddEntityComponentMask(entity, JSceneComponentMask::Camera);
+	addEntityComponentMask(entity, JSceneComponentMask::Camera);
 	return handle;
 }
 
@@ -188,7 +188,7 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	LightData lightData = data;
 	lightData.entity = entity;
 	const JLightHandle light = _lights.Add(entity, lightData);
-	AddEntityComponentMask(entity, JSceneComponentMask::Light);
+	addEntityComponentMask(entity, JSceneComponentMask::Light);
 	return light;
 }
 
@@ -205,7 +205,7 @@ JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materia
 	data.mesh = mesh;
 	data.transparent = transparent;
 	const JRenderObjectHandle renderObject = _renderObjects.Add(entity, data);
-	AddEntityComponentMask(entity, JSceneComponentMask::RenderObject);
+	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);
 	return renderObject;
 }
 

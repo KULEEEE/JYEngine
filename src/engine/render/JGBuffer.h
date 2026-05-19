@@ -38,8 +38,8 @@ public:
 	const Desc& GetDesc() const { return _desc; }
 
 private:
-	static std::unique_ptr<JRenderTarget> CreateTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor);
-	bool CreateDepthTarget();
+	static std::unique_ptr<JRenderTarget> createTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor);
+	bool createDepthTarget();
 
 	Desc _desc;
 	std::unique_ptr<JRenderTarget> _albedo;

@@ -49,10 +49,10 @@ private:
 	std::vector<ConstantBufferBinding> _constantBuffers;
 	std::vector<TextureBinding> _textures;
 
-	static int32 FindConstantBufferBindingIndex(JShader* shader, const std::string& name);
-	static int32 FindConstantBufferBindingIndex(JShader* shader, uint32 nameHash);
-	static int32 FindTextureBindingIndex(JShader* shader, const std::string& name);
-	static int32 FindTextureBindingIndex(JShader* shader, uint32 nameHash);
+	static int32 findConstantBufferBindingIndex(JShader* shader, const std::string& name);
+	static int32 findConstantBufferBindingIndex(JShader* shader, uint32 nameHash);
+	static int32 findTextureBindingIndex(JShader* shader, const std::string& name);
+	static int32 findTextureBindingIndex(JShader* shader, uint32 nameHash);
 };
 
 J_RENDER_END

@@ -69,15 +69,15 @@ public:
 	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:
-	JMaterialResource& GetOrCreateMaterialResource(uint32 materialID);
-	JCameraResource& GetOrCreateCameraResource(JCameraHandle camera);
-	JTransformResource& GetOrCreateTransformResource(JTransformHandle transform);
-	JLightResource& GetOrCreateLightResource();
-	uint32 FindMaterialResourceIndex(uint32 materialID) const;
-	uint32 FindCameraResourceIndex(JCameraHandle camera) const;
-	uint32 FindTransformResourceIndex(JTransformHandle transform) const;
-	static uint64 MakeCameraKey(JCameraHandle camera);
-	static uint64 MakeTransformKey(JTransformHandle transform);
+	JMaterialResource& getOrCreateMaterialResource(uint32 materialID);
+	JCameraResource& getOrCreateCameraResource(JCameraHandle camera);
+	JTransformResource& getOrCreateTransformResource(JTransformHandle transform);
+	JLightResource& getOrCreateLightResource();
+	uint32 findMaterialResourceIndex(uint32 materialID) const;
+	uint32 findCameraResourceIndex(JCameraHandle camera) const;
+	uint32 findTransformResourceIndex(JTransformHandle transform) const;
+	static uint64 makeCameraKey(JCameraHandle camera);
+	static uint64 makeTransformKey(JTransformHandle transform);
 
 	Render::JRenderContext* _renderContext = nullptr;
 	std::vector<MaterialResourceRecord> _materialResources;

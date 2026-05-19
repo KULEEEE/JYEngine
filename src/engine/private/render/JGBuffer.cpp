@@ -13,10 +13,10 @@ bool JGBuffer::Initialize(const Desc& desc)
 	_desc.width = std::max(_desc.width, 1u);
 	_desc.height = std::max(_desc.height, 1u);
 
-	_albedo = CreateTarget(_desc.width, _desc.height, _desc.albedoFormat, JColor(0.0f, 0.0f, 0.0f, 1.0f));
-	_normal = CreateTarget(_desc.width, _desc.height, _desc.normalFormat, JColor(0.5f, 0.5f, 1.0f, 1.0f));
-	_material = CreateTarget(_desc.width, _desc.height, _desc.materialFormat, JColor(0.0f, 0.0f, 0.0f, 1.0f));
-	if (!CreateDepthTarget())
+	_albedo = createTarget(_desc.width, _desc.height, _desc.albedoFormat, JColor(0.0f, 0.0f, 0.0f, 1.0f));
+	_normal = createTarget(_desc.width, _desc.height, _desc.normalFormat, JColor(0.5f, 0.5f, 1.0f, 1.0f));
+	_material = createTarget(_desc.width, _desc.height, _desc.materialFormat, JColor(0.0f, 0.0f, 0.0f, 1.0f));
+	if (!createDepthTarget())
 	{
 		return false;
 	}
@@ -45,7 +45,7 @@ bool JGBuffer::IsValid() const
 		&& _dsvHeap != nullptr;
 }
 
-std::unique_ptr<JRenderTarget> JGBuffer::CreateTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor)
+std::unique_ptr<JRenderTarget> JGBuffer::createTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor)
 {
 	JRenderTarget::Desc targetDesc;
 	targetDesc.width = width;
@@ -57,7 +57,7 @@ std::unique_ptr<JRenderTarget> JGBuffer::CreateTarget(uint32 width, uint32 heigh
 	return std::make_unique<JRenderTarget>(targetDesc);
 }
 
-bool JGBuffer::CreateDepthTarget()
+bool JGBuffer::createDepthTarget()
 {
 	if (GetEngine() == nullptr || GetEngine()->GetDevice() == nullptr)
 	{
@@ -96,7 +96,7 @@ bool JGBuffer::CreateDepthTarget()
 		IID_PPV_ARGS(&_depthResource));
 	if (FAILED(resourceHr) || _depthResource == nullptr)
 	{
-		std::cerr << "JGBuffer::CreateDepthTarget failed. HRESULT=0x" << std::hex << resourceHr << std::dec << std::endl;
+		std::cerr << "JGBuffer::createDepthTarget failed. HRESULT=0x" << std::hex << resourceHr << std::dec << std::endl;
 		return false;
 	}
 
@@ -107,7 +107,7 @@ bool JGBuffer::CreateDepthTarget()
 	const HRESULT heapHr = device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_dsvHeap));
 	if (FAILED(heapHr) || _dsvHeap == nullptr)
 	{
-		std::cerr << "JGBuffer::CreateDepthTarget DSV heap failed. HRESULT=0x" << std::hex << heapHr << std::dec << std::endl;
+		std::cerr << "JGBuffer::createDepthTarget DSV heap failed. HRESULT=0x" << std::hex << heapHr << std::dec << std::endl;
 		return false;
 	}
 

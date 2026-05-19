@@ -23,21 +23,21 @@ void JSceneColorPass::Execute(const JRenderPassContext& context, const JFrameDes
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	RenderDrawItems(context, frameDesc.camera, frameDesc.opaqueDrawItems);
-	RenderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
+	renderDrawItems(context, frameDesc.camera, frameDesc.opaqueDrawItems);
+	renderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
 
 	context.commandQueue->EndRenderPass();
 }
 
-void JSceneColorPass::RenderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
+void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
 {
 	for (const JDrawItem& drawItem : drawItems)
 	{
-		RenderDrawItem(context, camera, drawItem);
+		renderDrawItem(context, camera, drawItem);
 	}
 }
 
-void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
+void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
 	if (drawItem.meshResource == nullptr)
 	{

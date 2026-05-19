@@ -28,7 +28,7 @@ bool JGraphicResource::SetConstantBuffer(uint32 nameHash, JConstantBuffer* buffe
 		return false;
 	}
 
-	const int32 bindingIndex = FindConstantBufferBindingIndex(_shader, nameHash);
+	const int32 bindingIndex = findConstantBufferBindingIndex(_shader, nameHash);
 	if (bindingIndex < 0)
 	{
 		return false;
@@ -57,7 +57,7 @@ bool JGraphicResource::SetTexture(uint32 nameHash, JTexture* texture, const std:
 		return false;
 	}
 
-	const int32 bindingIndex = FindTextureBindingIndex(_shader, nameHash);
+	const int32 bindingIndex = findTextureBindingIndex(_shader, nameHash);
 	if (bindingIndex < 0)
 	{
 		return false;
@@ -79,12 +79,12 @@ void JGraphicResource::ClearBindings()
 	_textures.clear();
 }
 
-int32 JGraphicResource::FindConstantBufferBindingIndex(JShader* shader, const std::string& name)
+int32 JGraphicResource::findConstantBufferBindingIndex(JShader* shader, const std::string& name)
 {
-	return FindConstantBufferBindingIndex(shader, JHashFunction::StrCrc32(name.c_str()));
+	return findConstantBufferBindingIndex(shader, JHashFunction::StrCrc32(name.c_str()));
 }
 
-int32 JGraphicResource::FindConstantBufferBindingIndex(JShader* shader, uint32 nameHash)
+int32 JGraphicResource::findConstantBufferBindingIndex(JShader* shader, uint32 nameHash)
 {
 	if (shader == nullptr)
 	{
@@ -102,12 +102,12 @@ int32 JGraphicResource::FindConstantBufferBindingIndex(JShader* shader, uint32 n
 	return -1;
 }
 
-int32 JGraphicResource::FindTextureBindingIndex(JShader* shader, const std::string& name)
+int32 JGraphicResource::findTextureBindingIndex(JShader* shader, const std::string& name)
 {
-	return FindTextureBindingIndex(shader, JHashFunction::StrCrc32(name.c_str()));
+	return findTextureBindingIndex(shader, JHashFunction::StrCrc32(name.c_str()));
 }
 
-int32 JGraphicResource::FindTextureBindingIndex(JShader* shader, uint32 nameHash)
+int32 JGraphicResource::findTextureBindingIndex(JShader* shader, uint32 nameHash)
 {
 	if (shader == nullptr)
 	{

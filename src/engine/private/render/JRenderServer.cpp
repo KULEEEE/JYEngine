@@ -82,7 +82,7 @@ namespace
 	}
 }
 
-uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
+uint64 JRenderServer::makeCameraKey(JCameraHandle camera)
 {
 	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
 }
@@ -91,33 +91,33 @@ JRenderServer::~JRenderServer()
 {
 }
 
-uint32 JRenderServer::FindMaterialIndex(uint32 materialID) const
+uint32 JRenderServer::findMaterialIndex(uint32 materialID) const
 {
 	const auto iter = _materialIndexMap.find(materialID);
 	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JMaterial* JRenderServer::FindMaterial(uint32 materialID) const
+JMaterial* JRenderServer::findMaterial(uint32 materialID) const
 {
-	const uint32 index = FindMaterialIndex(materialID);
+	const uint32 index = findMaterialIndex(materialID);
 	return index == static_cast<uint32>(-1) ? nullptr : _materials[index].source;
 }
 
-uint32 JRenderServer::FindCameraIndex(JCameraHandle camera) const
+uint32 JRenderServer::findCameraIndex(JCameraHandle camera) const
 {
-	const auto iter = _cameraIndexMap.find(MakeCameraKey(camera));
+	const auto iter = _cameraIndexMap.find(makeCameraKey(camera));
 	return iter == _cameraIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(JCameraHandle camera)
+JRenderServer::CameraRecord* JRenderServer::findCameraRecord(JCameraHandle camera)
 {
-	const uint32 index = FindCameraIndex(camera);
+	const uint32 index = findCameraIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameras[index];
 }
 
-const JRenderServer::CameraRecord* JRenderServer::FindCameraRecord(JCameraHandle camera) const
+const JRenderServer::CameraRecord* JRenderServer::findCameraRecord(JCameraHandle camera) const
 {
-	const uint32 index = FindCameraIndex(camera);
+	const uint32 index = findCameraIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameras[index];
 }
 
@@ -128,7 +128,7 @@ void JRenderServer::RegisterMaterial(JMaterial* material)
 		return;
 	}
 
-	if (FindMaterialIndex(material->instanceID) != static_cast<uint32>(-1))
+	if (findMaterialIndex(material->instanceID) != static_cast<uint32>(-1))
 	{
 		return;
 	}
@@ -141,7 +141,7 @@ void JRenderServer::RegisterMaterial(JMaterial* material)
 
 void JRenderServer::UnregisterMaterial(uint32 materialID)
 {
-	const uint32 index = FindMaterialIndex(materialID);
+	const uint32 index = findMaterialIndex(materialID);
 	if (index != static_cast<uint32>(-1))
 	{
 		const uint32 lastIndex = static_cast<uint32>(_materials.size() - 1);
@@ -174,7 +174,7 @@ void JRenderServer::RegisterCamera(JCameraHandle camera)
 		return;
 	}
 
-	if (FindCameraIndex(camera) != static_cast<uint32>(-1))
+	if (findCameraIndex(camera) != static_cast<uint32>(-1))
 	{
 		MarkCameraDirty(camera);
 		return;
@@ -182,28 +182,28 @@ void JRenderServer::RegisterCamera(JCameraHandle camera)
 
 	const uint32 newIndex = static_cast<uint32>(_cameras.size());
 	_cameras.push_back({ camera });
-	_cameraIndexMap[MakeCameraKey(camera)] = newIndex;
+	_cameraIndexMap[makeCameraKey(camera)] = newIndex;
 	MarkCameraDirty(camera);
 }
 
 void JRenderServer::UnregisterCamera(JCameraHandle camera)
 {
-	const uint32 index = FindCameraIndex(camera);
+	const uint32 index = findCameraIndex(camera);
 	if (index != static_cast<uint32>(-1))
 	{
 		const uint32 lastIndex = static_cast<uint32>(_cameras.size() - 1);
 		if (index != lastIndex)
 		{
 			_cameras[index] = _cameras[lastIndex];
-			_cameraIndexMap[MakeCameraKey(_cameras[index].camera)] = index;
+			_cameraIndexMap[makeCameraKey(_cameras[index].camera)] = index;
 		}
 		_cameras.pop_back();
-		_cameraIndexMap.erase(MakeCameraKey(camera));
+		_cameraIndexMap.erase(makeCameraKey(camera));
 	}
 
 	for (auto iter = _dirtyCameraKeys.begin(); iter != _dirtyCameraKeys.end();)
 	{
-		if (*iter == MakeCameraKey(camera))
+		if (*iter == makeCameraKey(camera))
 		{
 			iter = _dirtyCameraKeys.erase(iter);
 			continue;
@@ -241,7 +241,7 @@ void JRenderServer::MarkCameraDirty(JCameraHandle camera)
 		return;
 	}
 
-	const uint64 cameraKey = MakeCameraKey(camera);
+	const uint64 cameraKey = makeCameraKey(camera);
 	for (uint64 dirtyCameraKey : _dirtyCameraKeys)
 	{
 		if (dirtyCameraKey == cameraKey)
@@ -257,7 +257,7 @@ void JRenderServer::Sync()
 {
 	for (uint32 materialID : _dirtyMaterialIDs)
 	{
-		JMaterial* material = FindMaterial(materialID);
+		JMaterial* material = findMaterial(materialID);
 		if (material == nullptr)
 		{
 			continue;
@@ -300,7 +300,7 @@ void JRenderServer::SyncScene(JScene& scene)
 	{
 		for (const CameraRecord& record : _cameras)
 		{
-			if (MakeCameraKey(record.camera) != cameraKey)
+			if (makeCameraKey(record.camera) != cameraKey)
 			{
 				continue;
 			}
@@ -310,7 +310,7 @@ void JRenderServer::SyncScene(JScene& scene)
 				break;
 			}
 
-			activeCameraKeys.insert(MakeCameraKey(record.camera));
+			activeCameraKeys.insert(makeCameraKey(record.camera));
 			const XMMATRIX viewProjection = makeViewMatrix(scene, record.camera) * makeProjectionMatrix(scene, record.camera);
 			_frameSnapshot.cameras.push_back({ record.camera, viewProjection });
 			_renderDB.SyncCamera(record.camera, viewProjection);
@@ -427,7 +427,7 @@ void JRenderServer::SyncScene(JScene& scene)
 	{
 		if (scene.GetCamera(record.camera) != nullptr)
 		{
-			activeCameraKeys.insert(MakeCameraKey(record.camera));
+			activeCameraKeys.insert(makeCameraKey(record.camera));
 		}
 	}
 

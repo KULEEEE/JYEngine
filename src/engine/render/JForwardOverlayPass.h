@@ -14,8 +14,8 @@ public:
 	const JRenderPassStats& GetLastStats() const override { return _lastStats; }
 
 private:
-	void RenderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems);
-	void RenderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem);
+	void renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems);
+	void renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem);
 
 	JRenderPassStats _lastStats = {};
 };

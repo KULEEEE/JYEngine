@@ -34,7 +34,7 @@ JRenderTarget::JRenderTarget(uint32 width, uint32 height, DXGI_FORMAT format, co
 
 JRenderTarget::JRenderTarget(const Desc& desc)
 {
-	CreateOffscreenResource(desc);
+	createOffscreenResource(desc);
 }
 
 JRenderTarget::JRenderTarget(ID3D12Resource* resource)
@@ -69,18 +69,18 @@ JRenderTarget::~JRenderTarget()
 	_ownedResources.clear();
 }
 
-bool JRenderTarget::CreateOffscreenResource(const Desc& desc)
+bool JRenderTarget::createOffscreenResource(const Desc& desc)
 {
 	if (GetEngine() == nullptr || GetEngine()->GetDevice() == nullptr || GetEngine()->GetDx12Helper() == nullptr)
 	{
-		std::cerr << "JRenderTarget::CreateOffscreenResource failed: engine device or dx12 helper is null." << std::endl;
+		std::cerr << "JRenderTarget::createOffscreenResource failed: engine device or dx12 helper is null." << std::endl;
 		return false;
 	}
 
 	ComPtr<ID3D12Device> device = GetEngine()->GetDevice()->GetDevice();
 	if (device == nullptr)
 	{
-		std::cerr << "JRenderTarget::CreateOffscreenResource failed: D3D12 device is null." << std::endl;
+		std::cerr << "JRenderTarget::createOffscreenResource failed: D3D12 device is null." << std::endl;
 		return false;
 	}
 
@@ -130,7 +130,7 @@ bool JRenderTarget::CreateOffscreenResource(const Desc& desc)
 		IID_PPV_ARGS(&resource));
 	if (FAILED(hr) || resource == nullptr)
 	{
-		std::cerr << "JRenderTarget::CreateOffscreenResource failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		std::cerr << "JRenderTarget::createOffscreenResource failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
 		return false;
 	}
 
@@ -139,7 +139,7 @@ bool JRenderTarget::CreateOffscreenResource(const Desc& desc)
 	_rtvResources.push_back(rawResource);
 	_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(rawResource));
 
-	if (_shaderResource && !CreateShaderResourceView(rawResource))
+	if (_shaderResource && !createShaderResourceView(rawResource))
 	{
 		return false;
 	}
@@ -147,7 +147,7 @@ bool JRenderTarget::CreateOffscreenResource(const Desc& desc)
 	return true;
 }
 
-bool JRenderTarget::CreateShaderResourceView(ID3D12Resource* resource)
+bool JRenderTarget::createShaderResourceView(ID3D12Resource* resource)
 {
 	if (resource == nullptr)
 	{
@@ -167,7 +167,7 @@ bool JRenderTarget::CreateShaderResourceView(ID3D12Resource* resource)
 	const HRESULT heapHr = device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_srvHeap));
 	if (FAILED(heapHr) || _srvHeap == nullptr)
 	{
-		std::cerr << "JRenderTarget::CreateShaderResourceView heap creation failed. HRESULT=0x" << std::hex << heapHr << std::dec << std::endl;
+		std::cerr << "JRenderTarget::createShaderResourceView heap creation failed. HRESULT=0x" << std::hex << heapHr << std::dec << std::endl;
 		return false;
 	}
 

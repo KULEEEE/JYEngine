@@ -18,7 +18,7 @@ public:
 	const JRenderPassStats& GetLastStats() const override { return _lastStats; }
 
 private:
-	bool EnsureResources(const JRenderPassContext& context);
+	bool ensureResources(const JRenderPassContext& context);
 
 	JRenderPassStats _lastStats = {};
 	Render::JShader* _shader = nullptr;

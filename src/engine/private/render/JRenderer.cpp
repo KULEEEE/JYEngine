@@ -16,24 +16,24 @@ J_ENGINE_BEGIN
 
 JRenderer::~JRenderer() = default;
 
-void JRenderer::InitializeDefaultPasses()
+void JRenderer::initializeDefaultPasses()
 {
 	if (_renderPath == RenderPath::Deferred)
 	{
-		InitializeDeferredPasses();
+		initializeDeferredPasses();
 		return;
 	}
 
-	InitializeForwardPasses();
+	initializeForwardPasses();
 }
 
-void JRenderer::InitializeForwardPasses()
+void JRenderer::initializeForwardPasses()
 {
 	_passes.clear();
 	_passes.push_back(std::make_unique<JSceneColorPass>());
 }
 
-void JRenderer::InitializeDeferredPasses()
+void JRenderer::initializeDeferredPasses()
 {
 	_passes.clear();
 	_passes.push_back(std::make_unique<JGBufferPass>());
@@ -46,7 +46,7 @@ void JRenderer::Initialize(Render::JCommandQueue* commandQueue, Render::JRenderC
 	_commandQueue = commandQueue;
 	_renderContext = renderContext;
 	_renderDB = renderDB;
-	InitializeDefaultPasses();
+	initializeDefaultPasses();
 }
 
 void JRenderer::SetRenderPath(RenderPath renderPath)
@@ -57,10 +57,10 @@ void JRenderer::SetRenderPath(RenderPath renderPath)
 	}
 
 	_renderPath = renderPath;
-	InitializeDefaultPasses();
+	initializeDefaultPasses();
 }
 
-void JRenderer::EnsureGBuffer(const FrameDesc& frameDesc)
+void JRenderer::ensureGBuffer(const FrameDesc& frameDesc)
 {
 	if (_renderPath != RenderPath::Deferred || frameDesc.renderTarget == nullptr)
 	{
@@ -97,9 +97,9 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 
 	if (_passes.empty())
 	{
-		InitializeDefaultPasses();
+		initializeDefaultPasses();
 	}
-	EnsureGBuffer(frameDesc);
+	ensureGBuffer(frameDesc);
 
 	const JCameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.camera);
 	if (cameraResource == nullptr || cameraResource->perFrameBuffer == nullptr)

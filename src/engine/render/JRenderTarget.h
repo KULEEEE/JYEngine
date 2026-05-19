@@ -49,8 +49,8 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUHandle() const { return _srvGPUHandle; }
 
 private:
-	bool CreateOffscreenResource(const Desc& desc);
-	bool CreateShaderResourceView(ID3D12Resource* resource);
+	bool createOffscreenResource(const Desc& desc);
+	bool createShaderResourceView(ID3D12Resource* resource);
 
 	std::vector<ComPtr<ID3D12Resource>> _ownedResources;
 	std::vector<ID3D12Resource*> _rtvResources;

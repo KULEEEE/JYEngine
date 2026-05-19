@@ -114,8 +114,8 @@ public:
 	const std::vector<RenderObjectSlot>& GetRenderObjectSlots() const { return _renderObjects.GetSlots(); }
 
 private:
-	std::string GenerateStableID();
-	void AddEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
+	std::string generateStableID();
+	void addEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
 
 	EntityPool _entities;
 	JTransformPool _transforms;

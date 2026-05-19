@@ -45,12 +45,12 @@ public:
 	bool BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
 
 private:
-	uint32 FindMaterialIndex(uint32 materialID) const;
-	JMaterial* FindMaterial(uint32 materialID) const;
-	uint32 FindCameraIndex(JCameraHandle camera) const;
-	CameraRecord* FindCameraRecord(JCameraHandle camera);
-	const CameraRecord* FindCameraRecord(JCameraHandle camera) const;
-	static uint64 MakeCameraKey(JCameraHandle camera);
+	uint32 findMaterialIndex(uint32 materialID) const;
+	JMaterial* findMaterial(uint32 materialID) const;
+	uint32 findCameraIndex(JCameraHandle camera) const;
+	CameraRecord* findCameraRecord(JCameraHandle camera);
+	const CameraRecord* findCameraRecord(JCameraHandle camera) const;
+	static uint64 makeCameraKey(JCameraHandle camera);
 
 	JRenderDB _renderDB;
 	JFrameSnapshot _frameSnapshot;

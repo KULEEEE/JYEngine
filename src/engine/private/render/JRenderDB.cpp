@@ -89,12 +89,12 @@ JRenderDB::~JRenderDB()
 	Clear();
 }
 
-uint64 JRenderDB::MakeCameraKey(JCameraHandle camera)
+uint64 JRenderDB::makeCameraKey(JCameraHandle camera)
 {
 	return (static_cast<uint64>(camera.generation) << 32) | camera.index;
 }
 
-uint64 JRenderDB::MakeTransformKey(JTransformHandle transform)
+uint64 JRenderDB::makeTransformKey(JTransformHandle transform)
 {
 	return (static_cast<uint64>(transform.generation) << 32) | transform.index;
 }
@@ -104,7 +104,7 @@ void JRenderDB::Initialize(Render::JRenderContext* renderContext)
 	_renderContext = renderContext;
 }
 
-JMaterialResource& JRenderDB::GetOrCreateMaterialResource(uint32 materialID)
+JMaterialResource& JRenderDB::getOrCreateMaterialResource(uint32 materialID)
 {
 	const auto iter = _materialIndexMap.find(materialID);
 	if (iter != _materialIndexMap.end())
@@ -122,15 +122,15 @@ JMaterialResource& JRenderDB::GetOrCreateMaterialResource(uint32 materialID)
 	return _materialResources.back().resource;
 }
 
-uint32 JRenderDB::FindMaterialResourceIndex(uint32 materialID) const
+uint32 JRenderDB::findMaterialResourceIndex(uint32 materialID) const
 {
 	const auto iter = _materialIndexMap.find(materialID);
 	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JCameraResource& JRenderDB::GetOrCreateCameraResource(JCameraHandle camera)
+JCameraResource& JRenderDB::getOrCreateCameraResource(JCameraHandle camera)
 {
-	const uint64 cameraKey = MakeCameraKey(camera);
+	const uint64 cameraKey = makeCameraKey(camera);
 	const auto iter = _cameraIndexMap.find(cameraKey);
 	if (iter != _cameraIndexMap.end())
 	{
@@ -147,15 +147,15 @@ JCameraResource& JRenderDB::GetOrCreateCameraResource(JCameraHandle camera)
 	return _cameraResources.back().resource;
 }
 
-uint32 JRenderDB::FindCameraResourceIndex(JCameraHandle camera) const
+uint32 JRenderDB::findCameraResourceIndex(JCameraHandle camera) const
 {
-	const auto iter = _cameraIndexMap.find(MakeCameraKey(camera));
+	const auto iter = _cameraIndexMap.find(makeCameraKey(camera));
 	return iter == _cameraIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JTransformResource& JRenderDB::GetOrCreateTransformResource(JTransformHandle transform)
+JTransformResource& JRenderDB::getOrCreateTransformResource(JTransformHandle transform)
 {
-	const uint64 transformKey = MakeTransformKey(transform);
+	const uint64 transformKey = makeTransformKey(transform);
 	const auto iter = _transformIndexMap.find(transformKey);
 	if (iter != _transformIndexMap.end())
 	{
@@ -172,50 +172,50 @@ JTransformResource& JRenderDB::GetOrCreateTransformResource(JTransformHandle tra
 	return _transformResources.back().resource;
 }
 
-JLightResource& JRenderDB::GetOrCreateLightResource()
+JLightResource& JRenderDB::getOrCreateLightResource()
 {
 	return _lightResource;
 }
 
-uint32 JRenderDB::FindTransformResourceIndex(JTransformHandle transform) const
+uint32 JRenderDB::findTransformResourceIndex(JTransformHandle transform) const
 {
-	const auto iter = _transformIndexMap.find(MakeTransformKey(transform));
+	const auto iter = _transformIndexMap.find(makeTransformKey(transform));
 	return iter == _transformIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
 JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID)
 {
-	const uint32 index = FindMaterialResourceIndex(materialID);
+	const uint32 index = findMaterialResourceIndex(materialID);
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
 const JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID) const
 {
-	const uint32 index = FindMaterialResourceIndex(materialID);
+	const uint32 index = findMaterialResourceIndex(materialID);
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
 JCameraResource* JRenderDB::FindCameraResource(JCameraHandle camera)
 {
-	const uint32 index = FindCameraResourceIndex(camera);
+	const uint32 index = findCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
 const JCameraResource* JRenderDB::FindCameraResource(JCameraHandle camera) const
 {
-	const uint32 index = FindCameraResourceIndex(camera);
+	const uint32 index = findCameraResourceIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameraResources[index].resource;
 }
 
 JTransformResource* JRenderDB::FindTransformResource(JTransformHandle transform)
 {
-	const uint32 index = FindTransformResourceIndex(transform);
+	const uint32 index = findTransformResourceIndex(transform);
 	return index == static_cast<uint32>(-1) ? nullptr : &_transformResources[index].resource;
 }
 
 const JTransformResource* JRenderDB::FindTransformResource(JTransformHandle transform) const
 {
-	const uint32 index = FindTransformResourceIndex(transform);
+	const uint32 index = findTransformResourceIndex(transform);
 	return index == static_cast<uint32>(-1) ? nullptr : &_transformResources[index].resource;
 }
 
@@ -243,7 +243,7 @@ const JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh) const
 
 void JRenderDB::SyncMaterial(const JMaterial& material)
 {
-	JMaterialResource& resource = GetOrCreateMaterialResource(material.instanceID);
+	JMaterialResource& resource = getOrCreateMaterialResource(material.instanceID);
 	resource.shader = material.GetShader();
 	resource.pipeline = material.GetPipeline();
 	resource.constantBuffers.clear();
@@ -267,7 +267,7 @@ void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection)
 		return;
 	}
 
-	JCameraResource& resource = GetOrCreateCameraResource(camera);
+	JCameraResource& resource = getOrCreateCameraResource(camera);
 	resource.camera = camera;
 
 	PerFrameConstants constants{};
@@ -288,7 +288,7 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 		return;
 	}
 
-	JTransformResource& resource = GetOrCreateTransformResource(transform);
+	JTransformResource& resource = getOrCreateTransformResource(transform);
 	resource.transform = transform;
 
 	PerObjectConstants constants{};
@@ -309,7 +309,7 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 		return;
 	}
 
-	JLightResource& resource = GetOrCreateLightResource();
+	JLightResource& resource = getOrCreateLightResource();
 	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
 
 	LightConstants constants{};
@@ -389,7 +389,7 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 
 void JRenderDB::RemoveMaterialResource(uint32 materialID)
 {
-	const uint32 index = FindMaterialResourceIndex(materialID);
+	const uint32 index = findMaterialResourceIndex(materialID);
 	if (index == static_cast<uint32>(-1))
 	{
 		return;
@@ -408,7 +408,7 @@ void JRenderDB::RemoveMaterialResource(uint32 materialID)
 
 void JRenderDB::RemoveCameraResource(JCameraHandle camera)
 {
-	const uint32 index = FindCameraResourceIndex(camera);
+	const uint32 index = findCameraResourceIndex(camera);
 	if (index == static_cast<uint32>(-1))
 	{
 		return;
@@ -424,12 +424,12 @@ void JRenderDB::RemoveCameraResource(JCameraHandle camera)
 	}
 
 	_cameraResources.pop_back();
-	_cameraIndexMap.erase(MakeCameraKey(camera));
+	_cameraIndexMap.erase(makeCameraKey(camera));
 }
 
 void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 {
-	const uint32 index = FindTransformResourceIndex(transform);
+	const uint32 index = findTransformResourceIndex(transform);
 	if (index == static_cast<uint32>(-1))
 	{
 		return;
@@ -445,7 +445,7 @@ void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 	}
 
 	_transformResources.pop_back();
-	_transformIndexMap.erase(MakeTransformKey(transform));
+	_transformIndexMap.erase(makeTransformKey(transform));
 }
 
 void JRenderDB::RemoveMeshResource(const JMesh* mesh)

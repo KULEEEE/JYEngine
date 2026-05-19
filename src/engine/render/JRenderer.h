@@ -38,10 +38,10 @@ public:
 	void Render(const FrameDesc& frameDesc);
 
 private:
-	void InitializeDefaultPasses();
-	void InitializeForwardPasses();
-	void InitializeDeferredPasses();
-	void EnsureGBuffer(const FrameDesc& frameDesc);
+	void initializeDefaultPasses();
+	void initializeForwardPasses();
+	void initializeDeferredPasses();
+	void ensureGBuffer(const FrameDesc& frameDesc);
 
 	Render::JCommandQueue* _commandQueue = nullptr;
 	Render::JRenderContext* _renderContext = nullptr;

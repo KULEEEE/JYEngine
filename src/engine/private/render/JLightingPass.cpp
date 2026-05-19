@@ -20,7 +20,7 @@ JLightingPass::~JLightingPass()
 	_shader = nullptr;
 }
 
-bool JLightingPass::EnsureResources(const JRenderPassContext& context)
+bool JLightingPass::ensureResources(const JRenderPassContext& context)
 {
 	if (_shader != nullptr && _pipeline != nullptr)
 	{
@@ -66,7 +66,7 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	Render::JTexture* albedoTexture = albedoTarget != nullptr ? albedoTarget->GetTextureView() : nullptr;
 	Render::JTexture* normalTexture = normalTarget != nullptr ? normalTarget->GetTextureView() : nullptr;
 	Render::JTexture* materialTexture = materialTarget != nullptr ? materialTarget->GetTextureView() : nullptr;
-	if (albedoTexture == nullptr || normalTexture == nullptr || materialTexture == nullptr || !EnsureResources(context))
+	if (albedoTexture == nullptr || normalTexture == nullptr || materialTexture == nullptr || !ensureResources(context))
 	{
 		return;
 	}
