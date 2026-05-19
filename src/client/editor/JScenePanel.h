@@ -14,6 +14,7 @@ namespace J::Engine
 {
 	class JMaterial;
 	class JMesh;
+	struct JFrameDesc;
 }
 
 J_EDITOR_BEGIN
@@ -35,6 +36,7 @@ private:
 	void updateSceneCamera(float deltaTime);
 	void selectDefaultRenderObject();
 	void updateSelectedObject(float deltaTime);
+	void populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime);
 	
 	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
@@ -50,14 +52,9 @@ private:
 	bool _isReady = false;
 	std::chrono::steady_clock::time_point _lastUpdateTime = {};
 	float _editorCameraMoveSpeed = 6.0f;
-	HWND _cameraInfoWindow = nullptr;
-	HWND _cameraInfoText = nullptr;
 	HWND _mainWindow = nullptr;
 	uint32 _viewportWidth = 0;
 	uint32 _viewportHeight = 0;
-
-	void updateCameraInfoPanel();
-	void createCameraInfoPanel();
 
 };
 

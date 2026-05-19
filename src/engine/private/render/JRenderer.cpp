@@ -9,6 +9,7 @@
 #include "engine/render/JGBufferPass.h"
 #include "engine/render/JLightingPass.h"
 #include "engine/render/JForwardOverlayPass.h"
+#include "engine/render/JDebugOverlayPass.h"
 
 #include <iostream>
 
@@ -31,6 +32,7 @@ void JRenderer::initializeForwardPasses()
 {
 	_passes.clear();
 	_passes.push_back(std::make_unique<JSceneColorPass>());
+	_passes.push_back(std::make_unique<JDebugOverlayPass>());
 }
 
 void JRenderer::initializeDeferredPasses()
@@ -39,6 +41,7 @@ void JRenderer::initializeDeferredPasses()
 	_passes.push_back(std::make_unique<JGBufferPass>());
 	_passes.push_back(std::make_unique<JLightingPass>());
 	_passes.push_back(std::make_unique<JForwardOverlayPass>());
+	_passes.push_back(std::make_unique<JDebugOverlayPass>());
 }
 
 void JRenderer::Initialize(Render::JCommandQueue* commandQueue, Render::JRenderContext* renderContext, JRenderDB* renderDB)

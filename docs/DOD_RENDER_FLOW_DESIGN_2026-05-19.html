@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DOD Render Flow Design 2026-05-19</title>
+  <style>
+    :root {
+      --bg: #111410;
+      --panel: #1a211b;
+      --panel-2: #20291f;
+      --line: #86a873;
+      --line-soft: #3c5337;
+      --text: #eef5e8;
+      --muted: #aebda8;
+      --cpu: #a8d46f;
+      --snapshot: #f3c969;
+      --gpu: #75c8b3;
+      --draw: #f09a71;
+      --warn: #f16d6d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(168, 212, 111, 0.18), transparent 28rem),
+        radial-gradient(circle at 85% 8%, rgba(117, 200, 179, 0.15), transparent 26rem),
+        linear-gradient(135deg, #111410 0%, #151a13 55%, #0e1412 100%);
+      color: var(--text);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 48px 0 72px;
+    }
+
+    header {
+      margin-bottom: 34px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(34px, 5vw, 64px);
+      letter-spacing: -0.055em;
+      line-height: 0.95;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 26px;
+      letter-spacing: -0.025em;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .lead {
+      max-width: 850px;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .panel {
+      border: 1px solid var(--line-soft);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(32, 41, 31, 0.94), rgba(22, 29, 22, 0.94));
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+      padding: 22px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 48px 1fr 48px 1fr 48px 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 18px;
+    }
+
+    .node {
+      min-height: 154px;
+      border: 1px solid rgba(238, 245, 232, 0.12);
+      border-radius: 20px;
+      padding: 18px;
+      background: rgba(255, 255, 255, 0.035);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.16;
+      background: linear-gradient(135deg, currentColor, transparent 68%);
+      pointer-events: none;
+    }
+
+    .node.cpu { color: var(--cpu); }
+    .node.snapshot { color: var(--snapshot); }
+    .node.gpu { color: var(--gpu); }
+    .node.draw { color: var(--draw); }
+
+    .node h3,
+    .node ul,
+    .node code {
+      position: relative;
+    }
+
+    .node h3 {
+      color: var(--text);
+      font-size: 19px;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--line);
+      font-size: 32px;
+      font-family: "Courier New", monospace;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    code {
+      color: #f7f2d7;
+      background: rgba(0, 0, 0, 0.24);
+      padding: 2px 6px;
+      border-radius: 7px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      border-radius: 18px;
+      background: #0b0f0b;
+      border: 1px solid rgba(134, 168, 115, 0.28);
+      color: #e8f2dc;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .section {
+      margin-top: 24px;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .bad { color: var(--warn); }
+    .good { color: var(--cpu); }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .mini {
+      border: 1px solid rgba(238, 245, 232, 0.12);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+    }
+
+    .mini strong {
+      color: var(--text);
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      padding: 16px 16px 16px 58px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(134, 168, 115, 0.22);
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--cpu);
+      color: #0e140c;
+      font-weight: 700;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .rule .mini {
+      min-height: 92px;
+    }
+
+    @media (max-width: 920px) {
+      .flow,
+      .compare,
+      .two,
+      .rule {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+        min-height: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="badge">2026-05-19 / Target Design</div>
+      <h1>Scene 이후 DOD Render Flow</h1>
+      <p class="lead">
+        목표는 Scene 이후 렌더링 경로를 단방향 데이터 파이프라인으로 고정하는 것이다.
+        Scene은 CPU 원본, Snapshot은 프레임 입력, RenderDB는 GPU 리소스 테이블,
+        DrawItem은 정렬 가능한 실행 단위가 된다.
+      </p>
+    </header>
+
+    <section class="panel">
+      <h2>최종 데이터 흐름</h2>
+      <div class="flow">
+        <article class="node cpu">
+          <h3>Scene Pools</h3>
+          <ul>
+            <li>CPU 원본 데이터</li>
+            <li><code>TransformPool</code> SoA</li>
+            <li><code>RenderObjectPool</code> handle/index</li>
+            <li>GPU 포인터 없음</li>
+          </ul>
+        </article>
+        <div class="arrow">→</div>
+        <article class="node snapshot">
+          <h3>Frame Snapshot</h3>
+          <ul>
+            <li>렌더에 필요한 CPU 계산 결과</li>
+            <li>world matrix</li>
+            <li>light position/color</li>
+            <li>render object references</li>
+          </ul>
+        </article>
+        <div class="arrow">→</div>
+        <article class="node gpu">
+          <h3>RenderDB</h3>
+          <ul>
+            <li>GPU resource owner</li>
+            <li>resource table index 발급</li>
+            <li>mesh/material/transform/camera 관리</li>
+            <li>추후 big buffer pack</li>
+          </ul>
+        </article>
+        <div class="arrow">→</div>
+        <article class="node draw">
+          <h3>DrawItem List</h3>
+          <ul>
+            <li>정렬 가능한 draw 실행 단위</li>
+            <li>pointer 대신 index/offset</li>
+            <li>sortKey 보유</li>
+            <li>Renderer가 순차 소비</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section compare">
+      <article class="panel">
+        <div class="badge bad">Current Risk</div>
+        <h2>현재 애매한 형태</h2>
+        <pre><code>struct JDrawItem
+{
+    JEntityHandle entity;
+    JRenderObjectHandle renderObject;
+    uint32 materialID;
+    const JMesh* mesh;
+
+    const JMeshResource* meshResource;
+    const JMaterialResource* materialResource;
+    const JTransformResource* transformResource;
+    bool transparent;
+};</code></pre>
+        <ul>
+          <li>DrawItem 배열 자체는 연속적이다.</li>
+          <li>하지만 resource pointer를 따라가면 랜덤 접근이 생긴다.</li>
+          <li>lifetime도 RenderDB 소유권과 섞여 보인다.</li>
+          <li>big buffer로 가면 포인터보다 offset/index가 맞다.</li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <div class="badge good">Target</div>
+        <h2>목표 DrawItem</h2>
+        <pre><code>struct JDrawItem
+{
+    uint64 sortKey = 0;
+
+    uint32 meshResourceIndex = INVALID_INDEX;
+    uint32 materialResourceIndex = INVALID_INDEX;
+    uint32 transformResourceIndex = INVALID_INDEX;
+
+    uint32 perObjectOffset = 0;
+    uint32 perMaterialOffset = 0;
+
+    uint32 indexStart = 0;
+    uint32 indexCount = 0;
+    int32 vertexBase = 0;
+
+    uint8 passMask = 0;
+};</code></pre>
+        <ul>
+          <li>Scene pointer 없음.</li>
+          <li>GPU resource pointer 없음.</li>
+          <li>정렬과 batching 기준을 가진다.</li>
+          <li>Renderer hot path에서 순차 처리하기 좋다.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section panel">
+      <h2>책임 분리</h2>
+      <div class="rule">
+        <div class="mini">
+          <strong>Scene</strong><br>
+          CPU 원본 상태만 보관한다. 에디터 입력과 게임 로직은 여기 데이터를 바꾼다.
+        </div>
+        <div class="mini">
+          <strong>Snapshot</strong><br>
+          한 프레임에 필요한 렌더 입력을 고정한다. GPU 리소스는 들지 않는다.
+        </div>
+        <div class="mini">
+          <strong>RenderDB</strong><br>
+          GPU 리소스와 dense resource table을 소유한다. Scene은 보지 않는다.
+        </div>
+        <div class="mini">
+          <strong>Renderer</strong><br>
+          DrawItem list를 순차 소비한다. Scene query와 unordered lookup을 피한다.
+        </div>
+      </div>
+    </section>
+
+    <section class="section grid two">
+      <article class="panel">
+        <h2>RenderObject 최종 방향</h2>
+        <p>렌더 경로에서 entity를 통해 transform을 다시 찾지 않도록 render object가 transform handle을 직접 가진다.</p>
+        <div class="stack">
+          <div class="mini"><strong>현재</strong><br><code>RenderObject -> entity -> transform lookup</code></div>
+          <div class="mini"><strong>목표</strong><br><code>RenderObject -> transformHandle</code></div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Sort Key 방향</h2>
+        <p>Opaque는 state change 감소가 우선이고, Transparent는 거리 정렬이 우선이다.</p>
+        <div class="stack">
+          <div class="mini"><strong>Opaque</strong><br><code>pipeline -> material -> mesh</code></div>
+          <div class="mini"><strong>Transparent</strong><br><code>distance back-to-front</code></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section panel">
+      <h2>권장 리팩토링 순서</h2>
+      <div class="timeline">
+        <div class="step">
+          <h3>RenderObjectData에 transform handle 추가</h3>
+          <p>Scene 이후 렌더 경로에서 entity lookup을 줄이는 가장 작은 DOD 개선이다.</p>
+        </div>
+        <div class="step">
+          <h3>JFrameSnapshot에서 DrawItem 분리</h3>
+          <p>Snapshot은 CPU 렌더 입력, DrawList는 렌더 실행 목록으로 책임을 나눈다.</p>
+        </div>
+        <div class="step">
+          <h3>JDrawItem을 pointer-free index 기반으로 전환</h3>
+          <p>RenderDB resource pointer 대신 dense resource index와 sortKey를 보관한다.</p>
+        </div>
+        <div class="step">
+          <h3>FrameDesc vector copy 제거</h3>
+          <p>DrawItem list를 복사하지 말고 view/reference로 Renderer에 전달한다.</p>
+        </div>
+        <div class="step">
+          <h3>Transform constant buffer부터 big buffer화</h3>
+          <p>DrawItem의 transform index가 per-object offset으로 자연스럽게 이어진다.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

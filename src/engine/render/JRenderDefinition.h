@@ -51,7 +51,7 @@ struct JVertexBuffer : public JInstantiable
 
 struct JIndexBuffer : public JInstantiable
 {
-	ID3D12Resource* buffer;
+	ID3D12Resource* buffer = nullptr;
 	D3D12_INDEX_BUFFER_VIEW view;
 
 	void Destroy()
@@ -66,7 +66,7 @@ struct JIndexBuffer : public JInstantiable
 
 struct JConstantBuffer : public JInstantiable
 {
-	ID3D12Resource* buffer;
+	ID3D12Resource* buffer = nullptr;
 
 	void Destroy()
 	{

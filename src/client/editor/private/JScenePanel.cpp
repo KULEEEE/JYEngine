@@ -111,13 +111,6 @@ JScenePanel::~JScenePanel()
 			renderServer->UnregisterMaterial(_editorGridMaterial->instanceID);
 		}
 	}
-
-	if (_cameraInfoWindow != nullptr)
-	{
-		DestroyWindow(_cameraInfoWindow);
-		_cameraInfoWindow = nullptr;
-		_cameraInfoText = nullptr;
-	}
 }
 
 Engine::JScene* JScenePanel::getScene()
@@ -173,8 +166,6 @@ void JScenePanel::Init()
 		renderer->SetRenderPath(Engine::JRenderer::RenderPath::Deferred);
 	}
 
-	createCameraInfoPanel();
-	updateCameraInfoPanel();
 	_lastUpdateTime = std::chrono::steady_clock::now();
 	_isReady = true;
 }
@@ -229,7 +220,6 @@ void JScenePanel::Update()
 	renderServer->MarkCameraDirty(_sceneCamera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
-	updateCameraInfoPanel();
 
 	Render::JViewport viewport = { 0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight), 0, 1 };
 	D3D12_RECT rect = CD3DX12_RECT(0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight));
@@ -241,6 +231,7 @@ void JScenePanel::Update()
 		return;
 	}
 
+	populateDebugOverlay(frameDesc, deltaTime);
 	renderer->Render(frameDesc);
 }
 
@@ -486,71 +477,12 @@ void JScenePanel::updateSelectedObject(float deltaTime)
 	scene->SetTransformTranslation(transformHandle, transform.translation);
 }
 
-#pragma region Debug Panel
-
-void JScenePanel::createCameraInfoPanel()
-{
-	if (_mainWindow == nullptr || _cameraInfoWindow != nullptr)
-	{
-		return;
-	}
-
-	RECT mainRect{};
-	GetWindowRect(_mainWindow, &mainRect);
-
-	_cameraInfoWindow = CreateWindowExW(
-		WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
-		L"STATIC",
-		L"Camera Info",
-		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
-		mainRect.right + 16,
-		mainRect.top,
-		360,
-		460,
-		_mainWindow,
-		nullptr,
-		GetModuleHandleW(nullptr),
-		nullptr);
-
-	if (_cameraInfoWindow == nullptr)
-	{
-		return;
-	}
-
-	_cameraInfoText = CreateWindowExW(
-		0,
-		L"STATIC",
-		L"",
-		WS_CHILD | WS_VISIBLE | SS_LEFT,
-		12,
-		12,
-		320,
-		400,
-		_cameraInfoWindow,
-		nullptr,
-		GetModuleHandleW(nullptr),
-		nullptr);
-
-	if (_cameraInfoText != nullptr)
-	{
-		HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-		SendMessageW(_cameraInfoText, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-	}
-}
-
-void JScenePanel::updateCameraInfoPanel()
+void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime)
 {
 	Engine::JScene* scene = getScene();
-	if (_cameraInfoWindow == nullptr || _cameraInfoText == nullptr || scene == nullptr || !_sceneCamera.IsValid())
+	if (scene == nullptr || !_sceneCamera.IsValid())
 	{
 		return;
-	}
-
-	if (_mainWindow != nullptr)
-	{
-		RECT mainRect{};
-		GetWindowRect(_mainWindow, &mainRect);
-		SetWindowPos(_cameraInfoWindow, HWND_TOPMOST, mainRect.right + 16, mainRect.top, 360, 460, SWP_NOACTIVATE);
 	}
 
 	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
@@ -562,83 +494,92 @@ void JScenePanel::updateCameraInfoPanel()
 
 	const Engine::JScene::TransformData transformData = scene->GetTransform(transformHandle);
 
-	std::wostringstream stream;
-	stream << std::fixed << std::setprecision(2);
-	stream << L"World Translate\n";
-	stream << L"X: " << transformData.translation.x << L"\n";
-	stream << L"Y: " << transformData.translation.y << L"\n";
-	stream << L"Z: " << transformData.translation.z << L"\n\n";
-	stream << L"World Rotation\n";
-	stream << L"X: " << wrapDegrees(toDegrees(transformData.rotation.x)) << L"\n";
-	stream << L"Y: " << wrapDegrees(toDegrees(transformData.rotation.y)) << L"\n";
-	stream << L"Z: " << wrapDegrees(toDegrees(transformData.rotation.z)) << L"\n\n";
-	stream << L"World Scale\n";
-	stream << L"X: " << transformData.scale.x << L"\n";
-	stream << L"Y: " << transformData.scale.y << L"\n";
-	stream << L"Z: " << transformData.scale.z << L"\n\n";
-	stream << L"Editor Camera\n";
-	stream << L"Base Speed: " << _editorCameraMoveSpeed << L"\n\n";
-	stream << L"Projection\n";
-	stream << L"Aspect: " << cameraData->aspectRatio << L"\n";
-	stream << L"Near: " << cameraData->nearP << L"\n";
-	stream << L"Far: " << cameraData->farP << L"\n\n";
+	uint32 lightCount = 0;
+	for (const Engine::JScene::LightSlot& slot : scene->GetLightSlots())
+	{
+		if (slot.active && slot.data.active)
+		{
+			++lightCount;
+		}
+	}
 
-	stream << L"Selected Object\n";
+	uint32 objectCount = 0;
+	for (const Engine::JScene::RenderObjectSlot& slot : scene->GetRenderObjectSlots())
+	{
+		if (slot.active && slot.data.active && slot.data.visible)
+		{
+			++objectCount;
+		}
+	}
+
+	const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
+	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
+	const Engine::JTransformHandle lightTransformHandle = lightData != nullptr ? scene->GetTransformHandle(lightData->entity) : Engine::JTransformHandle{};
+
+	std::ostringstream stream;
+	stream << std::fixed << std::setprecision(2);
+	stream << "FPS " << fps << "  DT " << (deltaTime * 1000.0f) << "MS";
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
+	stream.str("");
+	stream.clear();
+	stream << "DRAW O " << frameDesc.opaqueDrawItems.size()
+		<< "  T " << frameDesc.transparentDrawItems.size()
+		<< "  OBJ " << objectCount;
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
+	stream.str("");
+	stream.clear();
+	stream << "CAM POS "
+		<< transformData.translation.x << ", "
+		<< transformData.translation.y << ", "
+		<< transformData.translation.z;
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
+	stream.str("");
+	stream.clear();
+	stream << "CAM ROT "
+		<< wrapDegrees(toDegrees(transformData.rotation.x)) << ", "
+		<< wrapDegrees(toDegrees(transformData.rotation.y)) << ", "
+		<< wrapDegrees(toDegrees(transformData.rotation.z));
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
+	stream.str("");
+	stream.clear();
+	stream << "CAM SPEED " << _editorCameraMoveSpeed
+		<< "  NEAR " << (cameraData != nullptr ? cameraData->nearP : 0.0f)
+		<< "  FAR " << (cameraData != nullptr ? cameraData->farP : 0.0f);
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
 	if (_selectedEntity.IsValid())
 	{
 		const Engine::JTransformHandle selectedTransformHandle = scene->GetTransformHandle(_selectedEntity);
 		if (selectedTransformHandle.IsValid())
 		{
 			const Engine::JScene::TransformData selectedTransform = scene->GetTransform(selectedTransformHandle);
-			stream << L"Move: J/L X, U/O Y, I/K Z\n";
-			stream << L"Pos: "
-				<< selectedTransform.translation.x << L", "
-				<< selectedTransform.translation.y << L", "
-				<< selectedTransform.translation.z << L"\n\n";
+			stream.str("");
+			stream.clear();
+			stream << "SEL POS "
+				<< selectedTransform.translation.x << ", "
+				<< selectedTransform.translation.y << ", "
+				<< selectedTransform.translation.z
+				<< "  JLIK UO";
+			frameDesc.debugOverlayLines.push_back(stream.str());
 		}
-		else
-		{
-			stream << L"Missing transform\n\n";
-		}
-	}
-	else
-	{
-		stream << L"None\n\n";
 	}
 
-	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
-	const Engine::JTransformHandle lightTransformHandle = lightData != nullptr ? scene->GetTransformHandle(lightData->entity) : Engine::JTransformHandle{};
-	stream << L"Scene Light\n";
+	stream.str("");
+	stream.clear();
+	stream << "LIGHTS " << lightCount;
 	if (lightData != nullptr && lightTransformHandle.IsValid())
 	{
 		const Engine::JScene::TransformData lightTransformData = scene->GetTransform(lightTransformHandle);
-		uint32 lightCount = 0;
-		for (const Engine::JScene::LightSlot& slot : scene->GetLightSlots())
-		{
-			if (slot.active && slot.data.active)
-			{
-				++lightCount;
-			}
-		}
-		stream << L"Count: " << lightCount << L"\n";
-		stream << L"Pos: "
-			<< lightTransformData.translation.x << L", "
-			<< lightTransformData.translation.y << L", "
-			<< lightTransformData.translation.z << L"\n";
-		stream << L"Color: "
-			<< lightData->color.x << L", "
-			<< lightData->color.y << L", "
-			<< lightData->color.z << L"\n";
-		stream << L"Intensity: " << lightData->intensity << L"\n\n";
+		stream << "  FIRST "
+			<< lightTransformData.translation.x << ", "
+			<< lightTransformData.translation.y << ", "
+			<< lightTransformData.translation.z;
 	}
-	else
-	{
-		stream << L"Count: 0\n\n";
-	}
-
-	SetWindowTextW(_cameraInfoText, stream.str().c_str());
+	frameDesc.debugOverlayLines.push_back(stream.str());
 }
-
-#pragma endregion
 
 J_EDITOR_END

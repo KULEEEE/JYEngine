@@ -34,6 +34,7 @@ struct JFrameDesc
 	D3D12_RECT scissorRect = {};
 	std::vector<JDrawItem> opaqueDrawItems;
 	std::vector<JDrawItem> transparentDrawItems;
+	std::vector<std::string> debugOverlayLines;
 };
 
 J_ENGINE_END

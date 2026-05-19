@@ -166,9 +166,16 @@ public:
 			);
 		}
 
-		void* pData;
+		void* pData = nullptr;
 		D3D12_RANGE range = {};
-		buffer->buffer->Map(0, &range, &pData);
+		HRESULT hr = buffer->buffer->Map(0, &range, &pData);
+
+		if (FAILED(hr) || pData == nullptr)
+		{
+			std::cerr << "UpdateConstantBuffer map failed. HRESULT=0x"
+				<< std::hex << hr << std::dec << std::endl;
+			return;
+		}
 
 		::memset(pData, 0, bufferSize);
 		::memcpy(pData, data, size);
