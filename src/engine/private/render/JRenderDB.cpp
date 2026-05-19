@@ -4,7 +4,6 @@
 #include "engine/render/JRenderContext.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
-#include "engine/render/JMaterialResource.h"
 
 J_ENGINE_BEGIN
 
@@ -17,12 +16,54 @@ namespace
 		XMFLOAT4X4 world;
 	};
 
+	struct PerFrameConstants
+	{
+		XMFLOAT4X4 viewProjection;
+	};
+
 	struct LightConstants
 	{
 		JVec4 colorIntensities[MAX_RENDER_LIGHTS];
 		JVec4 positions[MAX_RENDER_LIGHTS];
 		JVec4 info;
 	};
+
+	void destroyConstantBuffer(Render::JConstantBuffer*& buffer)
+	{
+		if (buffer == nullptr)
+		{
+			return;
+		}
+
+		buffer->Destroy();
+		delete buffer;
+		buffer = nullptr;
+	}
+
+	void destroyMeshResource(JMeshResource& resource)
+	{
+		for (Render::JVertexBuffer* vertexBuffer : resource.vertexBuffers)
+		{
+			if (vertexBuffer != nullptr)
+			{
+				vertexBuffer->Destroy();
+				delete vertexBuffer;
+			}
+		}
+
+		if (resource.indexBufferResource != nullptr)
+		{
+			resource.indexBufferResource->Destroy();
+			delete resource.indexBufferResource;
+			resource.indexBufferResource = nullptr;
+		}
+
+		resource.vertexBuffers.clear();
+		resource.soaBuffers.clear();
+		resource.indexSize = 0;
+		resource.hasNormals = false;
+		resource.hasTexcoords = false;
+	}
 }
 
 JRenderDB::~JRenderDB()
@@ -55,7 +96,7 @@ JMaterialResource& JRenderDB::GetOrCreateMaterialResource(uint32 materialID)
 
 	MaterialResourceRecord record;
 	record.materialID = materialID;
-	record.resource = JMaterialResource(materialID);
+	record.resource.materialID = materialID;
 
 	const uint32 newIndex = static_cast<uint32>(_materialResources.size());
 	_materialResources.push_back(record);
@@ -185,29 +226,41 @@ const JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh) const
 void JRenderDB::SyncMaterial(const JMaterial& material)
 {
 	JMaterialResource& resource = GetOrCreateMaterialResource(material.instanceID);
-	resource.ClearBindings();
-	resource.SetShader(material.GetShader());
-	resource.SetPipeline(material.GetPipeline());
+	resource.shader = material.GetShader();
+	resource.pipeline = material.GetPipeline();
+	resource.constantBuffers.clear();
+	resource.textures.clear();
 
 	for (const JMaterial::ConstantBufferParam& param : material.GetConstantBuffers())
 	{
-		resource.SetConstantBuffer(param.name, param.buffer);
+		resource.constantBuffers.push_back({ param.name, param.nameHash, param.buffer });
 	}
 
 	for (const JMaterial::TextureParam& param : material.GetTextures())
 	{
-		resource.SetTexture(param.name, param.texture);
+		resource.textures.push_back({ param.name, param.nameHash, param.texture });
 	}
-
-	resource.ClearDirty();
 }
 
 void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer)
 {
+	if (_renderContext == nullptr || !camera.IsValid())
+	{
+		return;
+	}
+
 	JCameraResource& resource = GetOrCreateCameraResource(camera);
 	resource.camera = camera;
 	resource.perFrameBuffer = perFrameBuffer;
-	XMStoreFloat4x4(&resource.viewProjection, XMMatrixTranspose(viewProjection));
+
+	if (resource.perFrameBuffer == nullptr)
+	{
+		return;
+	}
+
+	PerFrameConstants constants{};
+	XMStoreFloat4x4(&constants.viewProjection, XMMatrixTranspose(viewProjection));
+	_renderContext->UpdateConstantBuffer(resource.perFrameBuffer, &constants, sizeof(constants));
 }
 
 void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
@@ -219,10 +272,9 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 
 	JTransformResource& resource = GetOrCreateTransformResource(transform);
 	resource.transform = transform;
-	XMStoreFloat4x4(&resource.world, XMMatrixTranspose(world));
 
 	PerObjectConstants constants{};
-	constants.world = resource.world;
+	XMStoreFloat4x4(&constants.world, XMMatrixTranspose(world));
 	if (resource.perObjectBuffer == nullptr)
 	{
 		resource.perObjectBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
@@ -241,30 +293,13 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 
 	JLightResource& resource = GetOrCreateLightResource();
 	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
-	resource.colorIntensities.clear();
-	resource.positions.clear();
-	resource.colorIntensities.reserve(resource.lightCount);
-	resource.positions.reserve(resource.lightCount);
-
-	for (uint32 i = 0; i < resource.lightCount; ++i)
-	{
-		const JLightSnapshotItem& item = snapshot.items[i];
-		resource.colorIntensities.push_back(item.colorIntensity);
-		resource.positions.push_back(item.position);
-	}
-
-	resource.colorIntensity = snapshot.items.empty()
-		? JVec4(1.0f, 1.0f, 1.0f, 0.0f)
-		: snapshot.items.front().colorIntensity;
-	resource.positionCount = snapshot.items.empty()
-		? JVec4(0.0f, 4.0f, -4.0f, 0.0f)
-		: JVec4(snapshot.items.front().position.x, snapshot.items.front().position.y, snapshot.items.front().position.z, static_cast<float>(resource.lightCount));
 
 	LightConstants constants{};
 	for (uint32 i = 0; i < resource.lightCount; ++i)
 	{
-		constants.colorIntensities[i] = resource.colorIntensities[i];
-		constants.positions[i] = resource.positions[i];
+		const JLightSnapshotItem& item = snapshot.items[i];
+		constants.colorIntensities[i] = item.colorIntensity;
+		constants.positions[i] = item.position;
 	}
 	constants.info = JVec4(static_cast<float>(resource.lightCount), 0.0f, 0.0f, 0.0f);
 
@@ -380,7 +415,7 @@ void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 		return;
 	}
 
-	delete _transformResources[index].resource.perObjectBuffer;
+	destroyConstantBuffer(_transformResources[index].resource.perObjectBuffer);
 
 	const uint32 lastIndex = static_cast<uint32>(_transformResources.size() - 1);
 	if (index != lastIndex)
@@ -401,31 +436,64 @@ void JRenderDB::RemoveMeshResource(const JMesh* mesh)
 		return;
 	}
 
-	for (Render::JVertexBuffer* vertexBuffer : iter->second.vertexBuffers)
-	{
-		delete vertexBuffer;
-	}
-	delete iter->second.indexBufferResource;
+	destroyMeshResource(iter->second);
 	_meshResources.erase(iter);
+}
+
+void JRenderDB::PruneUnusedSceneResources(
+	const std::unordered_set<uint64>& activeCameraKeys,
+	const std::unordered_set<uint64>& activeTransformKeys,
+	const std::unordered_set<const JMesh*>& activeMeshes)
+{
+	for (uint32 index = 0; index < _cameraResources.size();)
+	{
+		if (activeCameraKeys.find(_cameraResources[index].cameraKey) != activeCameraKeys.end())
+		{
+			++index;
+			continue;
+		}
+
+		const JCameraHandle camera = _cameraResources[index].resource.camera;
+		RemoveCameraResource(camera);
+	}
+
+	for (uint32 index = 0; index < _transformResources.size();)
+	{
+		if (activeTransformKeys.find(_transformResources[index].transformKey) != activeTransformKeys.end())
+		{
+			++index;
+			continue;
+		}
+
+		const JTransformHandle transform = _transformResources[index].resource.transform;
+		RemoveTransformResource(transform);
+	}
+
+	for (auto iter = _meshResources.begin(); iter != _meshResources.end();)
+	{
+		if (activeMeshes.find(iter->first) != activeMeshes.end())
+		{
+			++iter;
+			continue;
+		}
+
+		destroyMeshResource(iter->second);
+		iter = _meshResources.erase(iter);
+	}
 }
 
 void JRenderDB::Clear()
 {
 	for (auto& iter : _meshResources)
 	{
-		for (Render::JVertexBuffer* vertexBuffer : iter.second.vertexBuffers)
-		{
-			delete vertexBuffer;
-		}
-		delete iter.second.indexBufferResource;
+		destroyMeshResource(iter.second);
 	}
 
 	for (TransformResourceRecord& record : _transformResources)
 	{
-		delete record.resource.perObjectBuffer;
+		destroyConstantBuffer(record.resource.perObjectBuffer);
 	}
-	delete _lightResource.lightBuffer;
-	_lightResource.lightBuffer = nullptr;
+	destroyConstantBuffer(_lightResource.lightBuffer);
 
 	_meshResources.clear();
 	_materialResources.clear();
@@ -446,12 +514,12 @@ bool JRenderDB::BuildGraphicResource(uint32 materialID, Render::JShader* shader,
 
 	outResource.SetShader(shader);
 
-	for (const JMaterialResource::ConstantBufferEntry& entry : materialResource->GetConstantBuffers())
+	for (const JMaterialResource::ConstantBufferEntry& entry : materialResource->constantBuffers)
 	{
 		outResource.SetConstantBuffer(entry.nameHash, entry.buffer, entry.name);
 	}
 
-	for (const JMaterialResource::TextureEntry& entry : materialResource->GetTextures())
+	for (const JMaterialResource::TextureEntry& entry : materialResource->textures)
 	{
 		outResource.SetTexture(entry.nameHash, entry.texture, entry.name);
 	}

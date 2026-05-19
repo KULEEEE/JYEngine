@@ -5,7 +5,6 @@
 #include "engine/precompile.h"
 #include "engine/render/JRenderDefinition.h"
 #include "engine/render/JRenderResource.h"
-#include "engine/render/JMaterialResource.h"
 #include "engine/scene/JScene.h"
 
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }

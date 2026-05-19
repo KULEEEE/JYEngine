@@ -3,7 +3,6 @@
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
-#include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderContext.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"

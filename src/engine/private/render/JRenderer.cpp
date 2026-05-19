@@ -14,14 +14,6 @@
 
 J_ENGINE_BEGIN
 
-namespace
-{
-	struct PerFrameConstants
-	{
-		XMFLOAT4X4 viewProjection;
-	};
-}
-
 JRenderer::~JRenderer() = default;
 
 void JRenderer::InitializeDefaultPasses()
@@ -115,10 +107,6 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 		std::cerr << "JRenderer::Render skipped: camera resource is not ready." << std::endl;
 		return;
 	}
-
-	PerFrameConstants perFrameConstants{};
-	perFrameConstants.viewProjection = cameraResource->viewProjection;
-	_renderContext->UpdateConstantBuffer(cameraResource->perFrameBuffer, &perFrameConstants, sizeof(perFrameConstants));
 
 	JRenderPassContext context;
 	context.commandQueue = _commandQueue;

@@ -75,6 +75,11 @@ namespace
 		const float farPlane = std::max(nearPlane + 0.001f, cameraData->farP);
 		return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, nearPlane, farPlane);
 	}
+
+	uint64 makeTransformKey(JTransformHandle transform)
+	{
+		return (static_cast<uint64>(transform.generation) << 32) | transform.index;
+	}
 }
 
 uint64 JRenderServer::MakeCameraKey(JCameraHandle camera)
@@ -277,6 +282,22 @@ void JRenderServer::SyncScene(JScene& scene)
 	_frameSnapshot.opaqueDrawItems.clear();
 	_frameSnapshot.transparentDrawItems.clear();
 
+	std::unordered_set<uint64> activeCameraKeys;
+	std::unordered_set<uint64> activeTransformKeys;
+	std::unordered_set<const JMesh*> activeMeshes;
+
+	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
+	for (uint32 transformIndex = 0; transformIndex < transformSlots.size(); ++transformIndex)
+	{
+		const JTransformPool::SlotType& slot = transformSlots[transformIndex];
+		if (!slot.active)
+		{
+			continue;
+		}
+
+		activeTransformKeys.insert(makeTransformKey({ transformIndex, slot.generation }));
+	}
+
 	for (uint64 cameraKey : _dirtyCameraKeys)
 	{
 		for (const CameraRecord& record : _cameras)
@@ -291,6 +312,7 @@ void JRenderServer::SyncScene(JScene& scene)
 				break;
 			}
 
+			activeCameraKeys.insert(MakeCameraKey(record.camera));
 			const XMMATRIX viewProjection = makeViewMatrix(scene, record.camera) * makeProjectionMatrix(scene, record.camera);
 			_frameSnapshot.cameras.push_back({ record.camera, viewProjection, record.perFrameBuffer });
 			_renderDB.SyncCamera(record.camera, viewProjection, record.perFrameBuffer);
@@ -301,7 +323,6 @@ void JRenderServer::SyncScene(JScene& scene)
 	_dirtyCameraKeys.clear();
 
 	const std::vector<uint32> dirtyTransformIndices = scene.ConsumeDirtyTransformIndices();
-	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
 	for (uint32 transformIndex : dirtyTransformIndices)
 	{
 		if (transformIndex >= transformSlots.size())
@@ -331,6 +352,7 @@ void JRenderServer::SyncScene(JScene& scene)
 			continue;
 		}
 
+		activeMeshes.insert(slot.data.mesh);
 		_frameSnapshot.renderObjects.push_back({
 			slot.data.entity,
 			{ static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation },
@@ -402,6 +424,16 @@ void JRenderServer::SyncScene(JScene& scene)
 		_frameSnapshot.lights.push_back(snapshot);
 		_renderDB.SyncLight(snapshot);
 	}
+
+	for (const CameraRecord& record : _cameras)
+	{
+		if (scene.GetCamera(record.camera) != nullptr)
+		{
+			activeCameraKeys.insert(MakeCameraKey(record.camera));
+		}
+	}
+
+	_renderDB.PruneUnusedSceneResources(activeCameraKeys, activeTransformKeys, activeMeshes);
 }
 
 bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const

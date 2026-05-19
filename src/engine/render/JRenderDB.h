@@ -3,7 +3,6 @@
 #define __J_RENDER_DB_H__
 
 #include "engine/precompile.h"
-#include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderResource.h"
 #include "engine/render/JRenderSnapshot.h"
 #include "engine/scene/JScene.h"
@@ -61,6 +60,10 @@ public:
 	void RemoveCameraResource(JCameraHandle camera);
 	void RemoveTransformResource(JTransformHandle transform);
 	void RemoveMeshResource(const JMesh* mesh);
+	void PruneUnusedSceneResources(
+		const std::unordered_set<uint64>& activeCameraKeys,
+		const std::unordered_set<uint64>& activeTransformKeys,
+		const std::unordered_set<const JMesh*>& activeMeshes);
 	void Clear();
 
 	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;

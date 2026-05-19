@@ -3,7 +3,6 @@
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
-#include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"
 
@@ -47,14 +46,14 @@ void JForwardOverlayPass::RenderDrawItem(const JRenderPassContext& context, JCam
 
 	const JMeshResource* meshResource = drawItem.meshResource;
 	const JMaterialResource* materialResource = drawItem.materialResource;
-	if (meshResource == nullptr || materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
+	if (meshResource == nullptr || materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		return;
 	}
 
-	Render::JGraphicResource graphicResource(materialResource->GetShader());
-	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->GetShader(), graphicResource))
+	Render::JGraphicResource graphicResource(materialResource->shader);
+	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
 	{
 		++_lastStats.skippedDrawCount;
 		return;
@@ -72,7 +71,7 @@ void JForwardOverlayPass::RenderDrawItem(const JRenderPassContext& context, JCam
 		graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
 	}
 
-	context.commandQueue->SetPipeline(materialResource->GetPipeline());
+	context.commandQueue->SetPipeline(materialResource->pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);
 	context.commandQueue->BindVertexBuffer(meshResource);
 	context.commandQueue->DrawIndexed(static_cast<uint32>(meshResource->indexSize), 1, 0, 0, 0);

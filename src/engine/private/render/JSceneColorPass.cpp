@@ -2,7 +2,6 @@
 
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JGraphicResource.h"
-#include "engine/render/JMaterialResource.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"
 
@@ -56,15 +55,15 @@ void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, JCameraH
 	}
 
 	const JMaterialResource* materialResource = drawItem.materialResource;
-	if (materialResource == nullptr || materialResource->GetShader() == nullptr || materialResource->GetPipeline() == nullptr)
+	if (materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		std::cerr << GetName() << " draw skipped: material render data is incomplete." << std::endl;
 		return;
 	}
 
-	Render::JGraphicResource graphicResource(materialResource->GetShader());
-	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->GetShader(), graphicResource))
+	Render::JGraphicResource graphicResource(materialResource->shader);
+	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
 	{
 		++_lastStats.skippedDrawCount;
 		std::cerr << GetName() << " draw skipped: failed to build graphic resource." << std::endl;
@@ -92,7 +91,7 @@ void JSceneColorPass::RenderDrawItem(const JRenderPassContext& context, JCameraH
 		}
 	}
 
-	context.commandQueue->SetPipeline(materialResource->GetPipeline());
+	context.commandQueue->SetPipeline(materialResource->pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);
 	context.commandQueue->BindVertexBuffer(meshResource);
 	context.commandQueue->DrawIndexed(static_cast<uint32>(meshResource->indexSize), 1, 0, 0, 0);

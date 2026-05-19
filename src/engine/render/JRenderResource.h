@@ -6,29 +6,51 @@
 #include "engine/render/JRenderDefinition.h"
 #include "engine/scene/JSceneHandle.h"
 
+namespace J::Render
+{
+	class JShader;
+}
+
 J_ENGINE_BEGIN
+
+struct JMaterialResource
+{
+	struct ConstantBufferEntry
+	{
+		std::string name;
+		uint32 nameHash = 0;
+		Render::JConstantBuffer* buffer = nullptr;
+	};
+
+	struct TextureEntry
+	{
+		std::string name;
+		uint32 nameHash = 0;
+		Render::JTexture* texture = nullptr;
+	};
+
+	uint32 materialID = 0;
+	Render::JShader* shader = nullptr;
+	Render::JPipeline* pipeline = nullptr;
+	std::vector<ConstantBufferEntry> constantBuffers;
+	std::vector<TextureEntry> textures;
+};
 
 struct JCameraResource
 {
 	JCameraHandle camera = {};
-	XMFLOAT4X4 viewProjection = {};
 	Render::JConstantBuffer* perFrameBuffer = nullptr;
 };
 
 struct JTransformResource
 {
 	JTransformHandle transform = {};
-	XMFLOAT4X4 world = {};
 	Render::JConstantBuffer* perObjectBuffer = nullptr;
 };
 
 struct JLightResource
 {
 	Render::JConstantBuffer* lightBuffer = nullptr;
-	JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
-	JVec4 positionCount = { 0.0f, 4.0f, -4.0f, 0.0f };
-	std::vector<JVec4> colorIntensities;
-	std::vector<JVec4> positions;
 	uint32 lightCount = 0;
 };
 
