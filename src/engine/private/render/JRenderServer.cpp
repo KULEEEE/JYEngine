@@ -167,7 +167,7 @@ void JRenderServer::UnregisterMaterial(uint32 materialID)
 	_renderDB.RemoveMaterialResource(materialID);
 }
 
-void JRenderServer::RegisterCamera(JCameraHandle camera, Render::JConstantBuffer* perFrameBuffer)
+void JRenderServer::RegisterCamera(JCameraHandle camera)
 {
 	if (!camera.IsValid())
 	{
@@ -176,14 +176,12 @@ void JRenderServer::RegisterCamera(JCameraHandle camera, Render::JConstantBuffer
 
 	if (FindCameraIndex(camera) != static_cast<uint32>(-1))
 	{
-		CameraRecord* record = FindCameraRecord(camera);
-		record->perFrameBuffer = perFrameBuffer;
 		MarkCameraDirty(camera);
 		return;
 	}
 
 	const uint32 newIndex = static_cast<uint32>(_cameras.size());
-	_cameras.push_back({ camera, perFrameBuffer });
+	_cameras.push_back({ camera });
 	_cameraIndexMap[MakeCameraKey(camera)] = newIndex;
 	MarkCameraDirty(camera);
 }
@@ -314,8 +312,8 @@ void JRenderServer::SyncScene(JScene& scene)
 
 			activeCameraKeys.insert(MakeCameraKey(record.camera));
 			const XMMATRIX viewProjection = makeViewMatrix(scene, record.camera) * makeProjectionMatrix(scene, record.camera);
-			_frameSnapshot.cameras.push_back({ record.camera, viewProjection, record.perFrameBuffer });
-			_renderDB.SyncCamera(record.camera, viewProjection, record.perFrameBuffer);
+			_frameSnapshot.cameras.push_back({ record.camera, viewProjection });
+			_renderDB.SyncCamera(record.camera, viewProjection);
 			break;
 		}
 	}

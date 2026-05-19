@@ -9,7 +9,6 @@
 #include "engine/render/JRenderer.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
-/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JConstantBuffer; } }
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 
 J_ENGINE_BEGIN
@@ -26,7 +25,6 @@ public:
 	struct CameraRecord
 	{
 		JCameraHandle camera = {};
-		Render::JConstantBuffer* perFrameBuffer = nullptr;
 	};
 
 	JRenderServer() = default;
@@ -38,7 +36,7 @@ public:
 	void RegisterMaterial(JMaterial* material);
 	void UnregisterMaterial(uint32 materialID);
 	void MarkMaterialDirty(JMaterial* material);
-	void RegisterCamera(JCameraHandle camera, Render::JConstantBuffer* perFrameBuffer);
+	void RegisterCamera(JCameraHandle camera);
 	void UnregisterCamera(JCameraHandle camera);
 	void MarkCameraDirty(JCameraHandle camera);
 	void Sync();

@@ -85,9 +85,27 @@ public:
 		return iBuffer;
 	}
 	
-	void DestroyVertexBuffer(JVertexBuffer* buffer) { delete buffer; }
+	void DestroyVertexBuffer(JVertexBuffer* buffer)
+	{
+		if (buffer == nullptr)
+		{
+			return;
+		}
 
-	void DestroyIndexBuffer(JIndexBuffer* buffer) { delete buffer; }
+		buffer->Destroy();
+		delete buffer;
+	}
+
+	void DestroyIndexBuffer(JIndexBuffer* buffer)
+	{
+		if (buffer == nullptr)
+		{
+			return;
+		}
+
+		buffer->Destroy();
+		delete buffer;
+	}
 
 	JConstantBuffer* CreateConstantBuffer(void* buffer, size_t size)
 	{
@@ -156,6 +174,17 @@ public:
 		::memcpy(pData, data, size);
 
 		buffer->buffer->Unmap(0, nullptr);
+	}
+
+	void DestroyConstantBuffer(JConstantBuffer* buffer)
+	{
+		if (buffer == nullptr)
+		{
+			return;
+		}
+
+		buffer->Destroy();
+		delete buffer;
 	}
 
 	JTexture* CreateSolidColorTexture(const JColor& color)
@@ -326,6 +355,17 @@ public:
 
 		texture->samplerHeap = nullptr;
 		return texture;
+	}
+
+	void DestroyTexture(JTexture* texture)
+	{
+		if (texture == nullptr)
+		{
+			return;
+		}
+
+		texture->Destroy();
+		delete texture;
 	}
 	JTexture* CreateTextureFromFile(const std::string& path)
 	{

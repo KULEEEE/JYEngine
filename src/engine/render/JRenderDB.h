@@ -52,7 +52,7 @@ public:
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
-	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer);
+	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
 	void SyncLight(const JLightSnapshot& snapshot);
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);

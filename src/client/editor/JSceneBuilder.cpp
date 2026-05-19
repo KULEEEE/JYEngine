@@ -9,11 +9,6 @@ J_EDITOR_BEGIN
 
 namespace
 {
-	struct PerFrameConstants
-	{
-		XMFLOAT4X4 viewProjection;
-	};
-
 	Engine::JScene::TransformData toRuntimeTransform(const Engine::JSceneTransformData& source)
 	{
 		Engine::JScene::TransformData transform{};
@@ -81,23 +76,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 	JSceneBuildResult result;
 	result.scene = std::make_unique<Engine::JScene>();
 
-	PerFrameConstants perFrameConstants{};
-	XMStoreFloat4x4(&perFrameConstants.viewProjection, XMMatrixIdentity());
-	Render::JConstantBuffer* perFrameBuffer = context.materialFactory->CreateConstantBuffer(&perFrameConstants, sizeof(perFrameConstants));
-	if (perFrameBuffer == nullptr)
-	{
-		std::cerr << "JSceneBuilder::Build failed: per-frame buffer creation failed." << std::endl;
-		return false;
-	}
-	result.constantBuffers.emplace_back(perFrameBuffer, [](Render::JConstantBuffer* ptr)
-	{
-		if (ptr != nullptr)
-		{
-			ptr->Destroy();
-			delete ptr;
-		}
-	});
-
 	std::unordered_map<std::string, Engine::JMaterial*> materialLookup;
 	for (const Engine::JSceneMaterialData& materialData : sceneData.materials)
 	{
@@ -129,8 +107,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			result.Release(context.renderServer);
 			return false;
 		}
-
-		materialBundle->material->SetConstantBuffer("PerFrame", perFrameBuffer);
 
 		context.renderServer->RegisterMaterial(materialBundle->material.get());
 		result.materialIDs[materialData.id] = materialBundle->material->instanceID;
@@ -246,7 +222,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		
 			result.cameras[entityKey] = camera;
 			result.registeredCameras.push_back(camera);
-			context.renderServer->RegisterCamera(camera, perFrameBuffer);
+			context.renderServer->RegisterCamera(camera);
 
 			if (entityData.camera.primary || !result.primaryCamera.IsValid())
 			{

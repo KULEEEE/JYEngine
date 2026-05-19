@@ -28,23 +28,34 @@ namespace
 		JVec4 info;
 	};
 
-	void destroyConstantBuffer(Render::JConstantBuffer*& buffer)
+	void destroyConstantBuffer(Render::JRenderContext* renderContext, Render::JConstantBuffer*& buffer)
 	{
 		if (buffer == nullptr)
 		{
 			return;
 		}
 
-		buffer->Destroy();
-		delete buffer;
+		if (renderContext != nullptr)
+		{
+			renderContext->DestroyConstantBuffer(buffer);
+		}
+		else
+		{
+			buffer->Destroy();
+			delete buffer;
+		}
 		buffer = nullptr;
 	}
 
-	void destroyMeshResource(JMeshResource& resource)
+	void destroyMeshResource(Render::JRenderContext* renderContext, JMeshResource& resource)
 	{
 		for (Render::JVertexBuffer* vertexBuffer : resource.vertexBuffers)
 		{
-			if (vertexBuffer != nullptr)
+			if (renderContext != nullptr)
+			{
+				renderContext->DestroyVertexBuffer(vertexBuffer);
+			}
+			else if (vertexBuffer != nullptr)
 			{
 				vertexBuffer->Destroy();
 				delete vertexBuffer;
@@ -53,8 +64,15 @@ namespace
 
 		if (resource.indexBufferResource != nullptr)
 		{
-			resource.indexBufferResource->Destroy();
-			delete resource.indexBufferResource;
+			if (renderContext != nullptr)
+			{
+				renderContext->DestroyIndexBuffer(resource.indexBufferResource);
+			}
+			else
+			{
+				resource.indexBufferResource->Destroy();
+				delete resource.indexBufferResource;
+			}
 			resource.indexBufferResource = nullptr;
 		}
 
@@ -242,7 +260,7 @@ void JRenderDB::SyncMaterial(const JMaterial& material)
 	}
 }
 
-void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection, Render::JConstantBuffer* perFrameBuffer)
+void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection)
 {
 	if (_renderContext == nullptr || !camera.IsValid())
 	{
@@ -251,15 +269,15 @@ void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection,
 
 	JCameraResource& resource = GetOrCreateCameraResource(camera);
 	resource.camera = camera;
-	resource.perFrameBuffer = perFrameBuffer;
-
-	if (resource.perFrameBuffer == nullptr)
-	{
-		return;
-	}
 
 	PerFrameConstants constants{};
 	XMStoreFloat4x4(&constants.viewProjection, XMMatrixTranspose(viewProjection));
+	if (resource.perFrameBuffer == nullptr)
+	{
+		resource.perFrameBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
+		return;
+	}
+
 	_renderContext->UpdateConstantBuffer(resource.perFrameBuffer, &constants, sizeof(constants));
 }
 
@@ -340,10 +358,10 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	Render::JIndexBuffer* indexBuffer = _renderContext->CreateIndexBuffer(mesh->GetIndices());
 	if (vertexBuffer == nullptr || indexBuffer == nullptr)
 	{
-		delete vertexBuffer;
-		delete normalBuffer;
-		delete texcoordBuffer;
-		delete indexBuffer;
+		_renderContext->DestroyVertexBuffer(vertexBuffer);
+		_renderContext->DestroyVertexBuffer(normalBuffer);
+		_renderContext->DestroyVertexBuffer(texcoordBuffer);
+		_renderContext->DestroyIndexBuffer(indexBuffer);
 		return nullptr;
 	}
 
@@ -396,6 +414,8 @@ void JRenderDB::RemoveCameraResource(JCameraHandle camera)
 		return;
 	}
 
+	destroyConstantBuffer(_renderContext, _cameraResources[index].resource.perFrameBuffer);
+
 	const uint32 lastIndex = static_cast<uint32>(_cameraResources.size() - 1);
 	if (index != lastIndex)
 	{
@@ -415,7 +435,7 @@ void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 		return;
 	}
 
-	destroyConstantBuffer(_transformResources[index].resource.perObjectBuffer);
+	destroyConstantBuffer(_renderContext, _transformResources[index].resource.perObjectBuffer);
 
 	const uint32 lastIndex = static_cast<uint32>(_transformResources.size() - 1);
 	if (index != lastIndex)
@@ -436,7 +456,7 @@ void JRenderDB::RemoveMeshResource(const JMesh* mesh)
 		return;
 	}
 
-	destroyMeshResource(iter->second);
+	destroyMeshResource(_renderContext, iter->second);
 	_meshResources.erase(iter);
 }
 
@@ -477,7 +497,7 @@ void JRenderDB::PruneUnusedSceneResources(
 			continue;
 		}
 
-		destroyMeshResource(iter->second);
+		destroyMeshResource(_renderContext, iter->second);
 		iter = _meshResources.erase(iter);
 	}
 }
@@ -486,14 +506,14 @@ void JRenderDB::Clear()
 {
 	for (auto& iter : _meshResources)
 	{
-		destroyMeshResource(iter.second);
+		destroyMeshResource(_renderContext, iter.second);
 	}
 
 	for (TransformResourceRecord& record : _transformResources)
 	{
-		destroyConstantBuffer(record.resource.perObjectBuffer);
+		destroyConstantBuffer(_renderContext, record.resource.perObjectBuffer);
 	}
-	destroyConstantBuffer(_lightResource.lightBuffer);
+	destroyConstantBuffer(_renderContext, _lightResource.lightBuffer);
 
 	_meshResources.clear();
 	_materialResources.clear();

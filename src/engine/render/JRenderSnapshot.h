@@ -15,7 +15,6 @@ struct JCameraSnapshot
 {
 	JCameraHandle camera = {};
 	XMMATRIX viewProjection = XMMatrixIdentity();
-	Render::JConstantBuffer* perFrameBuffer = nullptr;
 };
 
 struct JTransformSnapshot
