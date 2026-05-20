@@ -15,7 +15,7 @@ J_ENGINE_BEGIN
 struct JDrawItem
 {
 	JEntityHandle entity = {};
-	JRenderObjectHandle renderObject = {};
+	JDrawComponentHandle drawComponent = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
 	uint32 subMeshIndex = 0;

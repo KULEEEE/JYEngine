@@ -276,7 +276,6 @@ void JRenderServer::SyncScene(JScene& scene)
 	_frameSnapshot.cameras.clear();
 	_frameSnapshot.transforms.clear();
 	_frameSnapshot.lights.clear();
-	_frameSnapshot.renderObjects.clear();
 	_frameSnapshot.opaqueDrawItems.clear();
 	_frameSnapshot.transparentDrawItems.clear();
 
@@ -343,7 +342,8 @@ void JRenderServer::SyncScene(JScene& scene)
 		_renderDB.SyncTransform(transformHandle, world);
 	}
 
-	for (const JScene::RenderObjectSlot& slot : scene.GetRenderObjectSlots())
+	const std::vector<JScene::DrawComponentSlot>& drawComponentSlots = scene.GetDrawComponentSlots();
+	for (const JScene::DrawComponentSlot& slot : drawComponentSlots)
 	{
 		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.mesh == nullptr)
 		{
@@ -357,37 +357,18 @@ void JRenderServer::SyncScene(JScene& scene)
 		}
 
 		activeMeshes.insert(slot.data.mesh);
-		_frameSnapshot.renderObjects.push_back({
-			slot.data.entity,
-			transform,
-			{ static_cast<uint32>(&slot - scene.GetRenderObjectSlots().data()), slot.generation },
-			slot.data.materialID,
-			slot.data.mesh,
-			slot.data.subMeshIndex,
-			slot.data.transparent,
-			slot.data.visible,
-			slot.data.active
-		});
 		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
-	}
-
-	for (const JRenderObjectSnapshot& snapshot : _frameSnapshot.renderObjects)
-	{
-		if (!snapshot.active || !snapshot.visible || snapshot.mesh == nullptr)
-		{
-			continue;
-		}
 
 		JRenderer::DrawItem drawItem;
-		drawItem.entity = snapshot.entity;
-		drawItem.renderObject = snapshot.renderObject;
-		drawItem.materialID = snapshot.materialID;
-		drawItem.mesh = snapshot.mesh;
-		drawItem.subMeshIndex = snapshot.subMeshIndex;
-		drawItem.meshResource = _renderDB.FindMeshResource(snapshot.mesh);
-		drawItem.materialResource = _renderDB.FindMaterialResource(snapshot.materialID);
-		drawItem.transformResource = _renderDB.FindTransformResource(snapshot.transform);
-		drawItem.transparent = snapshot.transparent;
+		drawItem.entity = slot.data.entity;
+		drawItem.drawComponent = { static_cast<uint32>(&slot - drawComponentSlots.data()), slot.generation };
+		drawItem.materialID = slot.data.materialID;
+		drawItem.mesh = slot.data.mesh;
+		drawItem.subMeshIndex = slot.data.subMeshIndex;
+		drawItem.meshResource = _renderDB.FindMeshResource(slot.data.mesh);
+		drawItem.materialResource = _renderDB.FindMaterialResource(slot.data.materialID);
+		drawItem.transformResource = _renderDB.FindTransformResource(transform);
+		drawItem.transparent = slot.data.transparent;
 
 		if (drawItem.meshResource == nullptr || drawItem.materialResource == nullptr || drawItem.transformResource == nullptr)
 		{

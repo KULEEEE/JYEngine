@@ -192,22 +192,22 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	return light;
 }
 
-JRenderObjectHandle JScene::AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent, uint32 subMeshIndex)
+JDrawComponentHandle JScene::AddDrawComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent, uint32 subMeshIndex)
 {
 	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
 	{
 		return {};
 	}
 
-	RenderObjectData data;
+	DrawComponentData data;
 	data.entity = entity;
 	data.mesh = mesh;
 	data.subMeshIndex = subMeshIndex;
 	data.materialID = materialID;
 	data.transparent = transparent;
-	const JRenderObjectHandle renderObject = _renderObjects.Add(entity, data);
-	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);
-	return renderObject;
+	const JDrawComponentHandle drawComponent = _drawComponents.Add(entity, data);
+	addEntityComponentMask(entity, JSceneComponentMask::DrawComponent);
+	return drawComponent;
 }
 
 JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
@@ -400,14 +400,14 @@ const JScene::LightData* JScene::GetLight(JLightHandle handle) const
 	return _lights.Get(handle);
 }
 
-JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle)
+JScene::DrawComponentData* JScene::GetDrawComponent(JDrawComponentHandle handle)
 {
-	return _renderObjects.Get(handle);
+	return _drawComponents.Get(handle);
 }
 
-const JScene::RenderObjectData* JScene::GetRenderObject(JRenderObjectHandle handle) const
+const JScene::DrawComponentData* JScene::GetDrawComponent(JDrawComponentHandle handle) const
 {
-	return _renderObjects.Get(handle);
+	return _drawComponents.Get(handle);
 }
 
 J_ENGINE_END

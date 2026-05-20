@@ -34,25 +34,11 @@ struct JLightSnapshot
 	std::vector<Item> items;
 };
 
-struct JRenderObjectSnapshot
-{
-	JEntityHandle entity = {};
-	JTransformHandle transform = {};
-	JRenderObjectHandle renderObject = {};
-	uint32 materialID = 0;
-	const JMesh* mesh = nullptr;
-	uint32 subMeshIndex = 0;
-	bool transparent = false;
-	bool visible = true;
-	bool active = true;
-};
-
 struct JFrameSnapshot
 {
 	std::vector<JCameraSnapshot> cameras;
 	std::vector<JTransformSnapshot> transforms;
 	std::vector<JLightSnapshot> lights;
-	std::vector<JRenderObjectSnapshot> renderObjects;
 	std::vector<JDrawItem> opaqueDrawItems;
 	std::vector<JDrawItem> transparentDrawItems;
 };

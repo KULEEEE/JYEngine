@@ -38,7 +38,7 @@ struct JLightHandle
 	bool IsValid() const { return index != static_cast<uint32>(-1); }
 };
 
-struct JRenderObjectHandle
+struct JDrawComponentHandle
 {
 	uint32 index = static_cast<uint32>(-1);
 	uint32 generation = 0;

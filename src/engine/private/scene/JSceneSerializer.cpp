@@ -224,25 +224,25 @@ namespace
 			data.light.intensity = light.value("intensity", data.light.intensity);
 		}
 
-		const json* materialComponent = nullptr;
-		if (value.contains("materialComponent") && value.at("materialComponent").is_object())
+		const json* drawComponent = nullptr;
+		if (value.contains("drawComponent") && value.at("drawComponent").is_object())
 		{
-			materialComponent = &value.at("materialComponent");
+			drawComponent = &value.at("drawComponent");
 		}
-		else if (value.contains("renderObject") && value.at("renderObject").is_object())
+		else if (value.contains("materialComponent") && value.at("materialComponent").is_object())
 		{
-			materialComponent = &value.at("renderObject");
+			drawComponent = &value.at("materialComponent");
 		}
 
-		if (materialComponent != nullptr)
+		if (drawComponent != nullptr)
 		{
-			data.hasMaterialComponent = true;
-			data.materialComponent.active = materialComponent->value("active", data.materialComponent.active);
-			data.materialComponent.visible = materialComponent->value("visible", data.materialComponent.visible);
-			data.materialComponent.transparent = materialComponent->value("transparent", data.materialComponent.transparent);
-			data.materialComponent.materialID = materialComponent->value("materialID", data.materialComponent.materialID);
-			data.materialComponent.meshID = materialComponent->value("meshID", data.materialComponent.meshID);
-			data.materialComponent.subMeshIndex = materialComponent->value("subMeshIndex", data.materialComponent.subMeshIndex);
+			data.hasDrawComponent = true;
+			data.drawComponent.active = drawComponent->value("active", data.drawComponent.active);
+			data.drawComponent.visible = drawComponent->value("visible", data.drawComponent.visible);
+			data.drawComponent.transparent = drawComponent->value("transparent", data.drawComponent.transparent);
+			data.drawComponent.materialID = drawComponent->value("materialID", data.drawComponent.materialID);
+			data.drawComponent.meshID = drawComponent->value("meshID", data.drawComponent.meshID);
+			data.drawComponent.subMeshIndex = drawComponent->value("subMeshIndex", data.drawComponent.subMeshIndex);
 		}
 
 		return data;
@@ -293,16 +293,16 @@ namespace
 			};
 		}
 
-		if (data.hasMaterialComponent)
+		if (data.hasDrawComponent)
 		{
-			value["materialComponent"] =
+			value["drawComponent"] =
 			{
-				{ "active", data.materialComponent.active },
-				{ "visible", data.materialComponent.visible },
-				{ "transparent", data.materialComponent.transparent },
-				{ "materialID", data.materialComponent.materialID },
-				{ "meshID", data.materialComponent.meshID },
-				{ "subMeshIndex", data.materialComponent.subMeshIndex },
+				{ "active", data.drawComponent.active },
+				{ "visible", data.drawComponent.visible },
+				{ "transparent", data.drawComponent.transparent },
+				{ "materialID", data.drawComponent.materialID },
+				{ "meshID", data.drawComponent.meshID },
+				{ "subMeshIndex", data.drawComponent.subMeshIndex },
 			};
 		}
 

@@ -73,7 +73,7 @@ struct JSceneLightData
 	float intensity = 1.0f;
 };
 
-struct JSceneMaterialComponentData
+struct JSceneDrawComponentData
 {
 	bool active = true;
 	bool visible = true;
@@ -99,8 +99,8 @@ struct JSceneEntityData
 	bool hasLight = false;
 	JSceneLightData light;
 
-	bool hasMaterialComponent = false;
-	JSceneMaterialComponentData materialComponent;
+	bool hasDrawComponent = false;
+	JSceneDrawComponentData drawComponent;
 };
 
 struct JSceneData

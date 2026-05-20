@@ -8,7 +8,7 @@
 #include "engine/scene/JComponentLayoutDefinition.h"
 #include "engine/scene/JCameraPool.h"
 #include "engine/scene/JLightPool.h"
-#include "engine/scene/JRenderObjectPool.h"
+#include "engine/scene/JDrawComponentPool.h"
 #include "engine/scene/JTransformPool.h"
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 
@@ -20,7 +20,7 @@ enum class JSceneComponentMask : uint32
 	Transform = 1 << 0,
 	Camera = 1 << 1,
 	Light = 1 << 2,
-	RenderObject = 1 << 3,
+	DrawComponent = 1 << 3,
 };
 
 struct JEntityMetadata
@@ -43,18 +43,18 @@ public:
 	using TransformData = JTransformComponents;
 	using CameraData = JCameraComponents;
 	using LightData = JLightComponents;
-	using RenderObjectData = JDrawComponent;
+	using DrawComponentData = JDrawComponent;
 
 	using EntityPool = JPool<JEntityHandle, EntityData>;
 	using TransformSlot = JTransformPool::SlotType;
 	using CameraPool = JCameraPool;
 	using LightPool = JLightPool;
-	using RenderObjectPool = JRenderObjectPool;
+	using DrawComponentPool = JDrawComponentPool;
 
 	using EntitySlot = EntityPool::SlotType;
 	using CameraSlot = CameraPool::SlotType;
 	using LightSlot = LightPool::SlotType;
-	using RenderObjectSlot = RenderObjectPool::SlotType;
+	using DrawComponentSlot = DrawComponentPool::SlotType;
 
 	JScene() = default;
 
@@ -62,7 +62,7 @@ public:
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
-	JRenderObjectHandle AddRenderObject(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false, uint32 subMeshIndex = 0);
+	JDrawComponentHandle AddDrawComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false, uint32 subMeshIndex = 0);
 
 	bool SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags = {});
 	void SetEntityName(JEntityHandle entity, const std::string& name);
@@ -104,14 +104,14 @@ public:
 	const CameraData* GetCamera(JCameraHandle handle) const;
 	LightData* GetLight(JLightHandle handle);
 	const LightData* GetLight(JLightHandle handle) const;
-	RenderObjectData* GetRenderObject(JRenderObjectHandle handle);
-	const RenderObjectData* GetRenderObject(JRenderObjectHandle handle) const;
+	DrawComponentData* GetDrawComponent(JDrawComponentHandle handle);
+	const DrawComponentData* GetDrawComponent(JDrawComponentHandle handle) const;
 
 	const std::vector<EntitySlot>& GetEntitySlots() const { return _entities.GetSlots(); }
 	const std::vector<TransformSlot>& GetTransformSlots() const { return _transforms.GetSlots(); }
 	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras.GetSlots(); }
 	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
-	const std::vector<RenderObjectSlot>& GetRenderObjectSlots() const { return _renderObjects.GetSlots(); }
+	const std::vector<DrawComponentSlot>& GetDrawComponentSlots() const { return _drawComponents.GetSlots(); }
 
 private:
 	std::string generateStableID();
@@ -121,7 +121,7 @@ private:
 	JTransformPool _transforms;
 	CameraPool _cameras;
 	LightPool _lights;
-	RenderObjectPool _renderObjects;
+	DrawComponentPool _drawComponents;
 	std::vector<JEntityMetadata> _entityMetadata;
 	std::vector<JTransformHandle> _entityTransformLookup;
 	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
