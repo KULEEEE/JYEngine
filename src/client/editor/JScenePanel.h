@@ -34,17 +34,17 @@ private:
 	const Engine::JScene* getScene() const;
 	void createEditorGrid();
 	void updateSceneCamera(float deltaTime);
-	void selectDefaultDrawComponent();
+	void selectDefaultRenderObject();
 	void updateSelectedObject(float deltaTime);
 	void populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime);
 	
 	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
 	Engine::JLightHandle _light = {};
-	Engine::JDrawComponentHandle _selectedDrawComponent = {};
+	Engine::JRenderObjectComponentHandle _selectedRenderObject = {};
 	Engine::JEntityHandle _selectedEntity = {};
 	Engine::JEntityHandle _editorGridEntity = {};
-	Engine::JDrawComponentHandle _editorGridDrawComponent = {};
+	Engine::JRenderObjectComponentHandle _editorGridRenderObject = {};
 	std::unique_ptr<Engine::JMaterial> _editorGridMaterial;
 	std::unique_ptr<Engine::JMesh> _editorGridMesh;
 	bool _isMouseLookActive = false;

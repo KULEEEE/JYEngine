@@ -224,25 +224,19 @@ namespace
 			data.light.intensity = light.value("intensity", data.light.intensity);
 		}
 
-		const json* drawComponent = nullptr;
-		if (value.contains("drawComponent") && value.at("drawComponent").is_object())
+		const json* renderObjectComponent = nullptr;
+		if (value.contains("renderObjectComponent") && value.at("renderObjectComponent").is_object())
 		{
-			drawComponent = &value.at("drawComponent");
+			renderObjectComponent = &value.at("renderObjectComponent");
 		}
-		else if (value.contains("materialComponent") && value.at("materialComponent").is_object())
+		if (renderObjectComponent != nullptr)
 		{
-			drawComponent = &value.at("materialComponent");
-		}
-
-		if (drawComponent != nullptr)
-		{
-			data.hasDrawComponent = true;
-			data.drawComponent.active = drawComponent->value("active", data.drawComponent.active);
-			data.drawComponent.visible = drawComponent->value("visible", data.drawComponent.visible);
-			data.drawComponent.transparent = drawComponent->value("transparent", data.drawComponent.transparent);
-			data.drawComponent.materialID = drawComponent->value("materialID", data.drawComponent.materialID);
-			data.drawComponent.meshID = drawComponent->value("meshID", data.drawComponent.meshID);
-			data.drawComponent.subMeshIndex = drawComponent->value("subMeshIndex", data.drawComponent.subMeshIndex);
+			data.hasRenderObjectComponent = true;
+			data.renderObjectComponent.active = renderObjectComponent->value("active", data.renderObjectComponent.active);
+			data.renderObjectComponent.visible = renderObjectComponent->value("visible", data.renderObjectComponent.visible);
+			data.renderObjectComponent.transparent = renderObjectComponent->value("transparent", data.renderObjectComponent.transparent);
+			data.renderObjectComponent.materialID = renderObjectComponent->value("materialID", data.renderObjectComponent.materialID);
+			data.renderObjectComponent.meshID = renderObjectComponent->value("meshID", data.renderObjectComponent.meshID);
 		}
 
 		return data;
@@ -293,16 +287,15 @@ namespace
 			};
 		}
 
-		if (data.hasDrawComponent)
+		if (data.hasRenderObjectComponent)
 		{
-			value["drawComponent"] =
+			value["renderObjectComponent"] =
 			{
-				{ "active", data.drawComponent.active },
-				{ "visible", data.drawComponent.visible },
-				{ "transparent", data.drawComponent.transparent },
-				{ "materialID", data.drawComponent.materialID },
-				{ "meshID", data.drawComponent.meshID },
-				{ "subMeshIndex", data.drawComponent.subMeshIndex },
+				{ "active", data.renderObjectComponent.active },
+				{ "visible", data.renderObjectComponent.visible },
+				{ "transparent", data.renderObjectComponent.transparent },
+				{ "materialID", data.renderObjectComponent.materialID },
+				{ "meshID", data.renderObjectComponent.meshID },
 			};
 		}
 

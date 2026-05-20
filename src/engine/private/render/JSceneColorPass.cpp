@@ -94,7 +94,8 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 	context.commandQueue->SetPipeline(materialResource->pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);
 	context.commandQueue->BindVertexBuffer(meshResource);
-	context.commandQueue->DrawIndexed(static_cast<uint32>(meshResource->indexSize), 1, 0, 0, 0);
+	const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(meshResource->indexSize);
+	context.commandQueue->DrawIndexed(indexCount, 1, drawItem.startIndex, 0, 0);
 	++_lastStats.drawCallCount;
 }
 

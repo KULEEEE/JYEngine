@@ -15,10 +15,13 @@ J_ENGINE_BEGIN
 struct JDrawItem
 {
 	JEntityHandle entity = {};
-	JDrawComponentHandle drawComponent = {};
+	JRenderObjectComponentHandle renderObject = {};
+	JTransformHandle transform = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
 	uint32 subMeshIndex = 0;
+	uint32 indexCount = 0;
+	uint32 startIndex = 0;
 	const JMeshResource* meshResource = nullptr;
 	const JMaterialResource* materialResource = nullptr;
 	const JTransformResource* transformResource = nullptr;

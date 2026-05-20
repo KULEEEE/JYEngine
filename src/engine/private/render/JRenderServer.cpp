@@ -1,86 +1,10 @@
 #include "engine/render/JRenderServer.h"
 
 #include "engine/asset/JMaterial.h"
+#include "engine/asset/JMesh.h"
+#include "engine/render/JRenderSnapshotBuilder.h"
 
 J_ENGINE_BEGIN
-
-namespace
-{
-	XMVECTOR getForward(float yaw, float pitch)
-	{
-		const float cosPitch = cosf(pitch);
-		return XMVector3Normalize(XMVectorSet(
-			sinf(yaw) * cosPitch,
-			sinf(pitch),
-			cosf(yaw) * cosPitch,
-			0.0f));
-	}
-
-	XMVECTOR getForwardXZ(float yaw)
-	{
-		return XMVector3Normalize(XMVectorSet(sinf(yaw), 0.0f, cosf(yaw), 0.0f));
-	}
-
-	XMVECTOR getRight(float yaw)
-	{
-		const XMVECTOR worldUp = XMVectorSet(0, 1, 0, 0);
-		return XMVector3Normalize(XMVector3Cross(worldUp, getForwardXZ(yaw)));
-	}
-
-	XMVECTOR getUp(float yaw, float pitch)
-	{
-		const XMVECTOR forward = getForward(yaw, pitch);
-		const XMVECTOR right = getRight(yaw);
-		return XMVector3Normalize(XMVector3Cross(forward, right));
-	}
-
-	XMMATRIX makeWorldMatrix(const JScene::TransformData& transform)
-	{
-		const XMMATRIX scale = XMMatrixScaling(transform.scale.x, transform.scale.y, transform.scale.z);
-		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.rotation.x, transform.rotation.y, transform.rotation.z);
-		const XMMATRIX translation = XMMatrixTranslation(transform.translation.x, transform.translation.y, transform.translation.z);
-		return scale * rotation * translation;
-	}
-
-	XMMATRIX makeViewMatrix(const JScene& scene, JCameraHandle camera)
-	{
-		const JScene::CameraData* cameraData = scene.GetCamera(camera);
-		if (cameraData == nullptr)
-		{
-			return XMMatrixIdentity();
-		}
-
-		const JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
-		if (!transformHandle.IsValid())
-		{
-			return XMMatrixIdentity();
-		}
-
-		const JScene::TransformData transform = scene.GetTransform(transformHandle);
-		const XMVECTOR position = XMVectorSet(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
-		const XMVECTOR forward = getForward(transform.rotation.y, transform.rotation.x);
-		const XMVECTOR up = getUp(transform.rotation.y, transform.rotation.x);
-		return XMMatrixLookAtLH(position, position + forward, up);
-	}
-
-	XMMATRIX makeProjectionMatrix(const JScene& scene, JCameraHandle camera)
-	{
-		const JScene::CameraData* cameraData = scene.GetCamera(camera);
-		if (cameraData == nullptr)
-		{
-			return XMMatrixIdentity();
-		}
-
-		const float nearPlane = std::max(0.001f, cameraData->nearP);
-		const float farPlane = std::max(nearPlane + 0.001f, cameraData->farP);
-		return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, nearPlane, farPlane);
-	}
-
-	uint64 makeTransformKey(JTransformHandle transform)
-	{
-		return (static_cast<uint64>(transform.generation) << 32) | transform.index;
-	}
-}
 
 uint64 JRenderServer::makeCameraKey(JCameraHandle camera)
 {
@@ -119,6 +43,19 @@ const JRenderServer::CameraRecord* JRenderServer::findCameraRecord(JCameraHandle
 {
 	const uint32 index = findCameraIndex(camera);
 	return index == static_cast<uint32>(-1) ? nullptr : &_cameras[index];
+}
+
+const JCameraSnapshot* JRenderServer::findCameraSnapshot(JCameraHandle camera) const
+{
+	for (const JCameraSnapshot& snapshot : _frameSnapshot.cameras)
+	{
+		if (snapshot.camera.index == camera.index && snapshot.camera.generation == camera.generation)
+		{
+			return &snapshot;
+		}
+	}
+
+	return nullptr;
 }
 
 void JRenderServer::RegisterMaterial(JMaterial* material)
@@ -270,156 +207,367 @@ void JRenderServer::Sync()
 	_dirtyMaterialIDs.clear();
 }
 
-void JRenderServer::SyncScene(JScene& scene)
+void JRenderServer::syncCameraResources()
 {
-	_primaryCamera = scene.GetPrimaryCamera();
-	_frameSnapshot.cameras.clear();
-	_frameSnapshot.transforms.clear();
-	_frameSnapshot.lights.clear();
-	_frameSnapshot.opaqueDrawItems.clear();
-	_frameSnapshot.transparentDrawItems.clear();
-
-	std::unordered_set<uint64> activeCameraKeys;
-	std::unordered_set<uint64> activeTransformKeys;
-	std::unordered_set<const JMesh*> activeMeshes;
-
-	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
-	for (uint32 transformIndex = 0; transformIndex < transformSlots.size(); ++transformIndex)
+	for (const JCameraSnapshot& snapshot : _frameSnapshot.cameras)
 	{
-		const JTransformPool::SlotType& slot = transformSlots[transformIndex];
-		if (!slot.active)
-		{
-			continue;
-		}
-
-		activeTransformKeys.insert(makeTransformKey({ transformIndex, slot.generation }));
+		_renderDB.SyncCamera(snapshot.camera, snapshot.viewProjection);
 	}
+	_dirtyCameraKeys.clear();
+}
 
-	for (uint64 cameraKey : _dirtyCameraKeys)
+std::vector<JCameraHandle> JRenderServer::collectRegisteredCameraHandles() const
+{
+	std::vector<JCameraHandle> cameras;
+	cameras.reserve(_cameras.size());
+	for (const CameraRecord& record : _cameras)
 	{
-		for (const CameraRecord& record : _cameras)
+		cameras.push_back(record.camera);
+	}
+	return cameras;
+}
+
+void JRenderServer::syncTransformResources()
+{
+	for (const JTransformSnapshot& snapshot : _frameSnapshot.transforms)
+	{
+		_renderDB.SyncTransform(snapshot.transform, snapshot.world);
+	}
+}
+
+void JRenderServer::syncLightResources()
+{
+	for (const JLightSnapshot& snapshot : _frameSnapshot.lights)
+	{
+		_renderDB.SyncLight(snapshot);
+	}
+}
+
+void JRenderServer::ensureMeshResources(const std::unordered_set<const JMesh*>& activeMeshes)
+{
+	for (const JMesh* mesh : activeMeshes)
+	{
+		_renderDB.GetOrCreateMeshResource(mesh);
+	}
+}
+
+void JRenderServer::updateDrawItemCache(JScene& scene, const std::vector<JSceneRenderObjectEvent>& events, JRenderSnapshotBuilder::Result& outResult)
+{
+	bool rebuildRequired = !_drawItemCache.initialized;
+	for (const JSceneRenderObjectEvent& event : events)
+	{
+		if (event.type == JSceneRenderObjectEventType::Removed)
 		{
-			if (makeCameraKey(record.camera) != cameraKey)
-			{
-				continue;
-			}
-
-			if (scene.GetCamera(record.camera) == nullptr)
-			{
-				break;
-			}
-
-			activeCameraKeys.insert(makeCameraKey(record.camera));
-			const XMMATRIX viewProjection = makeViewMatrix(scene, record.camera) * makeProjectionMatrix(scene, record.camera);
-			_frameSnapshot.cameras.push_back({ record.camera, viewProjection });
-			_renderDB.SyncCamera(record.camera, viewProjection);
+			rebuildRequired = true;
 			break;
 		}
 	}
 
-	_dirtyCameraKeys.clear();
-
-	const std::vector<uint32> dirtyTransformIndices = scene.ConsumeDirtyTransformIndices();
-	for (uint32 transformIndex : dirtyTransformIndices)
+	if (rebuildRequired)
 	{
-		if (transformIndex >= transformSlots.size())
-		{
-			continue;
-		}
-
-		const JTransformPool::SlotType& slot = transformSlots[transformIndex];
-		if (!slot.active)
-		{
-			continue;
-		}
-
-		const JTransformHandle transformHandle = {
-			transformIndex,
-			slot.generation
-		};
-		const XMMATRIX world = makeWorldMatrix(scene.GetTransform(transformHandle));
-		_frameSnapshot.transforms.push_back({ transformHandle, world });
-		_renderDB.SyncTransform(transformHandle, world);
+		rebuildDrawItemCache(scene, outResult);
+		return;
 	}
 
-	const std::vector<JScene::DrawComponentSlot>& drawComponentSlots = scene.GetDrawComponentSlots();
-	for (const JScene::DrawComponentSlot& slot : drawComponentSlots)
+	for (const JSceneRenderObjectEvent& event : events)
 	{
-		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.mesh == nullptr)
+		if (event.type == JSceneRenderObjectEventType::Added)
 		{
-			continue;
+			appendDrawItems(scene, event.handle, outResult);
 		}
-
-		const JTransformHandle transform = scene.GetTransformHandle(slot.data.entity);
-		if (!transform.IsValid())
+		else if (event.type == JSceneRenderObjectEventType::Modified)
 		{
-			continue;
-		}
-
-		activeMeshes.insert(slot.data.mesh);
-		_renderDB.GetOrCreateMeshResource(slot.data.mesh);
-
-		JRenderer::DrawItem drawItem;
-		drawItem.entity = slot.data.entity;
-		drawItem.drawComponent = { static_cast<uint32>(&slot - drawComponentSlots.data()), slot.generation };
-		drawItem.materialID = slot.data.materialID;
-		drawItem.mesh = slot.data.mesh;
-		drawItem.subMeshIndex = slot.data.subMeshIndex;
-		drawItem.meshResource = _renderDB.FindMeshResource(slot.data.mesh);
-		drawItem.materialResource = _renderDB.FindMaterialResource(slot.data.materialID);
-		drawItem.transformResource = _renderDB.FindTransformResource(transform);
-		drawItem.transparent = slot.data.transparent;
-
-		if (drawItem.meshResource == nullptr || drawItem.materialResource == nullptr || drawItem.transformResource == nullptr)
-		{
-			continue;
-		}
-
-		if (drawItem.transparent)
-		{
-			_frameSnapshot.transparentDrawItems.push_back(drawItem);
-		}
-		else
-		{
-			_frameSnapshot.opaqueDrawItems.push_back(drawItem);
+			patchDrawItems(scene, event.handle, outResult);
 		}
 	}
 
+	for (uint32 entityIndex : _drawItemCache.activeDrawEntityIndices)
 	{
-		JLightSnapshot snapshot{};
-		for (const JScene::LightSlot& slot : scene.GetLightSlots())
+		if (entityIndex >= _drawItemCache.drawRangeByEntityIndex.size())
 		{
-			if (!slot.active || !slot.data.active)
+			continue;
+		}
+
+		const DrawRange& range = _drawItemCache.drawRangeByEntityIndex[entityIndex];
+		if (!range.valid)
+		{
+			continue;
+		}
+
+		for (uint32 i = 0; i < range.count; ++i)
+		{
+			const uint32 drawItemIndex = range.start + i;
+			if (drawItemIndex >= _drawItemCache.drawItems.size())
 			{
 				continue;
 			}
 
-			const JTransformHandle transformHandle = scene.GetTransformHandle(slot.data.entity);
-			if (!transformHandle.IsValid())
+			const JDrawItem& drawItem = _drawItemCache.drawItems[drawItemIndex];
+			if (drawItem.mesh != nullptr)
+			{
+				outResult.activeMeshes.insert(drawItem.mesh);
+			}
+		}
+	}
+}
+
+void JRenderServer::rebuildDrawItemCache(const JScene& scene, JRenderSnapshotBuilder::Result& outResult)
+{
+	_drawItemCache.drawItems.clear();
+	_drawItemCache.drawRangeByEntityIndex.clear();
+	_drawItemCache.activeDrawEntityIndices.clear();
+	_drawItemCache.initialized = true;
+
+	const std::vector<JScene::RenderObjectComponentSlot>& slots = scene.GetRenderObjectComponentSlots();
+	for (uint32 renderObjectIndex = 0; renderObjectIndex < slots.size(); ++renderObjectIndex)
+	{
+		const JScene::RenderObjectComponentSlot& slot = slots[renderObjectIndex];
+		if (slot.active)
+		{
+			appendDrawItems(scene, { renderObjectIndex, slot.generation }, outResult);
+		}
+	}
+}
+
+void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult)
+{
+	const JScene::RenderObjectComponentData* data = scene.GetRenderObjectComponent(renderObject);
+	if (data == nullptr || !data->active || !data->visible || data->mesh == nullptr)
+	{
+		return;
+	}
+
+	const JTransformHandle transform = scene.GetTransformHandle(data->entity);
+	if (!transform.IsValid())
+	{
+		return;
+	}
+
+	if (data->entity.index >= _drawItemCache.drawRangeByEntityIndex.size())
+	{
+		_drawItemCache.drawRangeByEntityIndex.resize(data->entity.index + 1);
+	}
+
+	DrawRange& existingRange = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	if (existingRange.valid && existingRange.generation == data->entity.generation)
+	{
+		patchDrawItems(scene, renderObject, outResult);
+		return;
+	}
+
+	const uint32 start = static_cast<uint32>(_drawItemCache.drawItems.size());
+	const std::vector<JMesh::SubMeshInfo>& subMeshes = data->mesh->GetSubMeshInfos();
+	if (subMeshes.empty())
+	{
+		JDrawItem drawItem;
+		drawItem.entity = data->entity;
+		drawItem.renderObject = renderObject;
+		drawItem.transform = transform;
+		drawItem.materialID = data->materialID;
+		drawItem.mesh = data->mesh;
+		drawItem.transparent = data->transparent;
+		_drawItemCache.drawItems.push_back(drawItem);
+	}
+	else
+	{
+		for (uint32 subMeshIndex = 0; subMeshIndex < subMeshes.size(); ++subMeshIndex)
+		{
+			const JMesh::SubMeshInfo& subMesh = subMeshes[subMeshIndex];
+			if (subMesh.endIndex <= subMesh.startIndex)
 			{
 				continue;
 			}
 
-			const JScene::TransformData transform = scene.GetTransform(transformHandle);
-			JLightSnapshot::Item item{};
-			item.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
-			item.position = JVec4(transform.translation.x, transform.translation.y, transform.translation.z, 1.0f);
-			snapshot.items.push_back(item);
+			JDrawItem drawItem;
+			drawItem.entity = data->entity;
+			drawItem.renderObject = renderObject;
+			drawItem.transform = transform;
+			drawItem.materialID = data->materialID;
+			drawItem.mesh = data->mesh;
+			drawItem.subMeshIndex = subMeshIndex;
+			drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;
+			drawItem.startIndex = subMesh.startIndex;
+			drawItem.transparent = data->transparent;
+			_drawItemCache.drawItems.push_back(drawItem);
 		}
-
-		_frameSnapshot.lights.push_back(snapshot);
-		_renderDB.SyncLight(snapshot);
 	}
 
-	for (const CameraRecord& record : _cameras)
+	const uint32 count = static_cast<uint32>(_drawItemCache.drawItems.size()) - start;
+	if (count == 0)
 	{
-		if (scene.GetCamera(record.camera) != nullptr)
-		{
-			activeCameraKeys.insert(makeCameraKey(record.camera));
-		}
+		return;
 	}
 
-	_renderDB.PruneUnusedSceneResources(activeCameraKeys, activeTransformKeys, activeMeshes);
+	_drawItemCache.drawRangeByEntityIndex[data->entity.index] = { start, count, data->entity.generation, true };
+	_drawItemCache.activeDrawEntityIndices.push_back(data->entity.index);
+	outResult.activeMeshes.insert(data->mesh);
+}
+
+void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult)
+{
+	const JScene::RenderObjectComponentData* data = scene.GetRenderObjectComponent(renderObject);
+	if (data == nullptr || data->entity.index >= _drawItemCache.drawRangeByEntityIndex.size())
+	{
+		return;
+	}
+
+	DrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	if (!range.valid || range.generation != data->entity.generation)
+	{
+		appendDrawItems(scene, renderObject, outResult);
+		return;
+	}
+
+	if (!data->active || !data->visible || data->mesh == nullptr)
+	{
+		range.valid = false;
+		return;
+	}
+
+	const JTransformHandle transform = scene.GetTransformHandle(data->entity);
+	if (!transform.IsValid())
+	{
+		range.valid = false;
+		return;
+	}
+
+	const std::vector<JMesh::SubMeshInfo>& subMeshes = data->mesh->GetSubMeshInfos();
+	uint32 requiredCount = subMeshes.empty() ? 1 : 0;
+	for (const JMesh::SubMeshInfo& subMesh : subMeshes)
+	{
+		if (subMesh.endIndex > subMesh.startIndex)
+		{
+			++requiredCount;
+		}
+	}
+	if (requiredCount != range.count)
+	{
+		rebuildDrawItemCache(scene, outResult);
+		return;
+	}
+
+	outResult.activeMeshes.insert(data->mesh);
+	if (subMeshes.empty())
+	{
+		JDrawItem& drawItem = _drawItemCache.drawItems[range.start];
+		drawItem.entity = data->entity;
+		drawItem.renderObject = renderObject;
+		drawItem.transform = transform;
+		drawItem.materialID = data->materialID;
+		drawItem.mesh = data->mesh;
+		drawItem.subMeshIndex = 0;
+		drawItem.indexCount = 0;
+		drawItem.startIndex = 0;
+		drawItem.transparent = data->transparent;
+		return;
+	}
+
+	uint32 rangeOffset = 0;
+	for (uint32 subMeshIndex = 0; subMeshIndex < subMeshes.size(); ++subMeshIndex)
+	{
+		const JMesh::SubMeshInfo& subMesh = subMeshes[subMeshIndex];
+		if (subMesh.endIndex <= subMesh.startIndex)
+		{
+			continue;
+		}
+
+		JDrawItem& drawItem = _drawItemCache.drawItems[range.start + rangeOffset];
+		drawItem.entity = data->entity;
+		drawItem.renderObject = renderObject;
+		drawItem.transform = transform;
+		drawItem.materialID = data->materialID;
+		drawItem.mesh = data->mesh;
+		drawItem.subMeshIndex = subMeshIndex;
+		drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;
+		drawItem.startIndex = subMesh.startIndex;
+		drawItem.transparent = data->transparent;
+		++rangeOffset;
+	}
+}
+
+void JRenderServer::buildCameraDrawItemIndices()
+{
+	for (JCameraSnapshot& cameraSnapshot : _frameSnapshot.cameras)
+	{
+		cameraSnapshot.opaqueDrawItemIndices.clear();
+		cameraSnapshot.transparentDrawItemIndices.clear();
+		for (uint32 entityIndex : _drawItemCache.activeDrawEntityIndices)
+		{
+			if (entityIndex >= _drawItemCache.drawRangeByEntityIndex.size())
+			{
+				continue;
+			}
+
+			const DrawRange& range = _drawItemCache.drawRangeByEntityIndex[entityIndex];
+			if (!range.valid)
+			{
+				continue;
+			}
+
+			for (uint32 i = 0; i < range.count; ++i)
+			{
+				const uint32 drawItemIndex = range.start + i;
+				if (drawItemIndex >= _drawItemCache.drawItems.size())
+				{
+					continue;
+				}
+
+				const JDrawItem& drawItem = _drawItemCache.drawItems[drawItemIndex];
+				if (drawItem.transparent)
+				{
+					cameraSnapshot.transparentDrawItemIndices.push_back(drawItemIndex);
+				}
+				else
+				{
+					cameraSnapshot.opaqueDrawItemIndices.push_back(drawItemIndex);
+				}
+			}
+		}
+	}
+}
+
+void JRenderServer::resolveDrawItemResources()
+{
+	for (JDrawItem& drawItem : _drawItemCache.drawItems)
+	{
+		drawItem.meshResource = _renderDB.FindMeshResource(drawItem.mesh);
+		drawItem.materialResource = _renderDB.FindMaterialResource(drawItem.materialID);
+		drawItem.transformResource = _renderDB.FindTransformResource(drawItem.transform);
+		if (drawItem.indexCount == 0 && drawItem.meshResource != nullptr)
+		{
+			drawItem.indexCount = static_cast<uint32>(drawItem.meshResource->indexSize);
+		}
+	}
+}
+
+void JRenderServer::SyncScene(JScene& scene)
+{
+	if (_syncedScene != &scene)
+	{
+		_drawItemCache = {};
+		_syncedScene = &scene;
+	}
+
+	_primaryCamera = scene.GetPrimaryCamera();
+
+	const std::vector<JCameraHandle> cameraHandles = collectRegisteredCameraHandles();
+	const std::vector<JSceneRenderObjectEvent> renderObjectEvents = scene.ConsumeRenderObjectEvents();
+	JRenderSnapshotBuilder::Input input;
+	input.scene = &scene;
+	input.cameras = &cameraHandles;
+
+	JRenderSnapshotBuilder::Result buildResult;
+	JRenderSnapshotBuilder::Build(input, _frameSnapshot, buildResult);
+	updateDrawItemCache(scene, renderObjectEvents, buildResult);
+	buildCameraDrawItemIndices();
+
+	syncCameraResources();
+	syncTransformResources();
+	syncLightResources();
+	ensureMeshResources(buildResult.activeMeshes);
+	resolveDrawItemResources();
+
+	_renderDB.PruneUnusedSceneResources(buildResult.activeCameraKeys, buildResult.activeTransformKeys, buildResult.activeMeshes);
 }
 
 bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
@@ -435,8 +583,29 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	outFrameDesc.clearColor = clearColor;
 	outFrameDesc.viewport = viewport;
 	outFrameDesc.scissorRect = scissorRect;
-	outFrameDesc.opaqueDrawItems = _frameSnapshot.opaqueDrawItems;
-	outFrameDesc.transparentDrawItems = _frameSnapshot.transparentDrawItems;
+	const JCameraSnapshot* cameraSnapshot = findCameraSnapshot(_primaryCamera);
+	if (cameraSnapshot == nullptr)
+	{
+		return false;
+	}
+
+	outFrameDesc.opaqueDrawItems.reserve(cameraSnapshot->opaqueDrawItemIndices.size());
+	for (uint32 drawItemIndex : cameraSnapshot->opaqueDrawItemIndices)
+	{
+		if (drawItemIndex < _drawItemCache.drawItems.size())
+		{
+			outFrameDesc.opaqueDrawItems.push_back(_drawItemCache.drawItems[drawItemIndex]);
+		}
+	}
+
+	outFrameDesc.transparentDrawItems.reserve(cameraSnapshot->transparentDrawItemIndices.size());
+	for (uint32 drawItemIndex : cameraSnapshot->transparentDrawItemIndices)
+	{
+		if (drawItemIndex < _drawItemCache.drawItems.size())
+		{
+			outFrameDesc.transparentDrawItems.push_back(_drawItemCache.drawItems[drawItemIndex]);
+		}
+	}
 
 	return true;
 }

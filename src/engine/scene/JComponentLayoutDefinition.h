@@ -32,11 +32,10 @@ struct JLightComponents
 	bool active = true;
 };
 
-struct JDrawComponent
+struct JRenderObjectComponent
 {
 	JEntityHandle entity = {};
 	const JMesh* mesh = nullptr;
-	uint32 subMeshIndex = 0;
 	uint32 materialID = 0;
 	bool visible = true;
 	bool transparent = false;

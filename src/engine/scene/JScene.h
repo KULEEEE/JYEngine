@@ -8,7 +8,7 @@
 #include "engine/scene/JComponentLayoutDefinition.h"
 #include "engine/scene/JCameraPool.h"
 #include "engine/scene/JLightPool.h"
-#include "engine/scene/JDrawComponentPool.h"
+#include "engine/scene/JRenderObjectComponentPool.h"
 #include "engine/scene/JTransformPool.h"
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
 
@@ -20,7 +20,7 @@ enum class JSceneComponentMask : uint32
 	Transform = 1 << 0,
 	Camera = 1 << 1,
 	Light = 1 << 2,
-	DrawComponent = 1 << 3,
+	RenderObject = 1 << 3,
 };
 
 struct JEntityMetadata
@@ -30,6 +30,20 @@ struct JEntityMetadata
 	std::string stableID;
 	std::string name;
 	std::vector<std::string> tags;
+};
+
+enum class JSceneRenderObjectEventType : uint8
+{
+	Added,
+	Modified,
+	Removed
+};
+
+struct JSceneRenderObjectEvent
+{
+	JSceneRenderObjectEventType type = JSceneRenderObjectEventType::Modified;
+	JRenderObjectComponentHandle handle = {};
+	JEntityHandle entity = {};
 };
 
 class JScene
@@ -43,18 +57,18 @@ public:
 	using TransformData = JTransformComponents;
 	using CameraData = JCameraComponents;
 	using LightData = JLightComponents;
-	using DrawComponentData = JDrawComponent;
+	using RenderObjectComponentData = JRenderObjectComponent;
 
 	using EntityPool = JPool<JEntityHandle, EntityData>;
 	using TransformSlot = JTransformPool::SlotType;
 	using CameraPool = JCameraPool;
 	using LightPool = JLightPool;
-	using DrawComponentPool = JDrawComponentPool;
+	using RenderObjectComponentPool = JRenderObjectComponentPool;
 
 	using EntitySlot = EntityPool::SlotType;
 	using CameraSlot = CameraPool::SlotType;
 	using LightSlot = LightPool::SlotType;
-	using DrawComponentSlot = DrawComponentPool::SlotType;
+	using RenderObjectComponentSlot = RenderObjectComponentPool::SlotType;
 
 	JScene() = default;
 
@@ -62,7 +76,8 @@ public:
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
-	JDrawComponentHandle AddDrawComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false, uint32 subMeshIndex = 0);
+	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false);
+	bool RemoveRenderObjectComponent(JRenderObjectComponentHandle handle);
 
 	bool SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags = {});
 	void SetEntityName(JEntityHandle entity, const std::string& name);
@@ -104,26 +119,31 @@ public:
 	const CameraData* GetCamera(JCameraHandle handle) const;
 	LightData* GetLight(JLightHandle handle);
 	const LightData* GetLight(JLightHandle handle) const;
-	DrawComponentData* GetDrawComponent(JDrawComponentHandle handle);
-	const DrawComponentData* GetDrawComponent(JDrawComponentHandle handle) const;
+	RenderObjectComponentData* GetRenderObjectComponent(JRenderObjectComponentHandle handle);
+	const RenderObjectComponentData* GetRenderObjectComponent(JRenderObjectComponentHandle handle) const;
+	void MarkRenderObjectComponentModified(JRenderObjectComponentHandle handle);
+	std::vector<JSceneRenderObjectEvent> ConsumeRenderObjectEvents();
 
 	const std::vector<EntitySlot>& GetEntitySlots() const { return _entities.GetSlots(); }
 	const std::vector<TransformSlot>& GetTransformSlots() const { return _transforms.GetSlots(); }
 	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras.GetSlots(); }
 	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
-	const std::vector<DrawComponentSlot>& GetDrawComponentSlots() const { return _drawComponents.GetSlots(); }
+	const std::vector<RenderObjectComponentSlot>& GetRenderObjectComponentSlots() const { return _renderObjectComponents.GetSlots(); }
 
 private:
 	std::string generateStableID();
 	void addEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
+	void removeEntityComponentMask(JEntityHandle entity, JSceneComponentMask component);
+	void pushRenderObjectEvent(JSceneRenderObjectEventType type, JRenderObjectComponentHandle handle, JEntityHandle entity);
 
 	EntityPool _entities;
 	JTransformPool _transforms;
 	CameraPool _cameras;
 	LightPool _lights;
-	DrawComponentPool _drawComponents;
+	RenderObjectComponentPool _renderObjectComponents;
 	std::vector<JEntityMetadata> _entityMetadata;
 	std::vector<JTransformHandle> _entityTransformLookup;
+	std::vector<JSceneRenderObjectEvent> _renderObjectEvents;
 	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
 	JCameraHandle _primaryCamera = {};
 	uint32 _nextStableID = 1;

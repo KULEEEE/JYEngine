@@ -5,6 +5,7 @@
 #include "engine/precompile.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderSnapshot.h"
+#include "engine/render/JRenderSnapshotBuilder.h"
 #include "engine/scene/JScene.h"
 #include "engine/render/JRenderer.h"
 
@@ -45,15 +46,45 @@ public:
 	bool BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
 
 private:
+	struct DrawRange
+	{
+		uint32 start = 0;
+		uint32 count = 0;
+		uint32 generation = 0;
+		bool valid = false;
+	};
+
+	struct DrawItemCache
+	{
+		std::vector<JDrawItem> drawItems;
+		std::vector<DrawRange> drawRangeByEntityIndex;
+		std::vector<uint32> activeDrawEntityIndices;
+		bool initialized = false;
+	};
+
 	uint32 findMaterialIndex(uint32 materialID) const;
 	JMaterial* findMaterial(uint32 materialID) const;
 	uint32 findCameraIndex(JCameraHandle camera) const;
 	CameraRecord* findCameraRecord(JCameraHandle camera);
 	const CameraRecord* findCameraRecord(JCameraHandle camera) const;
+	const JCameraSnapshot* findCameraSnapshot(JCameraHandle camera) const;
+	std::vector<JCameraHandle> collectRegisteredCameraHandles() const;
+	void syncCameraResources();
+	void syncTransformResources();
+	void syncLightResources();
+	void ensureMeshResources(const std::unordered_set<const JMesh*>& activeMeshes);
+	void resolveDrawItemResources();
+	void updateDrawItemCache(JScene& scene, const std::vector<JSceneRenderObjectEvent>& events, JRenderSnapshotBuilder::Result& outResult);
+	void rebuildDrawItemCache(const JScene& scene, JRenderSnapshotBuilder::Result& outResult);
+	void appendDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult);
+	void patchDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult);
+	void buildCameraDrawItemIndices();
 	static uint64 makeCameraKey(JCameraHandle camera);
 
 	JRenderDB _renderDB;
 	JFrameSnapshot _frameSnapshot;
+	DrawItemCache _drawItemCache;
+	JScene* _syncedScene = nullptr;
 	JCameraHandle _primaryCamera = {};
 	std::vector<MaterialRecord> _materials;
 	std::unordered_map<uint32, uint32> _materialIndexMap;

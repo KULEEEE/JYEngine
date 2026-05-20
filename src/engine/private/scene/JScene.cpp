@@ -139,6 +139,20 @@ void JScene::addEntityComponentMask(JEntityHandle entity, JSceneComponentMask co
 	}
 }
 
+void JScene::removeEntityComponentMask(JEntityHandle entity, JSceneComponentMask component)
+{
+	JEntityMetadata* metadata = GetEntityMetadata(entity);
+	if (metadata != nullptr)
+	{
+		metadata->componentMask &= ~static_cast<uint32>(component);
+	}
+}
+
+void JScene::pushRenderObjectEvent(JSceneRenderObjectEventType type, JRenderObjectComponentHandle handle, JEntityHandle entity)
+{
+	_renderObjectEvents.push_back({ type, handle, entity });
+}
+
 JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData& data)
 {
 	if (!_entities.IsValid(entity))
@@ -192,22 +206,41 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	return light;
 }
 
-JDrawComponentHandle JScene::AddDrawComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent, uint32 subMeshIndex)
+JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent)
 {
 	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
 	{
 		return {};
 	}
 
-	DrawComponentData data;
+	RenderObjectComponentData data;
 	data.entity = entity;
 	data.mesh = mesh;
-	data.subMeshIndex = subMeshIndex;
 	data.materialID = materialID;
 	data.transparent = transparent;
-	const JDrawComponentHandle drawComponent = _drawComponents.Add(entity, data);
-	addEntityComponentMask(entity, JSceneComponentMask::DrawComponent);
-	return drawComponent;
+	const JRenderObjectComponentHandle renderObject = _renderObjectComponents.Add(entity, data);
+	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);
+	pushRenderObjectEvent(JSceneRenderObjectEventType::Added, renderObject, entity);
+	return renderObject;
+}
+
+bool JScene::RemoveRenderObjectComponent(JRenderObjectComponentHandle handle)
+{
+	RenderObjectComponentData* renderObject = _renderObjectComponents.Get(handle);
+	if (renderObject == nullptr)
+	{
+		return false;
+	}
+
+	const JEntityHandle entity = renderObject->entity;
+	if (!_renderObjectComponents.Remove(handle))
+	{
+		return false;
+	}
+
+	removeEntityComponentMask(entity, JSceneComponentMask::RenderObject);
+	pushRenderObjectEvent(JSceneRenderObjectEventType::Removed, handle, entity);
+	return true;
 }
 
 JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
@@ -400,14 +433,32 @@ const JScene::LightData* JScene::GetLight(JLightHandle handle) const
 	return _lights.Get(handle);
 }
 
-JScene::DrawComponentData* JScene::GetDrawComponent(JDrawComponentHandle handle)
+JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JRenderObjectComponentHandle handle)
 {
-	return _drawComponents.Get(handle);
+	return _renderObjectComponents.Get(handle);
 }
 
-const JScene::DrawComponentData* JScene::GetDrawComponent(JDrawComponentHandle handle) const
+const JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JRenderObjectComponentHandle handle) const
 {
-	return _drawComponents.Get(handle);
+	return _renderObjectComponents.Get(handle);
+}
+
+void JScene::MarkRenderObjectComponentModified(JRenderObjectComponentHandle handle)
+{
+	const RenderObjectComponentData* renderObject = _renderObjectComponents.Get(handle);
+	if (renderObject == nullptr)
+	{
+		return;
+	}
+
+	pushRenderObjectEvent(JSceneRenderObjectEventType::Modified, handle, renderObject->entity);
+}
+
+std::vector<JSceneRenderObjectEvent> JScene::ConsumeRenderObjectEvents()
+{
+	std::vector<JSceneRenderObjectEvent> events = std::move(_renderObjectEvents);
+	_renderObjectEvents.clear();
+	return events;
 }
 
 J_ENGINE_END

@@ -158,7 +158,7 @@ void JScenePanel::Init()
 	}
 
 	createEditorGrid();
-	selectDefaultDrawComponent();
+	selectDefaultRenderObject();
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -269,7 +269,7 @@ void JScenePanel::createEditorGrid()
 		return;
 	}
 
-	if (_editorGridDrawComponent.IsValid())
+	if (_editorGridRenderObject.IsValid())
 	{
 		return;
 	}
@@ -311,7 +311,7 @@ void JScenePanel::createEditorGrid()
 	scene->AddTransform(_editorGridEntity, transform);
 
 	renderServer->RegisterMaterial(_editorGridMaterial.get());
-	_editorGridDrawComponent = scene->AddDrawComponent(
+	_editorGridRenderObject = scene->AddRenderObjectComponent(
 		_editorGridEntity,
 		_editorGridMaterial->instanceID,
 		_editorGridMesh.get(),
@@ -417,7 +417,7 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 	scene->SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
-void JScenePanel::selectDefaultDrawComponent()
+void JScenePanel::selectDefaultRenderObject()
 {
 	Engine::JScene* scene = getScene();
 	if (scene == nullptr)
@@ -425,15 +425,15 @@ void JScenePanel::selectDefaultDrawComponent()
 		return;
 	}
 
-	const std::vector<Engine::JScene::DrawComponentSlot>& slots = scene->GetDrawComponentSlots();
-	for (const Engine::JScene::DrawComponentSlot& slot : slots)
+	const std::vector<Engine::JScene::RenderObjectComponentSlot>& slots = scene->GetRenderObjectComponentSlots();
+	for (const Engine::JScene::RenderObjectComponentSlot& slot : slots)
 	{
 		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.transparent)
 		{
 			continue;
 		}
 
-		_selectedDrawComponent = { static_cast<uint32>(&slot - slots.data()), slot.generation };
+		_selectedRenderObject = { static_cast<uint32>(&slot - slots.data()), slot.generation };
 		_selectedEntity = slot.data.entity;
 		return;
 	}
@@ -504,7 +504,7 @@ void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float delt
 	}
 
 	uint32 objectCount = 0;
-	for (const Engine::JScene::DrawComponentSlot& slot : scene->GetDrawComponentSlots())
+	for (const Engine::JScene::RenderObjectComponentSlot& slot : scene->GetRenderObjectComponentSlots())
 	{
 		if (slot.active && slot.data.active && slot.data.visible)
 		{

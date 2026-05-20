@@ -15,6 +15,8 @@ struct JCameraSnapshot
 {
 	JCameraHandle camera = {};
 	XMMATRIX viewProjection = XMMatrixIdentity();
+	std::vector<uint32> opaqueDrawItemIndices;
+	std::vector<uint32> transparentDrawItemIndices;
 };
 
 struct JTransformSnapshot
@@ -39,8 +41,6 @@ struct JFrameSnapshot
 	std::vector<JCameraSnapshot> cameras;
 	std::vector<JTransformSnapshot> transforms;
 	std::vector<JLightSnapshot> lights;
-	std::vector<JDrawItem> opaqueDrawItems;
-	std::vector<JDrawItem> transparentDrawItems;
 };
 
 J_ENGINE_END

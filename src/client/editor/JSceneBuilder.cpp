@@ -46,7 +46,7 @@ void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
 	}
 
 	registeredCameras.clear();
-	drawComponents.clear();
+	renderObjects.clear();
 	lights.clear();
 	cameras.clear();
 	transforms.clear();
@@ -250,42 +250,42 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			}
 		}
 
-		if (entityData.hasDrawComponent)
+		if (entityData.hasRenderObjectComponent)
 		{
 			if (!transform.IsValid())
 			{
-				std::cerr << "JSceneBuilder::Build failed: draw component requires transform: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: render object component requires transform: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
 
-			const auto meshIter = meshLookup.find(entityData.drawComponent.meshID);
-			const auto materialIter = result.materialIDs.find(entityData.drawComponent.materialID);
+			const auto meshIter = meshLookup.find(entityData.renderObjectComponent.meshID);
+			const auto materialIter = result.materialIDs.find(entityData.renderObjectComponent.materialID);
 			if (meshIter == meshLookup.end() || materialIter == result.materialIDs.end())
 			{
-				std::cerr << "JSceneBuilder::Build failed: draw component asset reference is invalid: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: render object component asset reference is invalid: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
 
-			Engine::JDrawComponentHandle drawComponent = result.scene->AddDrawComponent(
+			Engine::JRenderObjectComponentHandle renderObject = result.scene->AddRenderObjectComponent(
 				entity,
 				materialIter->second,
 				meshIter->second,
-				entityData.drawComponent.transparent,
-				entityData.drawComponent.subMeshIndex);
+				entityData.renderObjectComponent.transparent);
 
-			Engine::JScene::DrawComponentData* drawComponentData = result.scene->GetDrawComponent(drawComponent);
-			if (!drawComponent.IsValid() || drawComponentData == nullptr)
+			Engine::JScene::RenderObjectComponentData* renderObjectData = result.scene->GetRenderObjectComponent(renderObject);
+			if (!renderObject.IsValid() || renderObjectData == nullptr)
 			{
-				std::cerr << "JSceneBuilder::Build failed: draw component creation failed: " << entityData.stableID << std::endl;
+				std::cerr << "JSceneBuilder::Build failed: render object component creation failed: " << entityData.stableID << std::endl;
 				result.Release(context.renderServer);
 				return false;
 			}
 
-			drawComponentData->active = entityData.drawComponent.active;
-			drawComponentData->visible = entityData.drawComponent.visible;
-			result.drawComponents[entityKey] = drawComponent;
+			renderObjectData->active = entityData.renderObjectComponent.active;
+			renderObjectData->visible = entityData.renderObjectComponent.visible;
+			result.scene->MarkRenderObjectComponentModified(renderObject);
+			result.renderObjects[entityKey] = renderObject;
 		}
 	}
 

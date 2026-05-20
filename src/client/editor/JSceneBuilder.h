@@ -43,7 +43,7 @@ public:
 	std::unordered_map<std::string, Engine::JTransformHandle> transforms;
 	std::unordered_map<std::string, Engine::JCameraHandle> cameras;
 	std::unordered_map<std::string, Engine::JLightHandle> lights;
-	std::unordered_map<std::string, Engine::JDrawComponentHandle> drawComponents;
+	std::unordered_map<std::string, Engine::JRenderObjectComponentHandle> renderObjects;
 	std::vector<Engine::JCameraHandle> registeredCameras;
 
 	Engine::JCameraHandle primaryCamera = {};

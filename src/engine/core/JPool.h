@@ -49,6 +49,20 @@ public:
 			&& _slots[handle.index].generation == handle.generation;
 	}
 
+	bool Remove(THandle handle)
+	{
+		if (!IsValid(handle))
+		{
+			return false;
+		}
+
+		SlotType& slot = _slots[handle.index];
+		slot.active = false;
+		++slot.generation;
+		slot.data = {};
+		return true;
+	}
+
 	const std::vector<SlotType>& GetSlots() const
 	{
 		return _slots;
