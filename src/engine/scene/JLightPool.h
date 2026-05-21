@@ -11,13 +11,13 @@ J_ENGINE_BEGIN
 class JLightPool
 {
 public:
-	using SlotType = JPool<JLightHandle, JLightComponents>::SlotType;
+	using SlotType = JEntityComponentPool<JLightHandle, JLightComponents>::SlotType;
 
 	JLightHandle Add(JEntityHandle entity, const JLightComponents& data = {})
 	{
 		JLightComponents resolved = data;
 		resolved.entity = entity;
-		return _pool.Add(resolved);
+		return _pool.Add(entity, resolved);
 	}
 
 	bool IsValid(JLightHandle handle) const
@@ -35,6 +35,11 @@ public:
 		return _pool.Get(handle);
 	}
 
+	bool Remove(JLightHandle handle)
+	{
+		return _pool.Remove(handle);
+	}
+
 	const std::vector<SlotType>& GetSlots() const
 	{
 		return _pool.GetSlots();
@@ -46,7 +51,7 @@ public:
 	}
 
 private:
-	JPool<JLightHandle, JLightComponents> _pool;
+	JEntityComponentPool<JLightHandle, JLightComponents> _pool;
 };
 
 J_ENGINE_END

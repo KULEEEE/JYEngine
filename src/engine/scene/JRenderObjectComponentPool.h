@@ -12,13 +12,13 @@ J_ENGINE_BEGIN
 class JRenderObjectComponentPool
 {
 public:
-	using SlotType = JPool<JRenderObjectComponentHandle, JRenderObjectComponent>::SlotType;
+	using SlotType = JEntityComponentPool<JRenderObjectComponentHandle, JRenderObjectComponent>::SlotType;
 
 	JRenderObjectComponentHandle Add(JEntityHandle entity, const JRenderObjectComponent& data = {})
 	{
 		JRenderObjectComponent resolved = data;
 		resolved.entity = entity;
-		return _pool.Add(resolved);
+		return _pool.Add(entity, resolved);
 	}
 
 	bool IsValid(JRenderObjectComponentHandle handle) const
@@ -52,7 +52,7 @@ public:
 	}
 
 private:
-	JPool<JRenderObjectComponentHandle, JRenderObjectComponent> _pool;
+	JEntityComponentPool<JRenderObjectComponentHandle, JRenderObjectComponent> _pool;
 };
 
 J_ENGINE_END

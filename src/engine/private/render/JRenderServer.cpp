@@ -398,8 +398,14 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 		return;
 	}
 
-	_drawItemCache.drawRangeByEntityIndex[data->entity.index] = { start, count, data->entity.generation, true };
-	_drawItemCache.activeDrawEntityIndices.push_back(data->entity.index);
+	DrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	const bool wasTracked = range.tracked;
+	range = { start, count, data->entity.generation, true, wasTracked };
+	if (!range.tracked)
+	{
+		_drawItemCache.activeDrawEntityIndices.push_back(data->entity.index);
+		range.tracked = true;
+	}
 	outResult.activeMeshes.insert(data->mesh);
 }
 

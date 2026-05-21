@@ -447,6 +447,16 @@ void JScenePanel::updateSelectedObject(float deltaTime)
 		return;
 	}
 
+	if (GetAsyncKeyState('V') & 0x0001)
+	{
+		Engine::JScene::RenderObjectComponentData* renderObject = scene->GetRenderObjectComponent(_selectedEntity);
+		if (renderObject != nullptr)
+		{
+			renderObject->visible = !renderObject->visible;
+			scene->MarkRenderObjectComponentModified(_selectedEntity);
+		}
+	}
+
 	const Engine::JTransformHandle transformHandle = scene->GetTransformHandle(_selectedEntity);
 	if (!transformHandle.IsValid())
 	{

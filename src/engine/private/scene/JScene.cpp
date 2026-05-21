@@ -54,6 +54,36 @@ JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::strin
 	return entity;
 }
 
+bool JScene::RemoveEntity(JEntityHandle entity)
+{
+	if (!_entities.IsValid(entity))
+	{
+		return false;
+	}
+
+	RemoveRenderObjectComponent(entity);
+	RemoveLight(entity);
+	RemoveCamera(entity);
+	RemoveTransform(entity);
+
+	if (entity.index < _entityMetadata.size())
+	{
+		JEntityMetadata& metadata = _entityMetadata[entity.index];
+		if (metadata.stableIDHash != 0)
+		{
+			_stableIDLookup.erase(metadata.stableIDHash);
+		}
+		metadata = {};
+	}
+
+	if (entity.index < _entityTransformLookup.size())
+	{
+		_entityTransformLookup[entity.index] = {};
+	}
+
+	return _entities.Remove(entity);
+}
+
 bool JScene::SetEntityMetadata(JEntityHandle entity, const std::string& stableID, const std::string& name, const std::vector<std::string>& tags)
 {
 	if (!_entities.IsValid(entity))
@@ -161,6 +191,11 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 	}
 
 	const JTransformHandle transform = _transforms.Add(entity, data);
+	if (!transform.IsValid())
+	{
+		return {};
+	}
+
 	if (entity.index >= _entityTransformLookup.size())
 	{
 		_entityTransformLookup.resize(entity.index + 1);
@@ -172,7 +207,8 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 
 JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio, float nearP, float farP)
 {
-	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform))
+	if (!_entities.IsValid(entity) || !_transforms.IsValid(transform)
+		|| transform.index != entity.index || transform.generation != entity.generation)
 	{
 		return {};
 	}
@@ -184,12 +220,23 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 	data.farP = farP;
 
 	const JCameraHandle handle = _cameras.Add(entity, data);
+	if (!handle.IsValid())
+	{
+		return {};
+	}
+
 	if (!_primaryCamera.IsValid())
 	{
 		_primaryCamera = handle;
 	}
 	addEntityComponentMask(entity, JSceneComponentMask::Camera);
 	return handle;
+}
+
+JCameraHandle JScene::AddCamera(JEntityHandle entity, float aspectRatio, float nearP, float farP)
+{
+	const JTransformHandle transform = GetTransformHandle(entity);
+	return AddCamera(entity, transform, aspectRatio, nearP, farP);
 }
 
 JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
@@ -202,6 +249,11 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	LightData lightData = data;
 	lightData.entity = entity;
 	const JLightHandle light = _lights.Add(entity, lightData);
+	if (!light.IsValid())
+	{
+		return {};
+	}
+
 	addEntityComponentMask(entity, JSceneComponentMask::Light);
 	return light;
 }
@@ -219,9 +271,90 @@ JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle enti
 	data.materialID = materialID;
 	data.transparent = transparent;
 	const JRenderObjectComponentHandle renderObject = _renderObjectComponents.Add(entity, data);
+	if (!renderObject.IsValid())
+	{
+		return {};
+	}
+
 	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);
 	pushRenderObjectEvent(JSceneRenderObjectEventType::Added, renderObject, entity);
 	return renderObject;
+}
+
+bool JScene::RemoveTransform(JTransformHandle transform)
+{
+	if (!_transforms.IsValid(transform))
+	{
+		return false;
+	}
+
+	const JEntityHandle entity = _transforms.GetSlots()[transform.index].entity;
+	if (!_transforms.Remove(transform))
+	{
+		return false;
+	}
+
+	removeEntityComponentMask(entity, JSceneComponentMask::Transform);
+	if (entity.index < _entityTransformLookup.size())
+	{
+		_entityTransformLookup[entity.index] = {};
+	}
+	return true;
+}
+
+bool JScene::RemoveTransform(JEntityHandle entity)
+{
+	return RemoveTransform(GetTransformHandle(entity));
+}
+
+bool JScene::RemoveCamera(JCameraHandle camera)
+{
+	CameraData* cameraData = _cameras.Get(camera);
+	if (cameraData == nullptr)
+	{
+		return false;
+	}
+
+	const JEntityHandle entity = cameraData->entity;
+	if (!_cameras.Remove(camera))
+	{
+		return false;
+	}
+
+	removeEntityComponentMask(entity, JSceneComponentMask::Camera);
+	if (_primaryCamera.index == camera.index && _primaryCamera.generation == camera.generation)
+	{
+		_primaryCamera = {};
+	}
+	return true;
+}
+
+bool JScene::RemoveCamera(JEntityHandle entity)
+{
+	return RemoveCamera(GetCameraHandle(entity));
+}
+
+bool JScene::RemoveLight(JLightHandle light)
+{
+	LightData* lightData = _lights.Get(light);
+	if (lightData == nullptr)
+	{
+		return false;
+	}
+
+	const JEntityHandle entity = lightData->entity;
+	if (!_lights.Remove(light))
+	{
+		return false;
+	}
+
+	removeEntityComponentMask(entity, JSceneComponentMask::Light);
+	return true;
+}
+
+bool JScene::RemoveLight(JEntityHandle entity)
+{
+	return RemoveLight(GetLightHandle(entity));
 }
 
 bool JScene::RemoveRenderObjectComponent(JRenderObjectComponentHandle handle)
@@ -241,6 +374,11 @@ bool JScene::RemoveRenderObjectComponent(JRenderObjectComponentHandle handle)
 	removeEntityComponentMask(entity, JSceneComponentMask::RenderObject);
 	pushRenderObjectEvent(JSceneRenderObjectEventType::Removed, handle, entity);
 	return true;
+}
+
+bool JScene::RemoveRenderObjectComponent(JEntityHandle entity)
+{
+	return RemoveRenderObjectComponent(GetRenderObjectComponentHandle(entity));
 }
 
 JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
@@ -410,7 +548,41 @@ JTransformHandle JScene::GetTransformHandle(JEntityHandle entity) const
 		return {};
 	}
 
-	return _entityTransformLookup[entity.index];
+	const JTransformHandle transform = _entityTransformLookup[entity.index];
+	return _transforms.IsValid(transform) ? transform : JTransformHandle{};
+}
+
+JCameraHandle JScene::GetCameraHandle(JEntityHandle entity) const
+{
+	if (!_entities.IsValid(entity))
+	{
+		return {};
+	}
+
+	const JCameraHandle camera = { entity.index, entity.generation };
+	return _cameras.IsValid(camera) ? camera : JCameraHandle{};
+}
+
+JLightHandle JScene::GetLightHandle(JEntityHandle entity) const
+{
+	if (!_entities.IsValid(entity))
+	{
+		return {};
+	}
+
+	const JLightHandle light = { entity.index, entity.generation };
+	return _lights.IsValid(light) ? light : JLightHandle{};
+}
+
+JRenderObjectComponentHandle JScene::GetRenderObjectComponentHandle(JEntityHandle entity) const
+{
+	if (!_entities.IsValid(entity))
+	{
+		return {};
+	}
+
+	const JRenderObjectComponentHandle renderObject = { entity.index, entity.generation };
+	return _renderObjectComponents.IsValid(renderObject) ? renderObject : JRenderObjectComponentHandle{};
 }
 
 JScene::CameraData* JScene::GetCamera(JCameraHandle handle)
@@ -423,6 +595,16 @@ const JScene::CameraData* JScene::GetCamera(JCameraHandle handle) const
 	return _cameras.Get(handle);
 }
 
+JScene::CameraData* JScene::GetCamera(JEntityHandle entity)
+{
+	return GetCamera(GetCameraHandle(entity));
+}
+
+const JScene::CameraData* JScene::GetCamera(JEntityHandle entity) const
+{
+	return GetCamera(GetCameraHandle(entity));
+}
+
 JScene::LightData* JScene::GetLight(JLightHandle handle)
 {
 	return _lights.Get(handle);
@@ -431,6 +613,16 @@ JScene::LightData* JScene::GetLight(JLightHandle handle)
 const JScene::LightData* JScene::GetLight(JLightHandle handle) const
 {
 	return _lights.Get(handle);
+}
+
+JScene::LightData* JScene::GetLight(JEntityHandle entity)
+{
+	return GetLight(GetLightHandle(entity));
+}
+
+const JScene::LightData* JScene::GetLight(JEntityHandle entity) const
+{
+	return GetLight(GetLightHandle(entity));
 }
 
 JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JRenderObjectComponentHandle handle)
@@ -443,6 +635,16 @@ const JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JRende
 	return _renderObjectComponents.Get(handle);
 }
 
+JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JEntityHandle entity)
+{
+	return GetRenderObjectComponent(GetRenderObjectComponentHandle(entity));
+}
+
+const JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JEntityHandle entity) const
+{
+	return GetRenderObjectComponent(GetRenderObjectComponentHandle(entity));
+}
+
 void JScene::MarkRenderObjectComponentModified(JRenderObjectComponentHandle handle)
 {
 	const RenderObjectComponentData* renderObject = _renderObjectComponents.Get(handle);
@@ -452,6 +654,11 @@ void JScene::MarkRenderObjectComponentModified(JRenderObjectComponentHandle hand
 	}
 
 	pushRenderObjectEvent(JSceneRenderObjectEventType::Modified, handle, renderObject->entity);
+}
+
+void JScene::MarkRenderObjectComponentModified(JEntityHandle entity)
+{
+	MarkRenderObjectComponentModified(GetRenderObjectComponentHandle(entity));
 }
 
 std::vector<JSceneRenderObjectEvent> JScene::ConsumeRenderObjectEvents()

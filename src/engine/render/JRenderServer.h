@@ -52,6 +52,7 @@ private:
 		uint32 count = 0;
 		uint32 generation = 0;
 		bool valid = false;
+		bool tracked = false;
 	};
 
 	struct DrawItemCache

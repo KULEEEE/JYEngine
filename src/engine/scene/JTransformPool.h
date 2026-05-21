@@ -19,6 +19,7 @@ public:
 	};
 
 	JTransformHandle Add(JEntityHandle entity, const JTransformComponents& data = {});
+	bool Remove(JTransformHandle handle);
 	bool IsValid(JTransformHandle handle) const;
 
 	JTransformComponents Get(JTransformHandle handle) const;

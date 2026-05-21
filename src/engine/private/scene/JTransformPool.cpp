@@ -9,16 +9,37 @@ uint32 JTransformPool::findIndex(JTransformHandle handle) const
 
 JTransformHandle JTransformPool::Add(JEntityHandle entity, const JTransformComponents& data)
 {
-	SlotType slot;
+	if (!entity.IsValid())
+	{
+		return {};
+	}
+
+	if (entity.index >= _slots.size())
+	{
+		constexpr uint32 CHUNK_SIZE = 256;
+		const uint32 newSize = ((entity.index + 1 + CHUNK_SIZE - 1) / CHUNK_SIZE) * CHUNK_SIZE;
+		_slots.resize(newSize);
+		_translations.resize(newSize);
+		_rotations.resize(newSize);
+		_scales.resize(newSize);
+		_dirtyFlags.resize(newSize);
+	}
+
+	SlotType& slot = _slots[entity.index];
+	if (slot.active && slot.generation == entity.generation)
+	{
+		return {};
+	}
+
 	slot.active = true;
+	slot.generation = entity.generation;
 	slot.entity = entity;
-	_slots.push_back(slot);
-	_translations.push_back(data.translation);
-	_rotations.push_back(data.rotation);
-	_scales.push_back(data.scale);
-	_dirtyFlags.push_back(true);
-	_dirtyIndices.push_back(static_cast<uint32>(_slots.size() - 1));
-	return { static_cast<uint32>(_slots.size() - 1), slot.generation };
+	_translations[entity.index] = data.translation;
+	_rotations[entity.index] = data.rotation;
+	_scales[entity.index] = data.scale;
+	_dirtyFlags[entity.index] = true;
+	_dirtyIndices.push_back(entity.index);
+	return { entity.index, entity.generation };
 }
 
 bool JTransformPool::IsValid(JTransformHandle handle) const
@@ -27,6 +48,23 @@ bool JTransformPool::IsValid(JTransformHandle handle) const
 		&& handle.index < _slots.size()
 		&& _slots[handle.index].active
 		&& _slots[handle.index].generation == handle.generation;
+}
+
+bool JTransformPool::Remove(JTransformHandle handle)
+{
+	if (!IsValid(handle))
+	{
+		return false;
+	}
+
+	const uint32 index = handle.index;
+	_slots[index].active = false;
+	_slots[index].entity = {};
+	_translations[index] = {};
+	_rotations[index] = {};
+	_scales[index] = {};
+	_dirtyFlags[index] = false;
+	return true;
 }
 
 JTransformComponents JTransformPool::Get(JTransformHandle handle) const
