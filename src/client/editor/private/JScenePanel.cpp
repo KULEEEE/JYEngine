@@ -10,9 +10,7 @@
 #include "engine/asset/JMesh.h"
 
 #include <iostream>
-#include <iomanip>
 #include <algorithm>
-#include <sstream>
 
 J_EDITOR_BEGIN
 
@@ -26,26 +24,6 @@ namespace
 	constexpr float CAMERA_SPEED_SHIFT_MULTIPLIER = 4.0f;
 	constexpr float EDITOR_GRID_SIZE = 5000.0f;
 	constexpr float EDITOR_GRID_Y = -0.1f;
-
-	float toDegrees(float radians)
-	{
-		return XMConvertToDegrees(radians);
-	}
-
-	float wrapDegrees(float degrees)
-	{
-		while (degrees > 180.0f)
-		{
-			degrees -= 360.0f;
-		}
-
-		while (degrees < -180.0f)
-		{
-			degrees += 360.0f;
-		}
-
-		return degrees;
-	}
 
 	XMVECTOR getForward(float yaw, float pitch)
 	{
@@ -103,6 +81,8 @@ JScenePanel::JScenePanel(JSceneManager* sceneManager)
 
 JScenePanel::~JScenePanel()
 {
+	destroyStatsPopup();
+
 	if (_editorGridMaterial != nullptr)
 	{
 		if (Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr)
@@ -158,6 +138,7 @@ void JScenePanel::Init()
 
 	createEditorGrid();
 	selectDefaultRenderObject();
+	createStatsPopup();
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -216,6 +197,15 @@ void JScenePanel::Update()
 
 	updateSceneCamera(deltaTime);
 	updateSelectedObject(deltaTime);
+	if (_mainWindow != nullptr && GetForegroundWindow() == _mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
+	{
+		_showStatsPopup = !_showStatsPopup;
+		if (_statsPopup != nullptr)
+		{
+			ShowWindow(_statsPopup, _showStatsPopup ? SW_SHOWNOACTIVATE : SW_HIDE);
+		}
+	}
+
 	renderServer->MarkCameraDirty(_sceneCamera);
 	renderServer->Sync();
 	renderServer->SyncScene(*scene);
@@ -230,7 +220,7 @@ void JScenePanel::Update()
 		return;
 	}
 
-	populateDebugOverlay(frameDesc, deltaTime);
+	updateStatsPopup(frameDesc, deltaTime);
 	renderer->Render(frameDesc);
 }
 
@@ -459,116 +449,91 @@ void JScenePanel::updateSelectedObject(float deltaTime)
 	}
 }
 
-void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime)
+void JScenePanel::createStatsPopup()
 {
-	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_sceneCamera.IsValid())
+	if (_statsPopup != nullptr || _mainWindow == nullptr)
 	{
 		return;
 	}
 
-	const Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
-	const Engine::JTransformHandle transformHandle = cameraData != nullptr ? scene->GetTransformHandle(cameraData->entity) : Engine::JTransformHandle{};
-	if (!transformHandle.IsValid())
+	RECT ownerRect{};
+	GetWindowRect(_mainWindow, &ownerRect);
+	_statsPopup = CreateWindowExW(
+		WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+		L"STATIC",
+		L"FPS: 0.0\r\nDrawCalls: 0",
+		WS_POPUP | WS_BORDER | SS_LEFT,
+		ownerRect.left + 20,
+		ownerRect.top + 54,
+		260,
+		96,
+		_mainWindow,
+		nullptr,
+		GetModuleHandleW(nullptr),
+		nullptr);
+
+	if (_statsPopup == nullptr)
 	{
 		return;
 	}
 
-	const Engine::JScene::TransformData transformData = scene->GetTransform(transformHandle);
+	_statsFont = CreateFontW(
+		24,
+		0,
+		0,
+		0,
+		FW_SEMIBOLD,
+		FALSE,
+		FALSE,
+		FALSE,
+		DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS,
+		CLIP_DEFAULT_PRECIS,
+		CLEARTYPE_QUALITY,
+		DEFAULT_PITCH | FF_DONTCARE,
+		L"Consolas");
+	SendMessageW(_statsPopup, WM_SETFONT, reinterpret_cast<WPARAM>(_statsFont), TRUE);
+	ShowWindow(_statsPopup, _showStatsPopup ? SW_SHOWNOACTIVATE : SW_HIDE);
+}
 
-	uint32 lightCount = 0;
-	for (const Engine::JScene::LightSlot& slot : scene->GetLightSlots())
+void JScenePanel::destroyStatsPopup()
+{
+	if (_statsPopup != nullptr)
 	{
-		if (slot.active && slot.data.active)
-		{
-			++lightCount;
-		}
+		DestroyWindow(_statsPopup);
+		_statsPopup = nullptr;
 	}
 
-	uint32 objectCount = 0;
-	for (const Engine::JScene::RenderObjectComponentSlot& slot : scene->GetRenderObjectComponentSlots())
+	if (_statsFont != nullptr)
 	{
-		if (slot.active && slot.data.active && slot.data.visible)
-		{
-			++objectCount;
-		}
+		DeleteObject(_statsFont);
+		_statsFont = nullptr;
+	}
+}
+
+void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float deltaTime)
+{
+	if (_statsPopup == nullptr)
+	{
+		createStatsPopup();
+	}
+
+	if (_statsPopup == nullptr || !_showStatsPopup)
+	{
+		return;
+	}
+
+	RECT ownerRect{};
+	if (_mainWindow != nullptr && GetWindowRect(_mainWindow, &ownerRect))
+	{
+		SetWindowPos(_statsPopup, HWND_TOPMOST, ownerRect.left + 20, ownerRect.top + 54, 260, 96, SWP_NOACTIVATE);
 	}
 
 	const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
-	const Engine::JScene::LightData* lightData = scene->GetLight(_light);
-	const Engine::JTransformHandle lightTransformHandle = lightData != nullptr ? scene->GetTransformHandle(lightData->entity) : Engine::JTransformHandle{};
-
-	std::ostringstream stream;
-	stream << std::fixed << std::setprecision(2);
-	stream << "FPS " << fps << "  DT " << (deltaTime * 1000.0f) << "MS";
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	stream.str("");
-	stream.clear();
-	stream << "DRAW O " << frameDesc.opaqueDrawItems.size()
-		<< "  T " << frameDesc.transparentDrawItems.size()
-		<< "  OBJ " << objectCount;
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	stream.str("");
-	stream.clear();
-	stream << "CULL TEST " << frameDesc.cullingTestedDrawItemCount
-		<< "  CULLED " << frameDesc.culledDrawItemCount
-		<< "  VISIBLE " << (frameDesc.opaqueDrawItems.size() + frameDesc.transparentDrawItems.size());
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	stream.str("");
-	stream.clear();
-	stream << "CAM POS "
-		<< transformData.translation.x << ", "
-		<< transformData.translation.y << ", "
-		<< transformData.translation.z;
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	stream.str("");
-	stream.clear();
-	stream << "CAM ROT "
-		<< wrapDegrees(toDegrees(transformData.rotation.x)) << ", "
-		<< wrapDegrees(toDegrees(transformData.rotation.y)) << ", "
-		<< wrapDegrees(toDegrees(transformData.rotation.z));
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	stream.str("");
-	stream.clear();
-	stream << "CAM SPEED " << _editorCameraMoveSpeed
-		<< "  NEAR " << (cameraData != nullptr ? cameraData->nearP : 0.0f)
-		<< "  FAR " << (cameraData != nullptr ? cameraData->farP : 0.0f);
-	frameDesc.debugOverlayLines.push_back(stream.str());
-
-	if (_selectedEntity.IsValid())
-	{
-		const Engine::JTransformHandle selectedTransformHandle = scene->GetTransformHandle(_selectedEntity);
-		if (selectedTransformHandle.IsValid())
-		{
-			const Engine::JScene::TransformData selectedTransform = scene->GetTransform(selectedTransformHandle);
-			stream.str("");
-			stream.clear();
-			stream << "SEL POS "
-				<< selectedTransform.translation.x << ", "
-				<< selectedTransform.translation.y << ", "
-				<< selectedTransform.translation.z
-				<< "  V TOGGLE";
-			frameDesc.debugOverlayLines.push_back(stream.str());
-		}
-	}
-
-	stream.str("");
-	stream.clear();
-	stream << "LIGHTS " << lightCount;
-	if (lightData != nullptr && lightTransformHandle.IsValid())
-	{
-		const Engine::JScene::TransformData lightTransformData = scene->GetTransform(lightTransformHandle);
-		stream << "  FIRST "
-			<< lightTransformData.translation.x << ", "
-			<< lightTransformData.translation.y << ", "
-			<< lightTransformData.translation.z;
-	}
-	frameDesc.debugOverlayLines.push_back(stream.str());
+	const uint32 drawCallCount = static_cast<uint32>(frameDesc.opaqueDrawItems.size() + frameDesc.transparentDrawItems.size());
+	wchar_t text[128] = {};
+	swprintf_s(text, L"FPS: %.1f\r\nDrawCalls: %u", fps, drawCallCount);
+	SetWindowTextW(_statsPopup, text);
 }
 
 J_EDITOR_END

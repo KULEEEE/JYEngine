@@ -35,7 +35,6 @@ struct JFrameDesc
 	std::vector<JDrawItem> transparentDrawItems;
 	uint32 cullingTestedDrawItemCount = 0;
 	uint32 culledDrawItemCount = 0;
-	std::vector<std::string> debugOverlayLines;
 };
 
 J_ENGINE_END

@@ -36,7 +36,9 @@ private:
 	void updateSceneCamera(float deltaTime);
 	void selectDefaultRenderObject();
 	void updateSelectedObject(float deltaTime);
-	void populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime);
+	void createStatsPopup();
+	void destroyStatsPopup();
+	void updateStatsPopup(const Engine::JFrameDesc& frameDesc, float deltaTime);
 	
 	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
@@ -48,6 +50,7 @@ private:
 	std::unique_ptr<Engine::JMaterial> _editorGridMaterial;
 	std::unique_ptr<Engine::JMesh> _editorGridMesh;
 	bool _isMouseLookActive = false;
+	bool _showStatsPopup = true;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;
 	std::chrono::steady_clock::time_point _lastUpdateTime = {};
@@ -55,6 +58,8 @@ private:
 	HWND _mainWindow = nullptr;
 	uint32 _viewportWidth = 0;
 	uint32 _viewportHeight = 0;
+	HWND _statsPopup = nullptr;
+	HFONT _statsFont = nullptr;
 
 };
 
