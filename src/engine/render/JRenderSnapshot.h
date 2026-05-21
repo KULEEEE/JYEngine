@@ -11,10 +11,18 @@
 
 J_ENGINE_BEGIN
 
+struct JFrustum
+{
+	XMVECTOR planes[6] = {};
+};
+
 struct JCameraSnapshot
 {
 	JCameraHandle camera = {};
 	XMMATRIX viewProjection = XMMatrixIdentity();
+	JFrustum frustum = {};
+	uint32 cullingTestedDrawItemCount = 0;
+	uint32 culledDrawItemCount = 0;
 	std::vector<uint32> opaqueDrawItemIndices;
 	std::vector<uint32> transparentDrawItemIndices;
 };

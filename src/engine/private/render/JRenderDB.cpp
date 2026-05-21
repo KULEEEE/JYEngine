@@ -381,6 +381,7 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 
 	JTransformResource& resource = getOrCreateTransformResource(transform);
 	resource.transform = transform;
+	resource.world = world;
 
 	PerObjectConstants constants{};
 	XMStoreFloat4x4(&constants.world, XMMatrixTranspose(world));

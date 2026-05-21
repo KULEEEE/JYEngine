@@ -45,6 +45,7 @@ struct JCameraResource
 struct JTransformResource
 {
 	JTransformHandle transform = {};
+	XMMATRIX world = XMMatrixIdentity();
 	Render::JConstantBuffer* perObjectBuffer = nullptr;
 };
 

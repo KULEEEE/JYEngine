@@ -24,7 +24,10 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 	_cmdQueue = cmdQueue;
 	_swapChain = swapChain;
 	_renderContext = new JRenderContext(_device);
+	_jobSystem = new JJobSystem();
+	_jobSystem->Initialize();
 	_renderServer = new JRenderServer();
+	_renderServer->SetJobSystem(_jobSystem);
 	_renderServer->GetRenderDB().Initialize(_renderContext);
 	_renderer = new JRenderer();
 	_renderer->Initialize(_cmdQueue, _renderContext, &_renderServer->GetRenderDB());
@@ -41,6 +44,9 @@ void JEngine::destroy()
 
 	delete _renderServer;
 	_renderServer = nullptr;
+
+	delete _jobSystem;
+	_jobSystem = nullptr;
 
 	delete _renderContext;
 	_renderContext = nullptr;

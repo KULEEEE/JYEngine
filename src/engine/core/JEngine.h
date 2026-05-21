@@ -11,6 +11,7 @@
 #include "engine/render/JRenderServer.h"
 #include "engine/render/JRenderer.h"
 #include "engine/render/JMaterialFactory.h"
+#include "engine/core/JJobSystem.h"
 
 J_ENGINE_BEGIN
 
@@ -29,6 +30,7 @@ public:
 	JRenderServer* GetRenderServer() { return _renderServer; }
 	JRenderer* GetRenderer() { return _renderer; }
 	JMaterialFactory* GetMaterialFactory() { return _materialFactory; }
+	JJobSystem* GetJobSystem() { return _jobSystem; }
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);
@@ -39,6 +41,7 @@ private:
 	Render::JSwapChain* _swapChain = nullptr;
 	Render::JDx12Helper* _dx12Helper = nullptr;
 	Render::JRenderContext* _renderContext = nullptr;
+	JJobSystem* _jobSystem = nullptr;
 	JRenderServer* _renderServer = nullptr;
 	JRenderer* _renderer = nullptr;
 	JMaterialFactory* _materialFactory = nullptr;

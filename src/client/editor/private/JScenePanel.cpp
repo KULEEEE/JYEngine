@@ -24,7 +24,6 @@ namespace
 	constexpr float CAMERA_SPEED_MAX = 100.0f;
 	constexpr float CAMERA_SPEED_STEP_MULTIPLIER = 1.2f;
 	constexpr float CAMERA_SPEED_SHIFT_MULTIPLIER = 4.0f;
-	constexpr float OBJECT_MOVE_SPEED = 2.0f;
 	constexpr float EDITOR_GRID_SIZE = 5000.0f;
 	constexpr float EDITOR_GRID_Y = -0.1f;
 
@@ -441,6 +440,8 @@ void JScenePanel::selectDefaultRenderObject()
 
 void JScenePanel::updateSelectedObject(float deltaTime)
 {
+	(void)deltaTime;
+
 	Engine::JScene* scene = getScene();
 	if (scene == nullptr || !_selectedEntity.IsValid() || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
 	{
@@ -456,35 +457,6 @@ void JScenePanel::updateSelectedObject(float deltaTime)
 			scene->MarkRenderObjectComponentModified(_selectedEntity);
 		}
 	}
-
-	const Engine::JTransformHandle transformHandle = scene->GetTransformHandle(_selectedEntity);
-	if (!transformHandle.IsValid())
-	{
-		return;
-	}
-
-	float xInput = 0.0f;
-	float yInput = 0.0f;
-	float zInput = 0.0f;
-	if (GetAsyncKeyState('J') & 0x8000) xInput -= 1.0f;
-	if (GetAsyncKeyState('L') & 0x8000) xInput += 1.0f;
-	if (GetAsyncKeyState('U') & 0x8000) yInput += 1.0f;
-	if (GetAsyncKeyState('O') & 0x8000) yInput -= 1.0f;
-	if (GetAsyncKeyState('I') & 0x8000) zInput += 1.0f;
-	if (GetAsyncKeyState('K') & 0x8000) zInput -= 1.0f;
-
-	if (xInput == 0.0f && yInput == 0.0f && zInput == 0.0f)
-	{
-		return;
-	}
-
-	const float speedMultiplier = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ? 4.0f : 1.0f;
-	const float step = OBJECT_MOVE_SPEED * speedMultiplier * deltaTime;
-	Engine::JScene::TransformData transform = scene->GetTransform(transformHandle);
-	transform.translation.x += xInput * step;
-	transform.translation.y += yInput * step;
-	transform.translation.z += zInput * step;
-	scene->SetTransformTranslation(transformHandle, transform.translation);
 }
 
 void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float deltaTime)
@@ -540,6 +512,13 @@ void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float delt
 
 	stream.str("");
 	stream.clear();
+	stream << "CULL TEST " << frameDesc.cullingTestedDrawItemCount
+		<< "  CULLED " << frameDesc.culledDrawItemCount
+		<< "  VISIBLE " << (frameDesc.opaqueDrawItems.size() + frameDesc.transparentDrawItems.size());
+	frameDesc.debugOverlayLines.push_back(stream.str());
+
+	stream.str("");
+	stream.clear();
 	stream << "CAM POS "
 		<< transformData.translation.x << ", "
 		<< transformData.translation.y << ", "
@@ -573,7 +552,7 @@ void JScenePanel::populateDebugOverlay(Engine::JFrameDesc& frameDesc, float delt
 				<< selectedTransform.translation.x << ", "
 				<< selectedTransform.translation.y << ", "
 				<< selectedTransform.translation.z
-				<< "  JLIK UO";
+				<< "  V TOGGLE";
 			frameDesc.debugOverlayLines.push_back(stream.str());
 		}
 	}

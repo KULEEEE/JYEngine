@@ -53,7 +53,7 @@
       "active": true,
       "transform": {
         "translation": [0.0, 4.0, -3.0],
-        "rotation": [0.0, 0.0, 0.0],
+        "rotation": [1.5708, 0.0, 0.0],
         "scale": [1.0, 1.0, 1.0]
       },
       "light": {
@@ -68,7 +68,7 @@
       "active": true,
       "transform": {
         "translation": [-3.0, 2.0, -1.0],
-        "rotation": [0.0, 0.0, 0.0],
+        "rotation": [1.5708, 0.0, 0.0],
         "scale": [1.0, 1.0, 1.0]
       },
       "light": {
@@ -83,7 +83,7 @@
       "active": true,
       "transform": {
         "translation": [3.5, 2.5, 1.5],
-        "rotation": [0.0, 0.0, 0.0],
+        "rotation": [1.5708, 0.0, 0.0],
         "scale": [1.0, 1.0, 1.0]
       },
       "light": {
@@ -93,13 +93,166 @@
       }
     },
     {
-      "stableID": "ent_sample_cup",
-      "name": "Cup",
+      "stableID": "ent_sample_cup_00",
+      "name": "Cup 00",
+      "active": true,
+      "transform": {
+        "translation": [-6.0, 0.0, 0.0],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [8.0, 8.0, 8.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_01",
+      "name": "Cup 01",
+      "active": true,
+      "transform": {
+        "translation": [-3.0, 0.0, 1.5],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [9.0, 9.0, 9.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_02",
+      "name": "Cup 02",
       "active": true,
       "transform": {
         "translation": [0.0, 0.0, 0.0],
-        "rotation": [1.507, 0.0, 0.0],
-        "scale": [1.0, 1.0, 1.0]
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [10.0, 10.0, 10.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_03",
+      "name": "Cup 03",
+      "active": true,
+      "transform": {
+        "translation": [3.0, 0.0, 1.5],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [9.0, 9.0, 9.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_04",
+      "name": "Cup 04",
+      "active": true,
+      "transform": {
+        "translation": [6.0, 0.0, 0.0],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [8.0, 8.0, 8.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_05",
+      "name": "Cup 05",
+      "active": true,
+      "transform": {
+        "translation": [-4.5, 0.0, 5.0],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [10.0, 10.0, 10.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_06",
+      "name": "Cup 06",
+      "active": true,
+      "transform": {
+        "translation": [-1.5, 0.0, 6.5],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [11.0, 11.0, 11.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_07",
+      "name": "Cup 07",
+      "active": true,
+      "transform": {
+        "translation": [1.5, 0.0, 6.5],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [11.0, 11.0, 11.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_08",
+      "name": "Cup 08",
+      "active": true,
+      "transform": {
+        "translation": [4.5, 0.0, 5.0],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [10.0, 10.0, 10.0]
+      },
+      "renderObjectComponent": {
+        "active": true,
+        "visible": true,
+        "transparent": false,
+        "materialID": "mat_sample_pbr",
+        "meshID": "mesh_cup"
+      }
+    },
+    {
+      "stableID": "ent_sample_cup_09",
+      "name": "Cup 09",
+      "active": true,
+      "transform": {
+        "translation": [0.0, 0.0, 10.0],
+        "rotation": [1.5708, 0.0, 0.0],
+        "scale": [12.0, 12.0, 12.0]
       },
       "renderObjectComponent": {
         "active": true,

@@ -38,14 +38,14 @@ void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, JCa
 
 void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	if (drawItem.meshResource == nullptr)
+	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
+	if (meshResource == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		return;
 	}
 
-	const JMeshResource* meshResource = drawItem.meshResource;
-	const JMaterialResource* materialResource = drawItem.materialResource;
+	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
 	if (meshResource == nullptr || materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
@@ -59,7 +59,7 @@ void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCam
 		return;
 	}
 
-	const JTransformResource* transformResource = drawItem.transformResource;
+	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
 	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);

@@ -2,6 +2,8 @@
 
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
+#include "engine/core/JJobSystem.h"
+#include "engine/render/JCameraRenderQueueBuilder.h"
 #include "engine/render/JRenderSnapshotBuilder.h"
 
 J_ENGINE_BEGIN
@@ -288,7 +290,7 @@ void JRenderServer::updateDrawItemCache(JScene& scene, const std::vector<JSceneR
 			continue;
 		}
 
-		const DrawRange& range = _drawItemCache.drawRangeByEntityIndex[entityIndex];
+		const JDrawRange& range = _drawItemCache.drawRangeByEntityIndex[entityIndex];
 		if (!range.valid)
 		{
 			continue;
@@ -348,7 +350,7 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 		_drawItemCache.drawRangeByEntityIndex.resize(data->entity.index + 1);
 	}
 
-	DrawRange& existingRange = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	JDrawRange& existingRange = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
 	if (existingRange.valid && existingRange.generation == data->entity.generation)
 	{
 		patchDrawItems(scene, renderObject, outResult);
@@ -398,7 +400,7 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 		return;
 	}
 
-	DrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	JDrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
 	const bool wasTracked = range.tracked;
 	range = { start, count, data->entity.generation, true, wasTracked };
 	if (!range.tracked)
@@ -417,7 +419,7 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 		return;
 	}
 
-	DrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
+	JDrawRange& range = _drawItemCache.drawRangeByEntityIndex[data->entity.index];
 	if (!range.valid || range.generation != data->entity.generation)
 	{
 		appendDrawItems(scene, renderObject, outResult);
@@ -491,61 +493,6 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 	}
 }
 
-void JRenderServer::buildCameraDrawItemIndices()
-{
-	for (JCameraSnapshot& cameraSnapshot : _frameSnapshot.cameras)
-	{
-		cameraSnapshot.opaqueDrawItemIndices.clear();
-		cameraSnapshot.transparentDrawItemIndices.clear();
-		for (uint32 entityIndex : _drawItemCache.activeDrawEntityIndices)
-		{
-			if (entityIndex >= _drawItemCache.drawRangeByEntityIndex.size())
-			{
-				continue;
-			}
-
-			const DrawRange& range = _drawItemCache.drawRangeByEntityIndex[entityIndex];
-			if (!range.valid)
-			{
-				continue;
-			}
-
-			for (uint32 i = 0; i < range.count; ++i)
-			{
-				const uint32 drawItemIndex = range.start + i;
-				if (drawItemIndex >= _drawItemCache.drawItems.size())
-				{
-					continue;
-				}
-
-				const JDrawItem& drawItem = _drawItemCache.drawItems[drawItemIndex];
-				if (drawItem.transparent)
-				{
-					cameraSnapshot.transparentDrawItemIndices.push_back(drawItemIndex);
-				}
-				else
-				{
-					cameraSnapshot.opaqueDrawItemIndices.push_back(drawItemIndex);
-				}
-			}
-		}
-	}
-}
-
-void JRenderServer::resolveDrawItemResources()
-{
-	for (JDrawItem& drawItem : _drawItemCache.drawItems)
-	{
-		drawItem.meshResource = _renderDB.FindMeshResource(drawItem.mesh);
-		drawItem.materialResource = _renderDB.FindMaterialResource(drawItem.materialID);
-		drawItem.transformResource = _renderDB.FindTransformResource(drawItem.transform);
-		if (drawItem.indexCount == 0 && drawItem.meshResource != nullptr)
-		{
-			drawItem.indexCount = static_cast<uint32>(drawItem.meshResource->indexSize);
-		}
-	}
-}
-
 void JRenderServer::SyncScene(JScene& scene)
 {
 	if (_syncedScene != &scene)
@@ -565,13 +512,16 @@ void JRenderServer::SyncScene(JScene& scene)
 	JRenderSnapshotBuilder::Result buildResult;
 	JRenderSnapshotBuilder::Build(input, _frameSnapshot, buildResult);
 	updateDrawItemCache(scene, renderObjectEvents, buildResult);
-	buildCameraDrawItemIndices();
-
 	syncCameraResources();
 	syncTransformResources();
 	syncLightResources();
 	ensureMeshResources(buildResult.activeMeshes);
-	resolveDrawItemResources();
+
+	JCameraRenderQueueBuilder::Input queueInput;
+	queueInput.drawItemCache = &_drawItemCache;
+	queueInput.renderDB = &_renderDB;
+	queueInput.jobSystem = _jobSystem;
+	JCameraRenderQueueBuilder::Build(queueInput, _frameSnapshot);
 
 	_renderDB.PruneUnusedSceneResources(buildResult.activeCameraKeys, buildResult.activeTransformKeys, buildResult.activeMeshes);
 }
@@ -594,6 +544,9 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	{
 		return false;
 	}
+
+	outFrameDesc.cullingTestedDrawItemCount = cameraSnapshot->cullingTestedDrawItemCount;
+	outFrameDesc.culledDrawItemCount = cameraSnapshot->culledDrawItemCount;
 
 	outFrameDesc.opaqueDrawItems.reserve(cameraSnapshot->opaqueDrawItemIndices.size());
 	for (uint32 drawItemIndex : cameraSnapshot->opaqueDrawItemIndices)

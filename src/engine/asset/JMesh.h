@@ -4,6 +4,8 @@
 
 #include "engine/precompile.h"
 
+#include <cfloat>
+
 J_ENGINE_BEGIN
 
 class JMesh
@@ -16,6 +18,15 @@ public:
 		uint32 materialIndex;
 		uint32 startIndex;
 		uint32 endIndex;
+	};
+
+	struct Bounds
+	{
+		JVec3 min = {};
+		JVec3 max = {};
+		JVec3 center = {};
+		JVec3 extents = {};
+		bool valid = false;
 	};
 
 	enum class AttributeIndex : uint8
@@ -47,7 +58,11 @@ public:
 	JMesh& operator=(const JMesh& o);
 	~JMesh();
 
-	void SetPositions(vector<float>&& data) { _positions = std::move(data); }
+	void SetPositions(vector<float>&& data)
+	{
+		_positions = std::move(data);
+		updateBounds();
+	}
 	void SetTexcoords(vector<float>&& data, int index) { (!index) ? (_texcoords0 = std::move(data)) : (_texcoords1 = std::move(data)); }
 	void SetNormals(vector<float>&& data) { _normals = std::move(data); }
 	void SetColors(vector<float>&& data) { _colors = std::move(data); }
@@ -68,9 +83,46 @@ public:
 	const vector<float>& GetBoneWeights() const { return _boneWeights; }
 	const vector<uint32>& GetIndices() const { return _indices; }
 	const vector<SubMeshInfo>& GetSubMeshInfos() const { return _subMeshes; }
+	const Bounds& GetBounds() const { return _bounds; }
 
 	const size_t GetVertexCount() const { return _positions.size() / 4; }
 private:
+	void updateBounds()
+	{
+		_bounds = {};
+		if (_positions.size() < 4)
+		{
+			return;
+		}
+
+		JVec3 minPoint(FLT_MAX, FLT_MAX, FLT_MAX);
+		JVec3 maxPoint(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		for (size_t i = 0; i + 3 < _positions.size(); i += 4)
+		{
+			const float x = _positions[i + 0];
+			const float y = _positions[i + 1];
+			const float z = _positions[i + 2];
+
+			minPoint.x = std::min(minPoint.x, x);
+			minPoint.y = std::min(minPoint.y, y);
+			minPoint.z = std::min(minPoint.z, z);
+			maxPoint.x = std::max(maxPoint.x, x);
+			maxPoint.y = std::max(maxPoint.y, y);
+			maxPoint.z = std::max(maxPoint.z, z);
+		}
+
+		_bounds.min = minPoint;
+		_bounds.max = maxPoint;
+		_bounds.center = JVec3(
+			(minPoint.x + maxPoint.x) * 0.5f,
+			(minPoint.y + maxPoint.y) * 0.5f,
+			(minPoint.z + maxPoint.z) * 0.5f);
+		_bounds.extents = JVec3(
+			(maxPoint.x - minPoint.x) * 0.5f,
+			(maxPoint.y - minPoint.y) * 0.5f,
+			(maxPoint.z - minPoint.z) * 0.5f);
+		_bounds.valid = true;
+	}
 
 	vector<float> _positions;
 	vector<float> _texcoords0;
@@ -84,6 +136,7 @@ private:
 	vector<uint32> _indices;
 
 	vector<SubMeshInfo> _subMeshes;
+	Bounds _bounds;
 };
 
 J_ENGINE_END

@@ -20,7 +20,7 @@ namespace
 			return false;
 		}
 
-		const JTransformResource* transformResource = drawItem.transformResource;
+		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
 		if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 		{
 			graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
@@ -99,14 +99,14 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 
 	for (const JDrawItem& drawItem : frameDesc.opaqueDrawItems)
 	{
-		if (drawItem.meshResource == nullptr)
+		const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
+		if (meshResource == nullptr)
 		{
 			++_lastStats.skippedDrawCount;
 			continue;
 		}
 
-		const JMeshResource* meshResource = drawItem.meshResource;
-		const JMaterialResource* materialResource = drawItem.materialResource;
+		const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
 		if (meshResource == nullptr || materialResource == nullptr || !meshResource->hasNormals || !meshResource->hasTexcoords)
 		{
 			++_lastStats.skippedDrawCount;

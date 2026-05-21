@@ -39,22 +39,15 @@ void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCamera
 
 void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	if (drawItem.meshResource == nullptr)
+	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
+	if (meshResource == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
 		std::cerr << GetName() << " draw skipped: draw item mesh is null." << std::endl;
 		return;
 	}
 
-	const JMeshResource* meshResource = drawItem.meshResource;
-	if (meshResource == nullptr)
-	{
-		++_lastStats.skippedDrawCount;
-		std::cerr << GetName() << " draw skipped: mesh resource is not ready." << std::endl;
-		return;
-	}
-
-	const JMaterialResource* materialResource = drawItem.materialResource;
+	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
 	if (materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
 	{
 		++_lastStats.skippedDrawCount;
@@ -70,7 +63,7 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 		return;
 	}
 
-	const JTransformResource* transformResource = drawItem.transformResource;
+	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
 	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
 	{
 		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);

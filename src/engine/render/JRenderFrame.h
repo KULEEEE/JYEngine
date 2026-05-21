@@ -4,7 +4,6 @@
 
 #include "engine/precompile.h"
 #include "engine/render/JRenderDefinition.h"
-#include "engine/render/JRenderResource.h"
 #include "engine/scene/JScene.h"
 
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
@@ -22,9 +21,6 @@ struct JDrawItem
 	uint32 subMeshIndex = 0;
 	uint32 indexCount = 0;
 	uint32 startIndex = 0;
-	const JMeshResource* meshResource = nullptr;
-	const JMaterialResource* materialResource = nullptr;
-	const JTransformResource* transformResource = nullptr;
 	bool transparent = false;
 };
 
@@ -37,6 +33,8 @@ struct JFrameDesc
 	D3D12_RECT scissorRect = {};
 	std::vector<JDrawItem> opaqueDrawItems;
 	std::vector<JDrawItem> transparentDrawItems;
+	uint32 cullingTestedDrawItemCount = 0;
+	uint32 culledDrawItemCount = 0;
 	std::vector<std::string> debugOverlayLines;
 };
 
