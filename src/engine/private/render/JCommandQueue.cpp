@@ -161,11 +161,6 @@ void JCommandQueue::RenderBegin(uint32 frameIndex)
 	_cmdList->Reset(frameResource.commandAllocator.Get(), nullptr);
 }
 
-void JCommandQueue::RenderBegin()
-{
-	RenderBegin(_activeFrameIndex);
-}
-
 void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget)
 {
 	BeginRenderPass(renderTarget, clearColor, rectCount, nullptr, clearRenderTarget, false);
@@ -577,11 +572,6 @@ void JCommandQueue::RenderEnd(uint32 frameIndex)
 	const uint64 fenceValue = _nextFenceValue++;
 	_cmdQueue->Signal(_fence.Get(), fenceValue);
 	_frameResources[resolvedFrameIndex].fenceValue = fenceValue;
-}
-
-void JCommandQueue::RenderEnd()
-{
-	RenderEnd(_activeFrameIndex);
 }
 
 void JCommandQueue::waitForFenceValue(uint64 fenceValue)

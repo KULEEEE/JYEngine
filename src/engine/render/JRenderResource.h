@@ -59,7 +59,6 @@ struct JCameraResource
 {
 	JCameraHandle camera = {};
 	JPerFrameConstants constants = {};
-	Render::JConstantBuffer* perFrameBuffer = nullptr;
 };
 
 struct JTransformResource
@@ -67,13 +66,11 @@ struct JTransformResource
 	JTransformHandle transform = {};
 	XMMATRIX world = XMMatrixIdentity();
 	JPerObjectConstants constants = {};
-	Render::JConstantBuffer* perObjectBuffer = nullptr;
 };
 
 struct JLightResource
 {
 	JLightConstants constants = {};
-	Render::JConstantBuffer* lightBuffer = nullptr;
 	uint32 lightCount = 0;
 	bool initialized = false;
 };

@@ -139,50 +139,6 @@ public:
 		return cBuffer;
 	}
 
-	void UpdateConstantBuffer(JConstantBuffer* buffer, void* data, size_t size)
-	{
-		ComPtr<ID3D12Device> device = _device->GetDevice();
-
-		size_t bufferSize = (size + 255) & ~255;
-
-		if (buffer->buffer->GetDesc().Width < bufferSize)
-		{
-			buffer->buffer->Release();
-			buffer->buffer = nullptr;
-		}
-
-		if (buffer->buffer == nullptr)
-		{
-			CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
-			CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-
-			HRESULT hr = device->CreateCommittedResource(
-				&heapProps,
-				D3D12_HEAP_FLAG_NONE,
-				&bufferDesc,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(&buffer->buffer)
-			);
-		}
-
-		void* pData = nullptr;
-		D3D12_RANGE range = {};
-		HRESULT hr = buffer->buffer->Map(0, &range, &pData);
-
-		if (FAILED(hr) || pData == nullptr)
-		{
-			std::cerr << "UpdateConstantBuffer map failed. HRESULT=0x"
-				<< std::hex << hr << std::dec << std::endl;
-			return;
-		}
-
-		::memset(pData, 0, bufferSize);
-		::memcpy(pData, data, size);
-
-		buffer->buffer->Unmap(0, nullptr);
-	}
-
 	void DestroyConstantBuffer(JConstantBuffer* buffer)
 	{
 		if (buffer == nullptr)
@@ -360,7 +316,6 @@ public:
 		srvDesc.Texture2D.MipLevels = 1;
 		device->CreateShaderResourceView(texture->texture, &srvDesc, texture->srvHeap->GetCPUDescriptorHandleForHeapStart());
 
-		texture->samplerHeap = nullptr;
 		return texture;
 	}
 
@@ -561,7 +516,7 @@ public:
 		srvDesc.Texture2D.MipLevels = 1;
 		device->CreateShaderResourceView(texture->texture, &srvDesc, texture->srvHeap->GetCPUDescriptorHandleForHeapStart());
 
-		texture->samplerHeap = nullptr;		return texture;
+		return texture;
 	}
 	JShader* CreateShader(const std::string& path)
 	{

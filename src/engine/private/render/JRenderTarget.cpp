@@ -184,7 +184,6 @@ bool JRenderTarget::createShaderResourceView(ID3D12Resource* resource)
 
 	_textureView.texture = resource;
 	_textureView.srvHeap = _srvHeap.Get();
-	_textureView.samplerHeap = nullptr;
 	return true;
 }
 

@@ -510,8 +510,6 @@ void JRenderDB::RemoveCameraResource(JCameraHandle camera)
 		return;
 	}
 
-	destroyConstantBuffer(_renderContext, _cameraResources[index].resource.perFrameBuffer);
-
 	const uint32 lastIndex = static_cast<uint32>(_cameraResources.size() - 1);
 	if (index != lastIndex)
 	{
@@ -530,8 +528,6 @@ void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 	{
 		return;
 	}
-
-	destroyConstantBuffer(_renderContext, _transformResources[index].resource.perObjectBuffer);
 
 	const uint32 lastIndex = static_cast<uint32>(_transformResources.size() - 1);
 	if (index != lastIndex)
@@ -618,18 +614,6 @@ void JRenderDB::Clear()
 	{
 		destroyMaterialResource(_renderContext, record.resource);
 	}
-
-	for (TransformResourceRecord& record : _transformResources)
-	{
-		destroyConstantBuffer(_renderContext, record.resource.perObjectBuffer);
-	}
-
-	for (CameraResourceRecord& record : _cameraResources)
-	{
-		destroyConstantBuffer(_renderContext, record.resource.perFrameBuffer);
-	}
-
-	destroyConstantBuffer(_renderContext, _lightResource.lightBuffer);
 
 	_meshResources.clear();
 	_meshIndexMap.clear();

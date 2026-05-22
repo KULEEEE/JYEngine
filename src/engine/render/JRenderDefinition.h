@@ -82,7 +82,6 @@ struct JTexture : public JInstantiable// TODO: Refactoring
 {
 	ID3D12Resource* texture = nullptr;
 	ID3D12DescriptorHeap* srvHeap = nullptr;
-	ID3D12DescriptorHeap* samplerHeap = nullptr;
 
 	void Destroy()
 	{
@@ -98,11 +97,6 @@ struct JTexture : public JInstantiable// TODO: Refactoring
 			srvHeap = nullptr;
 		}
 
-		if (nullptr != samplerHeap)
-		{
-			samplerHeap->Release();
-			samplerHeap = nullptr;
-		}
 	}
 };
 

@@ -23,7 +23,6 @@ public:
 	void Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain);
 
 	void RenderBegin(uint32 frameIndex);
-	void RenderBegin();
 
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget = true);
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget = true, bool clearDepth = false);
@@ -43,7 +42,6 @@ public:
 
 	void EndRenderPass();
 	void RenderEnd(uint32 frameIndex);
-	void RenderEnd();
 	void WaitIdle();
 
 	ComPtr<ID3D12CommandQueue> GetCmdQueue() { return _cmdQueue; }
