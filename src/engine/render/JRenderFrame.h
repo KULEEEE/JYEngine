@@ -8,6 +8,7 @@
 
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
+namespace J { namespace Engine { struct JDrawItemCache; } }
 
 J_ENGINE_BEGIN
 
@@ -18,6 +19,9 @@ struct JDrawItem
 	JTransformHandle transform = {};
 	uint32 materialID = 0;
 	const JMesh* mesh = nullptr;
+	uint32 meshResourceIndex = static_cast<uint32>(-1);
+	uint32 materialResourceIndex = static_cast<uint32>(-1);
+	uint32 transformResourceIndex = static_cast<uint32>(-1);
 	uint32 subMeshIndex = 0;
 	uint32 indexCount = 0;
 	uint32 startIndex = 0;
@@ -31,8 +35,9 @@ struct JFrameDesc
 	JColor clearColor = JColors::DarkGray;
 	Render::JViewport viewport = {};
 	D3D12_RECT scissorRect = {};
-	std::vector<JDrawItem> opaqueDrawItems;
-	std::vector<JDrawItem> transparentDrawItems;
+	const JDrawItemCache* drawItemCache = nullptr;
+	std::vector<uint32> opaqueDrawItemIndices;
+	std::vector<uint32> transparentDrawItemIndices;
 	uint32 cullingTestedDrawItemCount = 0;
 	uint32 culledDrawItemCount = 0;
 };

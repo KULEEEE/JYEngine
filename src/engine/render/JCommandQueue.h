@@ -39,6 +39,7 @@ public:
 	void Draw(const uint32& vertexCount, const uint32& instanceCount);
 	void DrawFullscreenTriangle();
 	void DrawIndexed(const uint32& indexCount, const uint32& instanceCount, const uint32& startIndex, const uint32& baseVertex, const uint32& startInstance);
+	D3D12_GPU_VIRTUAL_ADDRESS UploadFrameConstantBuffer(const void* data, size_t size);
 
 	void EndRenderPass();
 	void RenderEnd(uint32 frameIndex);
@@ -52,12 +53,20 @@ private:
 	struct FrameResource
 	{
 		ComPtr<ID3D12CommandAllocator> commandAllocator;
-		std::vector<ComPtr<ID3D12DescriptorHeap>> transientDescriptorHeaps;
+		ComPtr<ID3D12Resource> uploadBuffer;
+		uint8* uploadMappedData = nullptr;
+		size_t uploadCapacity = 0;
+		size_t uploadOffset = 0;
+		ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+		uint32 descriptorCapacity = 0;
+		uint32 descriptorOffset = 0;
 		uint64 fenceValue = 0;
 	};
 
 	void destroy();
 	void waitForFenceValue(uint64 fenceValue);
+	bool initializeFrameResource(FrameResource& frameResource);
+	D3D12_GPU_DESCRIPTOR_HANDLE allocateFrameTextureTable(const JGraphicResource* resource, JShader* shader);
 
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 	ComPtr<ID3D12Device> _device;
@@ -68,6 +77,7 @@ private:
 	HANDLE _fenceEvent = INVALID_HANDLE_VALUE;
 	FrameResource _frameResources[SWAP_CHAIN_BUFFER_COUNT];
 	uint32 _activeFrameIndex = 0;
+	uint32 _srvDescriptorSize = 0;
 
 	Engine::JRenderTarget* _currentRenderTarget = nullptr;
 	std::vector<Engine::JRenderTarget*> _currentRenderTargets;

@@ -11,23 +11,6 @@ namespace
 {
 	constexpr uint32 MAX_RENDER_LIGHTS = 8;
 
-	struct PerObjectConstants
-	{
-		XMFLOAT4X4 world;
-	};
-
-	struct PerFrameConstants
-	{
-		XMFLOAT4X4 viewProjection;
-	};
-
-	struct LightConstants
-	{
-		JVec4 colorIntensities[MAX_RENDER_LIGHTS];
-		JVec4 positions[MAX_RENDER_LIGHTS];
-		JVec4 info;
-	};
-
 	void destroyConstantBuffer(Render::JRenderContext* renderContext, Render::JConstantBuffer*& buffer)
 	{
 		if (buffer == nullptr)
@@ -239,6 +222,12 @@ uint32 JRenderDB::findTransformResourceIndex(JTransformHandle transform) const
 	return iter == _transformIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
+uint32 JRenderDB::findMeshResourceIndex(const JMesh* mesh) const
+{
+	const auto iter = _meshIndexMap.find(mesh);
+	return iter == _meshIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
+}
+
 JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID)
 {
 	const uint32 index = findMaterialResourceIndex(materialID);
@@ -287,14 +276,44 @@ const JLightResource* JRenderDB::FindLightResource() const
 
 JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh)
 {
-	const auto iter = _meshResources.find(mesh);
-	return iter == _meshResources.end() ? nullptr : &iter->second;
+	const uint32 index = findMeshResourceIndex(mesh);
+	return index == static_cast<uint32>(-1) ? nullptr : &_meshResources[index].resource;
 }
 
 const JMeshResource* JRenderDB::FindMeshResource(const JMesh* mesh) const
 {
-	const auto iter = _meshResources.find(mesh);
-	return iter == _meshResources.end() ? nullptr : &iter->second;
+	const uint32 index = findMeshResourceIndex(mesh);
+	return index == static_cast<uint32>(-1) ? nullptr : &_meshResources[index].resource;
+}
+
+const JMaterialResource* JRenderDB::GetMaterialResourceByIndex(uint32 index) const
+{
+	return index < _materialResources.size() ? &_materialResources[index].resource : nullptr;
+}
+
+const JTransformResource* JRenderDB::GetTransformResourceByIndex(uint32 index) const
+{
+	return index < _transformResources.size() ? &_transformResources[index].resource : nullptr;
+}
+
+const JMeshResource* JRenderDB::GetMeshResourceByIndex(uint32 index) const
+{
+	return index < _meshResources.size() ? &_meshResources[index].resource : nullptr;
+}
+
+uint32 JRenderDB::GetMaterialResourceIndex(uint32 materialID) const
+{
+	return findMaterialResourceIndex(materialID);
+}
+
+uint32 JRenderDB::GetTransformResourceIndex(JTransformHandle transform) const
+{
+	return findTransformResourceIndex(transform);
+}
+
+uint32 JRenderDB::GetMeshResourceIndex(const JMesh* mesh) const
+{
+	return findMeshResourceIndex(mesh);
 }
 
 void JRenderDB::SyncMaterial(const JMaterial& material)
@@ -361,15 +380,7 @@ void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection)
 	JCameraResource& resource = getOrCreateCameraResource(camera);
 	resource.camera = camera;
 
-	PerFrameConstants constants{};
-	XMStoreFloat4x4(&constants.viewProjection, XMMatrixTranspose(viewProjection));
-	if (resource.perFrameBuffer == nullptr)
-	{
-		resource.perFrameBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
-		return;
-	}
-
-	_renderContext->UpdateConstantBuffer(resource.perFrameBuffer, &constants, sizeof(constants));
+	XMStoreFloat4x4(&resource.constants.viewProjection, XMMatrixTranspose(viewProjection));
 }
 
 void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
@@ -383,15 +394,7 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 	resource.transform = transform;
 	resource.world = world;
 
-	PerObjectConstants constants{};
-	XMStoreFloat4x4(&constants.world, XMMatrixTranspose(world));
-	if (resource.perObjectBuffer == nullptr)
-	{
-		resource.perObjectBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
-		return;
-	}
-
-	_renderContext->UpdateConstantBuffer(resource.perObjectBuffer, &constants, sizeof(constants));
+	XMStoreFloat4x4(&resource.constants.world, XMMatrixTranspose(world));
 }
 
 void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
@@ -404,22 +407,15 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 	JLightResource& resource = getOrCreateLightResource();
 	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
 
-	LightConstants constants{};
+	resource.constants = {};
 	for (uint32 i = 0; i < resource.lightCount; ++i)
 	{
 		const JLightSnapshot::Item& item = snapshot.items[i];
-		constants.colorIntensities[i] = item.colorIntensity;
-		constants.positions[i] = item.position;
+		resource.constants.colorIntensities[i] = item.colorIntensity;
+		resource.constants.positions[i] = item.position;
 	}
-	constants.info = JVec4(static_cast<float>(resource.lightCount), 0.0f, 0.0f, 0.0f);
-
-	if (resource.lightBuffer == nullptr)
-	{
-		resource.lightBuffer = _renderContext->CreateConstantBuffer(&constants, sizeof(constants));
-		return;
-	}
-
-	_renderContext->UpdateConstantBuffer(resource.lightBuffer, &constants, sizeof(constants));
+	resource.constants.info = JVec4(static_cast<float>(resource.lightCount), 0.0f, 0.0f, 0.0f);
+	resource.initialized = true;
 }
 
 JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
@@ -475,8 +471,14 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	resource.indexBuffer = indexBuffer->view;
 	resource.indexSize = mesh->GetIndices().size();
 
-	auto result = _meshResources.emplace(mesh, std::move(resource));
-	return &result.first->second;
+	MeshResourceRecord record;
+	record.mesh = mesh;
+	record.resource = std::move(resource);
+
+	const uint32 newIndex = static_cast<uint32>(_meshResources.size());
+	_meshResources.push_back(std::move(record));
+	_meshIndexMap[mesh] = newIndex;
+	return &_meshResources.back().resource;
 }
 
 void JRenderDB::RemoveMaterialResource(uint32 materialID)
@@ -544,14 +546,23 @@ void JRenderDB::RemoveTransformResource(JTransformHandle transform)
 
 void JRenderDB::RemoveMeshResource(const JMesh* mesh)
 {
-	const auto iter = _meshResources.find(mesh);
-	if (iter == _meshResources.end())
+	const uint32 index = findMeshResourceIndex(mesh);
+	if (index == static_cast<uint32>(-1))
 	{
 		return;
 	}
 
-	destroyMeshResource(_renderContext, iter->second);
-	_meshResources.erase(iter);
+	destroyMeshResource(_renderContext, _meshResources[index].resource);
+
+	const uint32 lastIndex = static_cast<uint32>(_meshResources.size() - 1);
+	if (index != lastIndex)
+	{
+		_meshResources[index] = std::move(_meshResources[lastIndex]);
+		_meshIndexMap[_meshResources[index].mesh] = index;
+	}
+
+	_meshResources.pop_back();
+	_meshIndexMap.erase(mesh);
 }
 
 void JRenderDB::PruneUnusedSceneResources(
@@ -583,24 +594,24 @@ void JRenderDB::PruneUnusedSceneResources(
 		RemoveTransformResource(transform);
 	}
 
-	for (auto iter = _meshResources.begin(); iter != _meshResources.end();)
+	for (uint32 index = 0; index < _meshResources.size();)
 	{
-		if (activeMeshes.find(iter->first) != activeMeshes.end())
+		if (activeMeshes.find(_meshResources[index].mesh) != activeMeshes.end())
 		{
-			++iter;
+			++index;
 			continue;
 		}
 
-		destroyMeshResource(_renderContext, iter->second);
-		iter = _meshResources.erase(iter);
+		const JMesh* mesh = _meshResources[index].mesh;
+		RemoveMeshResource(mesh);
 	}
 }
 
 void JRenderDB::Clear()
 {
-	for (auto& iter : _meshResources)
+	for (MeshResourceRecord& record : _meshResources)
 	{
-		destroyMeshResource(_renderContext, iter.second);
+		destroyMeshResource(_renderContext, record.resource);
 	}
 
 	for (MaterialResourceRecord& record : _materialResources)
@@ -621,12 +632,34 @@ void JRenderDB::Clear()
 	destroyConstantBuffer(_renderContext, _lightResource.lightBuffer);
 
 	_meshResources.clear();
+	_meshIndexMap.clear();
 	_materialResources.clear();
 	_materialIndexMap.clear();
 	_cameraResources.clear();
 	_cameraIndexMap.clear();
 	_transformResources.clear();
 	_transformIndexMap.clear();
+}
+
+JRenderDB::ResolvedDrawResources JRenderDB::ResolveDrawResources(const JDrawItem& drawItem) const
+{
+	ResolvedDrawResources resources;
+	resources.mesh = GetMeshResourceByIndex(drawItem.meshResourceIndex);
+	resources.material = GetMaterialResourceByIndex(drawItem.materialResourceIndex);
+	resources.transform = GetTransformResourceByIndex(drawItem.transformResourceIndex);
+	if (resources.mesh == nullptr)
+	{
+		resources.mesh = FindMeshResource(drawItem.mesh);
+	}
+	if (resources.material == nullptr)
+	{
+		resources.material = FindMaterialResource(drawItem.materialID);
+	}
+	if (resources.transform == nullptr)
+	{
+		resources.transform = FindTransformResource(drawItem.transform);
+	}
+	return resources;
 }
 
 bool JRenderDB::BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const

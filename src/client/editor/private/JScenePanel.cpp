@@ -104,10 +104,13 @@ const Engine::JScene* JScenePanel::getScene() const
 
 void JScenePanel::Init()
 {
-	_mainWindow = GetActiveWindow();
 	if (_mainWindow == nullptr)
 	{
-		_mainWindow = GetForegroundWindow();
+		_mainWindow = GetActiveWindow();
+		if (_mainWindow == nullptr)
+		{
+			_mainWindow = GetForegroundWindow();
+		}
 	}
 
 	if (_sceneManager == nullptr)
@@ -516,6 +519,9 @@ void JScenePanel::destroyStatsPopup()
 
 void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float deltaTime)
 {
+	const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
+	const uint32 drawCallCount = static_cast<uint32>(frameDesc.opaqueDrawItemIndices.size() + frameDesc.transparentDrawItemIndices.size());
+
 	if (_statsPopup == nullptr)
 	{
 		createStatsPopup();
@@ -532,8 +538,6 @@ void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float de
 		SetWindowPos(_statsPopup, HWND_TOPMOST, ownerRect.left + 20, ownerRect.top + 54, 260, 96, SWP_NOACTIVATE);
 	}
 
-	const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
-	const uint32 drawCallCount = static_cast<uint32>(frameDesc.opaqueDrawItems.size() + frameDesc.transparentDrawItems.size());
 	wchar_t text[128] = {};
 	swprintf_s(text, L"FPS: %.1f\r\nDrawCalls: %u", fps, drawCallCount);
 	SetWindowTextW(_statsPopup, text);

@@ -1,6 +1,7 @@
 #include "engine/render/JSceneColorPass.h"
 
 #include "engine/render/JCommandQueue.h"
+#include "engine/render/JDrawItemCache.h"
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"
@@ -23,37 +24,40 @@ void JSceneColorPass::Execute(const JRenderPassContext& context, const JFrameDes
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	renderDrawItems(context, frameDesc.camera, frameDesc.opaqueDrawItems);
-	renderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
+	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.opaqueDrawItemIndices);
+	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.transparentDrawItemIndices);
 
 	context.commandQueue->EndRenderPass();
 }
 
-void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
+void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices)
 {
-	for (const JDrawItem& drawItem : drawItems)
+	if (frameDesc.drawItemCache == nullptr)
 	{
-		renderDrawItem(context, camera, drawItem);
+		return;
+	}
+
+	for (uint32 drawItemIndex : drawItemIndices)
+	{
+		if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
+		{
+			renderDrawItem(context, camera, frameDesc.drawItemCache->drawItems[drawItemIndex]);
+		}
 	}
 }
 
 void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
-	if (meshResource == nullptr)
+	const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
+	if (!resources.IsValid())
 	{
 		++_lastStats.skippedDrawCount;
-		std::cerr << GetName() << " draw skipped: draw item mesh is null." << std::endl;
 		return;
 	}
 
-	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
-	if (materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
-	{
-		++_lastStats.skippedDrawCount;
-		std::cerr << GetName() << " draw skipped: material render data is incomplete." << std::endl;
-		return;
-	}
+	const JMeshResource* meshResource = resources.mesh;
+	const JMaterialResource* materialResource = resources.material;
+	const JTransformResource* transformResource = resources.transform;
 
 	Render::JGraphicResource graphicResource(materialResource->shader);
 	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
@@ -63,22 +67,21 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 		return;
 	}
 
-	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
-	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
-	{
-		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
-	}
+	const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
+	graphicResource.SetConstantBufferAddress("PerObject", objectGpuAddress);
 
 	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-	if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+	if (cameraResource != nullptr)
 	{
-		graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
+		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+		graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
 	}
 
 	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;
-	if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
+	if (lightResource != nullptr && lightResource->initialized)
 	{
-		if (graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer))
+		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&lightResource->constants, sizeof(lightResource->constants));
+		if (graphicResource.SetConstantBufferAddress("PerLights", gpuAddress))
 		{
 			++_lastStats.lightBindingCount;
 		}

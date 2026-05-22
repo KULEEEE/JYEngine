@@ -102,7 +102,7 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	ensureGBuffer(frameDesc);
 
 	const JCameraResource* cameraResource = _renderDB->FindCameraResource(frameDesc.camera);
-	if (cameraResource == nullptr || cameraResource->perFrameBuffer == nullptr)
+	if (cameraResource == nullptr)
 	{
 		std::cerr << "JRenderer::Render skipped: camera resource is not ready." << std::endl;
 		return;

@@ -1,6 +1,7 @@
 #include "engine/render/JGBufferPass.h"
 
 #include "engine/render/JCommandQueue.h"
+#include "engine/render/JDrawItemCache.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderContext.h"
@@ -21,15 +22,17 @@ namespace
 		}
 
 		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
-		if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
+		if (transformResource != nullptr)
 		{
-			graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
+			const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
+			graphicResource.SetConstantBufferAddress("PerObject", gpuAddress);
 		}
 
 		const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-		if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+		if (cameraResource != nullptr)
 		{
-			graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
+			const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+			graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
 		}
 
 		return true;
@@ -97,17 +100,29 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	for (const JDrawItem& drawItem : frameDesc.opaqueDrawItems)
+	if (frameDesc.drawItemCache == nullptr)
 	{
-		const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
-		if (meshResource == nullptr)
+		context.commandQueue->EndRenderPass();
+		return;
+	}
+
+	for (uint32 drawItemIndex : frameDesc.opaqueDrawItemIndices)
+	{
+		if (drawItemIndex >= frameDesc.drawItemCache->drawItems.size())
+		{
+			continue;
+		}
+
+		const JDrawItem& drawItem = frameDesc.drawItemCache->drawItems[drawItemIndex];
+		const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
+		if (!resources.IsValid())
 		{
 			++_lastStats.skippedDrawCount;
 			continue;
 		}
 
-		const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
-		if (meshResource == nullptr || materialResource == nullptr || !meshResource->hasNormals || !meshResource->hasTexcoords)
+		const JMeshResource* meshResource = resources.mesh;
+		if (!meshResource->hasNormals || !meshResource->hasTexcoords)
 		{
 			++_lastStats.skippedDrawCount;
 			continue;

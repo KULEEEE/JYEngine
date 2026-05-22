@@ -64,6 +64,7 @@ private:
 	void rebuildDrawItemCache(const JScene& scene, JRenderSnapshotBuilder::Result& outResult);
 	void appendDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult);
 	void patchDrawItems(const JScene& scene, JRenderObjectComponentHandle renderObject, JRenderSnapshotBuilder::Result& outResult);
+	void resolveDrawItemResourceIndices();
 	static uint64 makeCameraKey(JCameraHandle camera);
 
 	JRenderDB _renderDB;

@@ -13,6 +13,16 @@ J_RENDER_BEGIN
 
 using namespace J::Engine;
 
+namespace
+{
+	constexpr size_t FRAME_UPLOAD_BUFFER_SIZE = 16 * 1024 * 1024;
+
+	size_t alignTo(size_t value, size_t alignment)
+	{
+		return (value + alignment - 1) & ~(alignment - 1);
+	}
+}
+
 JCommandQueue::JCommandQueue()
 {
 }
@@ -43,12 +53,12 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
+	_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	for (FrameResource& frameResource : _frameResources)
 	{
-		hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameResource.commandAllocator));
-		if (FAILED(hr))
+		if (!initializeFrameResource(frameResource))
 		{
-			std::cerr << "CreateCommandAllocator failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
 			return;
 		}
 	}
@@ -80,6 +90,54 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 	}
 }
 
+bool JCommandQueue::initializeFrameResource(FrameResource& frameResource)
+{
+	HRESULT hr = _device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameResource.commandAllocator));
+	if (FAILED(hr))
+	{
+		std::cerr << "CreateCommandAllocator failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return false;
+	}
+
+	const CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD);
+	const CD3DX12_RESOURCE_DESC uploadDesc = CD3DX12_RESOURCE_DESC::Buffer(FRAME_UPLOAD_BUFFER_SIZE);
+	hr = _device->CreateCommittedResource(
+		&uploadHeapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&uploadDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&frameResource.uploadBuffer));
+	if (FAILED(hr))
+	{
+		std::cerr << "Create frame upload buffer failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return false;
+	}
+
+	hr = frameResource.uploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&frameResource.uploadMappedData));
+	if (FAILED(hr) || frameResource.uploadMappedData == nullptr)
+	{
+		std::cerr << "Map frame upload buffer failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return false;
+	}
+	frameResource.uploadCapacity = FRAME_UPLOAD_BUFFER_SIZE;
+	frameResource.uploadOffset = 0;
+
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.NumDescriptors = MAX_DESCRIPTOR_COUNT;
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	hr = _device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&frameResource.descriptorHeap));
+	if (FAILED(hr))
+	{
+		std::cerr << "Create frame descriptor heap failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+		return false;
+	}
+	frameResource.descriptorCapacity = MAX_DESCRIPTOR_COUNT;
+	frameResource.descriptorOffset = 0;
+	return true;
+}
+
 void JCommandQueue::RenderBegin(uint32 frameIndex)
 {
 	if (_cmdList == nullptr)
@@ -97,7 +155,8 @@ void JCommandQueue::RenderBegin(uint32 frameIndex)
 	}
 
 	waitForFenceValue(frameResource.fenceValue);
-	frameResource.transientDescriptorHeaps.clear();
+	frameResource.uploadOffset = 0;
+	frameResource.descriptorOffset = 0;
 	frameResource.commandAllocator->Reset();
 	_cmdList->Reset(frameResource.commandAllocator.Get(), nullptr);
 }
@@ -319,6 +378,12 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 
 	for (const JGraphicResource::ConstantBufferBinding& binding : resource->GetConstantBuffers())
 	{
+		if (binding.gpuAddress != 0)
+		{
+			_cmdList->SetGraphicsRootConstantBufferView(binding.rootParameterIndex, binding.gpuAddress);
+			continue;
+		}
+
 		if (binding.buffer == nullptr || binding.buffer->buffer == nullptr)
 		{
 			continue;
@@ -329,59 +394,62 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 
 	if (!resource->GetTextures().empty())
 	{
-		const auto& textures = resource->GetTextures();
-		if (textures.size() == 1)
+		const D3D12_GPU_DESCRIPTOR_HANDLE tableHandle = allocateFrameTextureTable(resource, shader);
+		if (tableHandle.ptr != 0)
 		{
-			const JTexture* texture = textures.front().texture;
-			if (texture != nullptr && texture->srvHeap != nullptr)
-			{
-				ID3D12DescriptorHeap* heaps[] = { texture->srvHeap, texture->samplerHeap };
-				_cmdList->SetDescriptorHeaps(texture->samplerHeap != nullptr ? 2u : 1u, heaps);
-
-				const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
-				_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, texture->srvHeap->GetGPUDescriptorHandleForHeapStart());
-			}
-		}
-		else if (_device != nullptr)
-		{
-			uint32 srvDescriptorCount = 0;
-			for (const JShader::BindingInfo::Resource& textureBinding : shader->bindingInfo.textures)
-			{
-				srvDescriptorCount = std::max(srvDescriptorCount, textureBinding.slot + 1);
-			}
-
-			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-			heapDesc.NumDescriptors = srvDescriptorCount;
-			heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-			ComPtr<ID3D12DescriptorHeap> srvHeap;
-			const HRESULT hr = _device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&srvHeap));
-			if (SUCCEEDED(hr) && srvHeap != nullptr)
-			{
-				const uint32 descriptorSize = _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				for (const JGraphicResource::TextureBinding& binding : textures)
-				{
-					const JTexture* texture = binding.texture;
-					if (texture == nullptr || texture->srvHeap == nullptr || binding.shaderSlot >= heapDesc.NumDescriptors)
-					{
-						continue;
-					}
-
-					D3D12_CPU_DESCRIPTOR_HANDLE dest = srvHeap->GetCPUDescriptorHandleForHeapStart();
-					dest.ptr += static_cast<SIZE_T>(binding.shaderSlot) * descriptorSize;
-					_device->CopyDescriptorsSimple(1, dest, texture->srvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				}
-
-				ID3D12DescriptorHeap* heaps[] = { srvHeap.Get() };
-				_cmdList->SetDescriptorHeaps(1, heaps);
-
-				const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
-				_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, srvHeap->GetGPUDescriptorHandleForHeapStart());
-				_frameResources[_activeFrameIndex].transientDescriptorHeaps.push_back(srvHeap);
-			}
+			const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
+			_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, tableHandle);
 		}
 	}
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGraphicResource* resource, JShader* shader)
+{
+	D3D12_GPU_DESCRIPTOR_HANDLE emptyHandle{};
+	if (_device == nullptr || resource == nullptr || shader == nullptr || _activeFrameIndex >= SWAP_CHAIN_BUFFER_COUNT)
+	{
+		return emptyHandle;
+	}
+
+	uint32 srvDescriptorCount = 0;
+	for (const JShader::BindingInfo::Resource& textureBinding : shader->bindingInfo.textures)
+	{
+		srvDescriptorCount = std::max(srvDescriptorCount, textureBinding.slot + 1);
+	}
+	if (srvDescriptorCount == 0)
+	{
+		return emptyHandle;
+	}
+
+	FrameResource& frameResource = _frameResources[_activeFrameIndex];
+	if (frameResource.descriptorHeap == nullptr || frameResource.descriptorOffset + srvDescriptorCount > frameResource.descriptorCapacity)
+	{
+		std::cerr << "Frame descriptor ring overflow: requested " << srvDescriptorCount << " descriptors." << std::endl;
+		return emptyHandle;
+	}
+
+	const uint32 tableBase = frameResource.descriptorOffset;
+	frameResource.descriptorOffset += srvDescriptorCount;
+
+	for (const JGraphicResource::TextureBinding& binding : resource->GetTextures())
+	{
+		const JTexture* texture = binding.texture;
+		if (texture == nullptr || texture->srvHeap == nullptr || binding.shaderSlot >= srvDescriptorCount)
+		{
+			continue;
+		}
+
+		D3D12_CPU_DESCRIPTOR_HANDLE dest = frameResource.descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		dest.ptr += static_cast<SIZE_T>(tableBase + binding.shaderSlot) * _srvDescriptorSize;
+		_device->CopyDescriptorsSimple(1, dest, texture->srvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
+	ID3D12DescriptorHeap* heaps[] = { frameResource.descriptorHeap.Get() };
+	_cmdList->SetDescriptorHeaps(1, heaps);
+
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = frameResource.descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	gpuHandle.ptr += static_cast<UINT64>(tableBase) * _srvDescriptorSize;
+	return gpuHandle;
 }
 
 void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
@@ -423,6 +491,32 @@ void JCommandQueue::DrawIndexed(const uint32& indexCount, const uint32& instance
 		return;
 	}
 	_cmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance);
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS JCommandQueue::UploadFrameConstantBuffer(const void* data, size_t size)
+{
+	if (data == nullptr || size == 0 || _activeFrameIndex >= SWAP_CHAIN_BUFFER_COUNT)
+	{
+		return 0;
+	}
+
+	FrameResource& frameResource = _frameResources[_activeFrameIndex];
+	if (frameResource.uploadBuffer == nullptr || frameResource.uploadMappedData == nullptr)
+	{
+		return 0;
+	}
+
+	const size_t alignedOffset = alignTo(frameResource.uploadOffset, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	const size_t alignedSize = alignTo(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	if (alignedOffset + alignedSize > frameResource.uploadCapacity)
+	{
+		std::cerr << "Frame upload ring overflow: requested " << alignedSize << " bytes." << std::endl;
+		return 0;
+	}
+
+	memcpy(frameResource.uploadMappedData + alignedOffset, data, size);
+	frameResource.uploadOffset = alignedOffset + alignedSize;
+	return frameResource.uploadBuffer->GetGPUVirtualAddress() + alignedOffset;
 }
 
 void JCommandQueue::EndRenderPass()
@@ -536,7 +630,17 @@ void JCommandQueue::destroy()
 	_cmdList.Reset();
 	for (FrameResource& frameResource : _frameResources)
 	{
-		frameResource.transientDescriptorHeaps.clear();
+		if (frameResource.uploadBuffer != nullptr && frameResource.uploadMappedData != nullptr)
+		{
+			frameResource.uploadBuffer->Unmap(0, nullptr);
+			frameResource.uploadMappedData = nullptr;
+		}
+		frameResource.uploadBuffer.Reset();
+		frameResource.uploadCapacity = 0;
+		frameResource.uploadOffset = 0;
+		frameResource.descriptorHeap.Reset();
+		frameResource.descriptorCapacity = 0;
+		frameResource.descriptorOffset = 0;
 		frameResource.commandAllocator.Reset();
 		frameResource.fenceValue = 0;
 	}

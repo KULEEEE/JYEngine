@@ -245,7 +245,7 @@ void JRenderServer::syncTransformResources()
 void JRenderServer::syncLightResources(bool forceSync)
 {
 	const JLightResource* lightResource = _renderDB.FindLightResource();
-	if (!forceSync && lightResource != nullptr && lightResource->lightBuffer != nullptr)
+	if (!forceSync && lightResource != nullptr && lightResource->initialized)
 	{
 		return;
 	}
@@ -332,8 +332,13 @@ void JRenderServer::rebuildDrawItemCache(const JScene& scene, JRenderSnapshotBui
 	_drawItemCache.initialized = true;
 
 	const std::vector<JScene::RenderObjectComponentSlot>& slots = scene.GetRenderObjectComponentSlots();
-	for (uint32 renderObjectIndex = 0; renderObjectIndex < slots.size(); ++renderObjectIndex)
+	for (uint32 renderObjectIndex : scene.GetActiveRenderObjectComponentIndices())
 	{
+		if (renderObjectIndex >= slots.size())
+		{
+			continue;
+		}
+
 		const JScene::RenderObjectComponentSlot& slot = slots[renderObjectIndex];
 		if (slot.active)
 		{
@@ -504,6 +509,16 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 	}
 }
 
+void JRenderServer::resolveDrawItemResourceIndices()
+{
+	for (JDrawItem& drawItem : _drawItemCache.drawItems)
+	{
+		drawItem.meshResourceIndex = _renderDB.GetMeshResourceIndex(drawItem.mesh);
+		drawItem.materialResourceIndex = _renderDB.GetMaterialResourceIndex(drawItem.materialID);
+		drawItem.transformResourceIndex = _renderDB.GetTransformResourceIndex(drawItem.transform);
+	}
+}
+
 void JRenderServer::SyncScene(JScene& scene)
 {
 	if (_syncedScene != &scene)
@@ -541,6 +556,7 @@ void JRenderServer::SyncScene(JScene& scene)
 	JCameraRenderQueueBuilder::Build(queueInput, _frameSnapshot);
 
 	_renderDB.PruneUnusedSceneResources(buildResult.activeCameraKeys, buildResult.activeTransformKeys, buildResult.activeMeshes);
+	resolveDrawItemResourceIndices();
 }
 
 bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
@@ -556,6 +572,7 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	outFrameDesc.clearColor = clearColor;
 	outFrameDesc.viewport = viewport;
 	outFrameDesc.scissorRect = scissorRect;
+	outFrameDesc.drawItemCache = &_drawItemCache;
 	const JCameraSnapshot* cameraSnapshot = findCameraSnapshot(_primaryCamera);
 	if (cameraSnapshot == nullptr)
 	{
@@ -565,23 +582,8 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	outFrameDesc.cullingTestedDrawItemCount = cameraSnapshot->cullingTestedDrawItemCount;
 	outFrameDesc.culledDrawItemCount = cameraSnapshot->culledDrawItemCount;
 
-	outFrameDesc.opaqueDrawItems.reserve(cameraSnapshot->opaqueDrawItemIndices.size());
-	for (uint32 drawItemIndex : cameraSnapshot->opaqueDrawItemIndices)
-	{
-		if (drawItemIndex < _drawItemCache.drawItems.size())
-		{
-			outFrameDesc.opaqueDrawItems.push_back(_drawItemCache.drawItems[drawItemIndex]);
-		}
-	}
-
-	outFrameDesc.transparentDrawItems.reserve(cameraSnapshot->transparentDrawItemIndices.size());
-	for (uint32 drawItemIndex : cameraSnapshot->transparentDrawItemIndices)
-	{
-		if (drawItemIndex < _drawItemCache.drawItems.size())
-		{
-			outFrameDesc.transparentDrawItems.push_back(_drawItemCache.drawItems[drawItemIndex]);
-		}
-	}
+	outFrameDesc.opaqueDrawItemIndices = cameraSnapshot->opaqueDrawItemIndices;
+	outFrameDesc.transparentDrawItemIndices = cameraSnapshot->transparentDrawItemIndices;
 
 	return true;
 }

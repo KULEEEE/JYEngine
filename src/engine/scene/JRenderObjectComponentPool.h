@@ -51,6 +51,11 @@ public:
 		return _pool.GetSlots();
 	}
 
+	const std::vector<uint32>& GetActiveEntityIndices() const
+	{
+		return _pool.GetActiveEntityIndices();
+	}
+
 private:
 	JEntityComponentPool<JRenderObjectComponentHandle, JRenderObjectComponent> _pool;
 };

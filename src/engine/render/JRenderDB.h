@@ -5,6 +5,7 @@
 #include "engine/precompile.h"
 #include "engine/render/JRenderResource.h"
 #include "engine/render/JRenderSnapshot.h"
+#include "engine/render/JRenderFrame.h"
 #include "engine/scene/JScene.h"
 
 /*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
@@ -17,6 +18,22 @@ J_ENGINE_BEGIN
 class JRenderDB
 {
 public:
+	struct ResolvedDrawResources
+	{
+		const JMeshResource* mesh = nullptr;
+		const JMaterialResource* material = nullptr;
+		const JTransformResource* transform = nullptr;
+
+		bool IsValid() const
+		{
+			return mesh != nullptr
+				&& material != nullptr
+				&& transform != nullptr
+				&& material->shader != nullptr
+				&& material->pipeline != nullptr;
+		}
+	};
+
 	struct MaterialResourceRecord
 	{
 		uint32 materialID = 0;
@@ -35,6 +52,12 @@ public:
 		JTransformResource resource;
 	};
 
+	struct MeshResourceRecord
+	{
+		const JMesh* mesh = nullptr;
+		JMeshResource resource;
+	};
+
 	JRenderDB() = default;
 	~JRenderDB();
 
@@ -50,6 +73,12 @@ public:
 	const JLightResource* FindLightResource() const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
+	const JMaterialResource* GetMaterialResourceByIndex(uint32 index) const;
+	const JTransformResource* GetTransformResourceByIndex(uint32 index) const;
+	const JMeshResource* GetMeshResourceByIndex(uint32 index) const;
+	uint32 GetMaterialResourceIndex(uint32 materialID) const;
+	uint32 GetTransformResourceIndex(JTransformHandle transform) const;
+	uint32 GetMeshResourceIndex(const JMesh* mesh) const;
 
 	void SyncMaterial(const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection);
@@ -66,6 +95,7 @@ public:
 		const std::unordered_set<const JMesh*>& activeMeshes);
 	void Clear();
 
+	ResolvedDrawResources ResolveDrawResources(const JDrawItem& drawItem) const;
 	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:
@@ -76,6 +106,7 @@ private:
 	uint32 findMaterialResourceIndex(uint32 materialID) const;
 	uint32 findCameraResourceIndex(JCameraHandle camera) const;
 	uint32 findTransformResourceIndex(JTransformHandle transform) const;
+	uint32 findMeshResourceIndex(const JMesh* mesh) const;
 	static uint64 makeCameraKey(JCameraHandle camera);
 	static uint64 makeTransformKey(JTransformHandle transform);
 
@@ -87,7 +118,8 @@ private:
 	std::vector<TransformResourceRecord> _transformResources;
 	std::unordered_map<uint64, uint32> _transformIndexMap;
 	JLightResource _lightResource;
-	std::unordered_map<const JMesh*, JMeshResource> _meshResources;
+	std::vector<MeshResourceRecord> _meshResources;
+	std::unordered_map<const JMesh*, uint32> _meshIndexMap;
 };
 
 J_ENGINE_END

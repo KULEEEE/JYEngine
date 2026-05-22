@@ -13,6 +13,25 @@ namespace J::Render
 
 J_ENGINE_BEGIN
 
+struct JPerObjectConstants
+{
+	XMFLOAT4X4 world;
+};
+
+struct JPerFrameConstants
+{
+	XMFLOAT4X4 viewProjection;
+};
+
+struct JLightConstants
+{
+	static constexpr uint32 MAX_LIGHTS = 8;
+
+	JVec4 colorIntensities[MAX_LIGHTS];
+	JVec4 positions[MAX_LIGHTS];
+	JVec4 info;
+};
+
 struct JMaterialResource
 {
 	struct ConstantBufferEntry
@@ -39,6 +58,7 @@ struct JMaterialResource
 struct JCameraResource
 {
 	JCameraHandle camera = {};
+	JPerFrameConstants constants = {};
 	Render::JConstantBuffer* perFrameBuffer = nullptr;
 };
 
@@ -46,13 +66,16 @@ struct JTransformResource
 {
 	JTransformHandle transform = {};
 	XMMATRIX world = XMMatrixIdentity();
+	JPerObjectConstants constants = {};
 	Render::JConstantBuffer* perObjectBuffer = nullptr;
 };
 
 struct JLightResource
 {
+	JLightConstants constants = {};
 	Render::JConstantBuffer* lightBuffer = nullptr;
 	uint32 lightCount = 0;
+	bool initialized = false;
 };
 
 struct JMeshResource

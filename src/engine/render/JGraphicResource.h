@@ -18,6 +18,7 @@ public:
 		uint32 shaderSlot = 0;
 		uint32 rootParameterIndex = 0;
 		JConstantBuffer* buffer = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = 0;
 	};
 
 	struct TextureBinding
@@ -36,6 +37,8 @@ public:
 
 	bool SetConstantBuffer(const std::string& name, JConstantBuffer* buffer);
 	bool SetConstantBuffer(uint32 nameHash, JConstantBuffer* buffer, const std::string& debugName = "");
+	bool SetConstantBufferAddress(const std::string& name, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress);
+	bool SetConstantBufferAddress(uint32 nameHash, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, const std::string& debugName = "");
 	bool SetTexture(const std::string& name, JTexture* texture);
 	bool SetTexture(uint32 nameHash, JTexture* texture, const std::string& debugName = "");
 

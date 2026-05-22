@@ -155,6 +155,7 @@ public:
 	const std::vector<CameraSlot>& GetCameraSlots() const { return _cameras.GetSlots(); }
 	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
 	const std::vector<RenderObjectComponentSlot>& GetRenderObjectComponentSlots() const { return _renderObjectComponents.GetSlots(); }
+	const std::vector<uint32>& GetActiveRenderObjectComponentIndices() const { return _renderObjectComponents.GetActiveEntityIndices(); }
 
 private:
 	std::string generateStableID();

@@ -45,6 +45,35 @@ bool JGraphicResource::SetConstantBuffer(uint32 nameHash, JConstantBuffer* buffe
 	return true;
 }
 
+bool JGraphicResource::SetConstantBufferAddress(const std::string& name, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress)
+{
+	return SetConstantBufferAddress(JHashFunction::StrCrc32(name.c_str()), gpuAddress, name);
+}
+
+bool JGraphicResource::SetConstantBufferAddress(uint32 nameHash, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, const std::string& debugName)
+{
+	if (_shader == nullptr || gpuAddress == 0)
+	{
+		return false;
+	}
+
+	const int32 bindingIndex = findConstantBufferBindingIndex(_shader, nameHash);
+	if (bindingIndex < 0)
+	{
+		return false;
+	}
+
+	const JShader::BindingInfo::Resource& shaderBinding = _shader->bindingInfo.cBuffers[bindingIndex];
+	ConstantBufferBinding binding;
+	binding.name = debugName.empty() ? shaderBinding.name : debugName;
+	binding.nameHash = nameHash;
+	binding.shaderSlot = shaderBinding.slot;
+	binding.rootParameterIndex = static_cast<uint32>(bindingIndex);
+	binding.gpuAddress = gpuAddress;
+	_constantBuffers.push_back(binding);
+	return true;
+}
+
 bool JGraphicResource::SetTexture(const std::string& name, JTexture* texture)
 {
 	return SetTexture(JHashFunction::StrCrc32(name.c_str()), texture, name);

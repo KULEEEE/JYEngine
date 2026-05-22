@@ -1,6 +1,7 @@
 #include "engine/render/JForwardOverlayPass.h"
 
 #include "engine/render/JCommandQueue.h"
+#include "engine/render/JDrawItemCache.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderDB.h"
@@ -15,7 +16,7 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 	_lastStats = {};
 	_lastStats.name = GetName();
 
-	if (context.commandQueue == nullptr || context.renderDB == nullptr || frameDesc.renderTarget == nullptr || frameDesc.transparentDrawItems.empty())
+	if (context.commandQueue == nullptr || context.renderDB == nullptr || frameDesc.renderTarget == nullptr || frameDesc.transparentDrawItemIndices.empty())
 	{
 		return;
 	}
@@ -24,33 +25,38 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0, context.gBuffer != nullptr ? &dsvHandle : nullptr, false, false);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
-	renderDrawItems(context, frameDesc.camera, frameDesc.transparentDrawItems);
+	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.transparentDrawItemIndices);
 	context.commandQueue->EndRenderPass();
 }
 
-void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const std::vector<JDrawItem>& drawItems)
+void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices)
 {
-	for (const JDrawItem& drawItem : drawItems)
+	if (frameDesc.drawItemCache == nullptr)
 	{
-		renderDrawItem(context, camera, drawItem);
+		return;
+	}
+
+	for (uint32 drawItemIndex : drawItemIndices)
+	{
+		if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
+		{
+			renderDrawItem(context, camera, frameDesc.drawItemCache->drawItems[drawItemIndex]);
+		}
 	}
 }
 
 void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
 {
-	const JMeshResource* meshResource = context.renderDB->FindMeshResource(drawItem.mesh);
-	if (meshResource == nullptr)
+	const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
+	if (!resources.IsValid())
 	{
 		++_lastStats.skippedDrawCount;
 		return;
 	}
 
-	const JMaterialResource* materialResource = context.renderDB->FindMaterialResource(drawItem.materialID);
-	if (meshResource == nullptr || materialResource == nullptr || materialResource->shader == nullptr || materialResource->pipeline == nullptr)
-	{
-		++_lastStats.skippedDrawCount;
-		return;
-	}
+	const JMeshResource* meshResource = resources.mesh;
+	const JMaterialResource* materialResource = resources.material;
+	const JTransformResource* transformResource = resources.transform;
 
 	Render::JGraphicResource graphicResource(materialResource->shader);
 	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
@@ -59,16 +65,14 @@ void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCam
 		return;
 	}
 
-	const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
-	if (transformResource != nullptr && transformResource->perObjectBuffer != nullptr)
-	{
-		graphicResource.SetConstantBuffer("PerObject", transformResource->perObjectBuffer);
-	}
+	const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
+	graphicResource.SetConstantBufferAddress("PerObject", objectGpuAddress);
 
 	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-	if (cameraResource != nullptr && cameraResource->perFrameBuffer != nullptr)
+	if (cameraResource != nullptr)
 	{
-		graphicResource.SetConstantBuffer("PerFrame", cameraResource->perFrameBuffer);
+		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+		graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
 	}
 
 	context.commandQueue->SetPipeline(materialResource->pipeline);

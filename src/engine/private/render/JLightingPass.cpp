@@ -77,9 +77,10 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 
 	Render::JGraphicResource graphicResource(_shader);
 	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;
-	if (lightResource != nullptr && lightResource->lightBuffer != nullptr)
+	if (lightResource != nullptr && lightResource->initialized)
 	{
-		graphicResource.SetConstantBuffer("PerLights", lightResource->lightBuffer);
+		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&lightResource->constants, sizeof(lightResource->constants));
+		graphicResource.SetConstantBufferAddress("PerLights", gpuAddress);
 	}
 	graphicResource.SetTexture("GBufferAlbedo", albedoTexture);
 	graphicResource.SetTexture("GBufferNormal", normalTexture);
