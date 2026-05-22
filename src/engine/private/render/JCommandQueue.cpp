@@ -19,6 +19,7 @@ JCommandQueue::JCommandQueue()
 
 JCommandQueue::~JCommandQueue()
 {
+	destroy();
 }
 
 void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain)
@@ -42,14 +43,17 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 		return;
 	}
 
-	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAlloc));
-	if (FAILED(hr))
+	for (FrameResource& frameResource : _frameResources)
 	{
-		std::cerr << "CreateCommandAllocator failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
-		return;
+		hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameResource.commandAllocator));
+		if (FAILED(hr))
+		{
+			std::cerr << "CreateCommandAllocator failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
+			return;
+		}
 	}
 
-	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAlloc.Get(), nullptr, IID_PPV_ARGS(&_cmdList));
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _frameResources[0].commandAllocator.Get(), nullptr, IID_PPV_ARGS(&_cmdList));
 	if (FAILED(hr))
 	{
 		std::cerr << "CreateCommandList failed. HRESULT=0x" << std::hex << hr << std::dec << std::endl;
@@ -76,17 +80,31 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 	}
 }
 
-void JCommandQueue::RenderBegin()
+void JCommandQueue::RenderBegin(uint32 frameIndex)
 {
-	if (_cmdAlloc == nullptr || _cmdList == nullptr)
+	if (_cmdList == nullptr)
 	{
 		std::cerr << "RenderBegin skipped: command queue is not initialized." << std::endl;
 		return;
 	}
 
-	_cmdAlloc->Reset();
-	_cmdList->Reset(_cmdAlloc.Get(), nullptr);
-	_transientDescriptorHeaps.clear();
+	_activeFrameIndex = frameIndex % SWAP_CHAIN_BUFFER_COUNT;
+	FrameResource& frameResource = _frameResources[_activeFrameIndex];
+	if (frameResource.commandAllocator == nullptr)
+	{
+		std::cerr << "RenderBegin skipped: frame command allocator is null." << std::endl;
+		return;
+	}
+
+	waitForFenceValue(frameResource.fenceValue);
+	frameResource.transientDescriptorHeaps.clear();
+	frameResource.commandAllocator->Reset();
+	_cmdList->Reset(frameResource.commandAllocator.Get(), nullptr);
+}
+
+void JCommandQueue::RenderBegin()
+{
+	RenderBegin(_activeFrameIndex);
 }
 
 void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget)
@@ -360,7 +378,7 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 
 				const uint32 textureRootParameterIndex = static_cast<uint32>(shader->bindingInfo.cBuffers.size());
 				_cmdList->SetGraphicsRootDescriptorTable(textureRootParameterIndex, srvHeap->GetGPUDescriptorHandleForHeapStart());
-				_transientDescriptorHeaps.push_back(srvHeap);
+				_frameResources[_activeFrameIndex].transientDescriptorHeaps.push_back(srvHeap);
 			}
 		}
 	}
@@ -443,7 +461,7 @@ void JCommandQueue::EndRenderPass()
 	}
 }
 
-void JCommandQueue::RenderEnd()
+void JCommandQueue::RenderEnd(uint32 frameIndex)
 {
 	if (_cmdList == nullptr || _cmdQueue == nullptr)
 	{
@@ -460,28 +478,71 @@ void JCommandQueue::RenderEnd()
 
 	ID3D12CommandList* cmdListArr[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(_countof(cmdListArr), cmdListArr);
+
+	const uint32 resolvedFrameIndex = frameIndex % SWAP_CHAIN_BUFFER_COUNT;
+	const uint64 fenceValue = _nextFenceValue++;
+	_cmdQueue->Signal(_fence.Get(), fenceValue);
+	_frameResources[resolvedFrameIndex].fenceValue = fenceValue;
 }
 
-void JCommandQueue::WaitSync()
+void JCommandQueue::RenderEnd()
 {
-	if (_cmdQueue == nullptr || _fence == nullptr || _fenceEvent == nullptr)
+	RenderEnd(_activeFrameIndex);
+}
+
+void JCommandQueue::waitForFenceValue(uint64 fenceValue)
+{
+	if (fenceValue == 0 || _fence == nullptr || _fenceEvent == nullptr)
 	{
-		std::cerr << "WaitSync skipped: synchronization objects are not initialized." << std::endl;
 		return;
 	}
 
-	_fenceValue++;
-	_cmdQueue->Signal(_fence.Get(), _fenceValue);
-
-	if (_fence->GetCompletedValue() < _fenceValue)
+	if (_fence->GetCompletedValue() < fenceValue)
 	{
-		_fence->SetEventOnCompletion(_fenceValue, _fenceEvent);
+		_fence->SetEventOnCompletion(fenceValue, _fenceEvent);
 		::WaitForSingleObject(_fenceEvent, INFINITE);
+	}
+}
+
+void JCommandQueue::WaitIdle()
+{
+	if (_cmdQueue == nullptr || _fence == nullptr || _fenceEvent == nullptr)
+	{
+		return;
+	}
+
+	const uint64 fenceValue = _nextFenceValue++;
+	_cmdQueue->Signal(_fence.Get(), fenceValue);
+	waitForFenceValue(fenceValue);
+
+	for (FrameResource& frameResource : _frameResources)
+	{
+		frameResource.fenceValue = 0;
 	}
 }
 
 void JCommandQueue::destroy()
 {
+	WaitIdle();
+
+	if (_fenceEvent != INVALID_HANDLE_VALUE)
+	{
+		::CloseHandle(_fenceEvent);
+		_fenceEvent = INVALID_HANDLE_VALUE;
+	}
+
+	_currentRenderTarget = nullptr;
+	_currentRenderTargets.clear();
+	_cmdList.Reset();
+	for (FrameResource& frameResource : _frameResources)
+	{
+		frameResource.transientDescriptorHeaps.clear();
+		frameResource.commandAllocator.Reset();
+		frameResource.fenceValue = 0;
+	}
+	_cmdQueue.Reset();
+	_fence.Reset();
+	_device.Reset();
 }
 
 J_RENDER_END

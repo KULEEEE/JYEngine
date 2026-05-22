@@ -612,6 +612,12 @@ void JRenderDB::Clear()
 	{
 		destroyConstantBuffer(_renderContext, record.resource.perObjectBuffer);
 	}
+
+	for (CameraResourceRecord& record : _cameraResources)
+	{
+		destroyConstantBuffer(_renderContext, record.resource.perFrameBuffer);
+	}
+
 	destroyConstantBuffer(_renderContext, _lightResource.lightBuffer);
 
 	_meshResources.clear();

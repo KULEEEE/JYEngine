@@ -206,9 +206,11 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 				return false;
 			}
 
-			cameraData->active = entityData.camera.active;
-			cameraData->nearP = entityData.camera.nearP;
-			cameraData->farP = entityData.camera.farP;
+			Engine::JScene::CameraData resolvedCameraData = *cameraData;
+			resolvedCameraData.active = entityData.camera.active;
+			resolvedCameraData.nearP = entityData.camera.nearP;
+			resolvedCameraData.farP = entityData.camera.farP;
+			result.scene->SetCameraData(camera, resolvedCameraData);
 		
 			result.cameras[entityKey] = camera;
 			result.registeredCameras.push_back(camera);
@@ -282,9 +284,10 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 				return false;
 			}
 
-			renderObjectData->active = entityData.renderObjectComponent.active;
-			renderObjectData->visible = entityData.renderObjectComponent.visible;
-			result.scene->MarkRenderObjectComponentModified(renderObject);
+			Engine::JScene::RenderObjectComponentData resolvedRenderObjectData = *renderObjectData;
+			resolvedRenderObjectData.active = entityData.renderObjectComponent.active;
+			resolvedRenderObjectData.visible = entityData.renderObjectComponent.visible;
+			result.scene->SetRenderObjectComponentData(renderObject, resolvedRenderObjectData);
 			result.renderObjects[entityKey] = renderObject;
 		}
 	}

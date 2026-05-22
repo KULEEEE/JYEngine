@@ -213,7 +213,12 @@ void JRenderServer::syncCameraResources()
 {
 	for (const JCameraSnapshot& snapshot : _frameSnapshot.cameras)
 	{
-		_renderDB.SyncCamera(snapshot.camera, snapshot.viewProjection);
+		const uint64 cameraKey = makeCameraKey(snapshot.camera);
+		const bool isDirty = std::find(_dirtyCameraKeys.begin(), _dirtyCameraKeys.end(), cameraKey) != _dirtyCameraKeys.end();
+		if (isDirty || _renderDB.FindCameraResource(snapshot.camera) == nullptr)
+		{
+			_renderDB.SyncCamera(snapshot.camera, snapshot.viewProjection);
+		}
 	}
 	_dirtyCameraKeys.clear();
 }
@@ -237,8 +242,14 @@ void JRenderServer::syncTransformResources()
 	}
 }
 
-void JRenderServer::syncLightResources()
+void JRenderServer::syncLightResources(bool forceSync)
 {
+	const JLightResource* lightResource = _renderDB.FindLightResource();
+	if (!forceSync && lightResource != nullptr && lightResource->lightBuffer != nullptr)
+	{
+		return;
+	}
+
 	for (const JLightSnapshot& snapshot : _frameSnapshot.lights)
 	{
 		_renderDB.SyncLight(snapshot);
@@ -505,6 +516,12 @@ void JRenderServer::SyncScene(JScene& scene)
 
 	const std::vector<JCameraHandle> cameraHandles = collectRegisteredCameraHandles();
 	const std::vector<JSceneRenderObjectEvent> renderObjectEvents = scene.ConsumeRenderObjectEvents();
+	for (JCameraHandle camera : scene.ConsumeDirtyCameras())
+	{
+		MarkCameraDirty(camera);
+	}
+	const bool lightDirty = !scene.ConsumeDirtyLights().empty();
+
 	JRenderSnapshotBuilder::Input input;
 	input.scene = &scene;
 	input.cameras = &cameraHandles;
@@ -514,7 +531,7 @@ void JRenderServer::SyncScene(JScene& scene)
 	updateDrawItemCache(scene, renderObjectEvents, buildResult);
 	syncCameraResources();
 	syncTransformResources();
-	syncLightResources();
+	syncLightResources(lightDirty);
 	ensureMeshResources(buildResult.activeMeshes);
 
 	JCameraRenderQueueBuilder::Input queueInput;

@@ -183,6 +183,24 @@ void JScene::pushRenderObjectEvent(JSceneRenderObjectEventType type, JRenderObje
 	_renderObjectEvents.push_back({ type, handle, entity });
 }
 
+void JScene::markCameraDirtyForEntity(JEntityHandle entity)
+{
+	const JCameraHandle camera = GetCameraHandle(entity);
+	if (camera.IsValid())
+	{
+		MarkCameraDirty(camera);
+	}
+}
+
+void JScene::markLightDirtyForEntity(JEntityHandle entity)
+{
+	const JLightHandle light = GetLightHandle(entity);
+	if (light.IsValid())
+	{
+		MarkLightDirty(light);
+	}
+}
+
 JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData& data)
 {
 	if (!_entities.IsValid(entity))
@@ -230,6 +248,7 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 		_primaryCamera = handle;
 	}
 	addEntityComponentMask(entity, JSceneComponentMask::Camera);
+	MarkCameraDirty(handle);
 	return handle;
 }
 
@@ -255,6 +274,7 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	}
 
 	addEntityComponentMask(entity, JSceneComponentMask::Light);
+	MarkLightDirty(light);
 	return light;
 }
 
@@ -343,6 +363,7 @@ bool JScene::RemoveLight(JLightHandle light)
 	}
 
 	const JEntityHandle entity = lightData->entity;
+	MarkLightDirty(light);
 	if (!_lights.Remove(light))
 	{
 		return false;
@@ -410,6 +431,12 @@ JScene::TransformData JScene::GetTransform(JEntityHandle entity) const
 void JScene::SetTransform(JTransformHandle handle, const TransformData& data)
 {
 	_transforms.Set(handle, data);
+	if (_transforms.IsValid(handle))
+	{
+		const JEntityHandle entity = _transforms.GetSlots()[handle.index].entity;
+		markCameraDirtyForEntity(entity);
+		markLightDirtyForEntity(entity);
+	}
 }
 
 void JScene::SetTransform(JEntityHandle entity, const TransformData& data)
@@ -423,6 +450,12 @@ void JScene::SetTransform(JEntityHandle entity, const TransformData& data)
 void JScene::SetTransformTranslation(JTransformHandle handle, const JVec3& value)
 {
 	_transforms.SetTranslation(handle, value);
+	if (_transforms.IsValid(handle))
+	{
+		const JEntityHandle entity = _transforms.GetSlots()[handle.index].entity;
+		markCameraDirtyForEntity(entity);
+		markLightDirtyForEntity(entity);
+	}
 }
 
 void JScene::SetTransformTranslation(JEntityHandle entity, const JVec3& value)
@@ -436,6 +469,12 @@ void JScene::SetTransformTranslation(JEntityHandle entity, const JVec3& value)
 void JScene::SetTransformRotation(JTransformHandle handle, const JVec3& value)
 {
 	_transforms.SetRotation(handle, value);
+	if (_transforms.IsValid(handle))
+	{
+		const JEntityHandle entity = _transforms.GetSlots()[handle.index].entity;
+		markCameraDirtyForEntity(entity);
+		markLightDirtyForEntity(entity);
+	}
 }
 
 void JScene::SetTransformRotation(JEntityHandle entity, const JVec3& value)
@@ -449,6 +488,12 @@ void JScene::SetTransformRotation(JEntityHandle entity, const JVec3& value)
 void JScene::SetTransformScale(JTransformHandle handle, const JVec3& value)
 {
 	_transforms.SetScale(handle, value);
+	if (_transforms.IsValid(handle))
+	{
+		const JEntityHandle entity = _transforms.GetSlots()[handle.index].entity;
+		markCameraDirtyForEntity(entity);
+		markLightDirtyForEntity(entity);
+	}
 }
 
 void JScene::SetTransformScale(JEntityHandle entity, const JVec3& value)
@@ -469,21 +514,9 @@ bool JScene::HasDirtyTransforms() const
 	return _transforms.HasDirty();
 }
 
-JVec3* JScene::GetTransformTranslation(JTransformHandle handle)
-{
-	return _transforms.GetTranslation(handle);
-}
-
 const JVec3* JScene::GetTransformTranslation(JTransformHandle handle) const
 {
 	return _transforms.GetTranslation(handle);
-}
-
-JVec3* JScene::GetTransformTranslation(JEntityHandle entity)
-{
-	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
-		? _transforms.GetTranslation(_entityTransformLookup[entity.index])
-		: nullptr;
 }
 
 const JVec3* JScene::GetTransformTranslation(JEntityHandle entity) const
@@ -493,21 +526,9 @@ const JVec3* JScene::GetTransformTranslation(JEntityHandle entity) const
 		: nullptr;
 }
 
-JVec3* JScene::GetTransformRotation(JTransformHandle handle)
-{
-	return _transforms.GetRotation(handle);
-}
-
 const JVec3* JScene::GetTransformRotation(JTransformHandle handle) const
 {
 	return _transforms.GetRotation(handle);
-}
-
-JVec3* JScene::GetTransformRotation(JEntityHandle entity)
-{
-	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
-		? _transforms.GetRotation(_entityTransformLookup[entity.index])
-		: nullptr;
 }
 
 const JVec3* JScene::GetTransformRotation(JEntityHandle entity) const
@@ -517,21 +538,9 @@ const JVec3* JScene::GetTransformRotation(JEntityHandle entity) const
 		: nullptr;
 }
 
-JVec3* JScene::GetTransformScale(JTransformHandle handle)
-{
-	return _transforms.GetScale(handle);
-}
-
 const JVec3* JScene::GetTransformScale(JTransformHandle handle) const
 {
 	return _transforms.GetScale(handle);
-}
-
-JVec3* JScene::GetTransformScale(JEntityHandle entity)
-{
-	return _entities.IsValid(entity) && entity.index < _entityTransformLookup.size()
-		? _transforms.GetScale(_entityTransformLookup[entity.index])
-		: nullptr;
 }
 
 const JVec3* JScene::GetTransformScale(JEntityHandle entity) const
@@ -643,6 +652,147 @@ JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JEntityHandl
 const JScene::RenderObjectComponentData* JScene::GetRenderObjectComponent(JEntityHandle entity) const
 {
 	return GetRenderObjectComponent(GetRenderObjectComponentHandle(entity));
+}
+
+void JScene::SetCameraData(JCameraHandle camera, const CameraData& data)
+{
+	CameraData* cameraData = _cameras.Get(camera);
+	if (cameraData == nullptr)
+	{
+		return;
+	}
+
+	CameraData resolved = data;
+	resolved.entity = cameraData->entity;
+	*cameraData = resolved;
+	MarkCameraDirty(camera);
+}
+
+void JScene::SetCameraAspectRatio(JCameraHandle camera, float aspectRatio)
+{
+	CameraData* cameraData = _cameras.Get(camera);
+	if (cameraData == nullptr)
+	{
+		return;
+	}
+
+	cameraData->aspectRatio = aspectRatio;
+	MarkCameraDirty(camera);
+}
+
+void JScene::SetLightData(JLightHandle light, const LightData& data)
+{
+	LightData* lightData = _lights.Get(light);
+	if (lightData == nullptr)
+	{
+		return;
+	}
+
+	LightData resolved = data;
+	resolved.entity = lightData->entity;
+	*lightData = resolved;
+	MarkLightDirty(light);
+}
+
+void JScene::SetRenderObjectComponentData(JRenderObjectComponentHandle handle, const RenderObjectComponentData& data)
+{
+	RenderObjectComponentData* renderObject = _renderObjectComponents.Get(handle);
+	if (renderObject == nullptr)
+	{
+		return;
+	}
+
+	RenderObjectComponentData resolved = data;
+	resolved.entity = renderObject->entity;
+	*renderObject = resolved;
+	pushRenderObjectEvent(JSceneRenderObjectEventType::Modified, handle, resolved.entity);
+}
+
+void JScene::SetRenderObjectVisible(JRenderObjectComponentHandle handle, bool visible)
+{
+	RenderObjectComponentData* renderObject = _renderObjectComponents.Get(handle);
+	if (renderObject == nullptr || renderObject->visible == visible)
+	{
+		return;
+	}
+
+	renderObject->visible = visible;
+	pushRenderObjectEvent(JSceneRenderObjectEventType::Modified, handle, renderObject->entity);
+}
+
+void JScene::SetRenderObjectVisible(JEntityHandle entity, bool visible)
+{
+	SetRenderObjectVisible(GetRenderObjectComponentHandle(entity), visible);
+}
+
+void JScene::MarkCameraDirty(JCameraHandle camera)
+{
+	if (!_cameras.IsValid(camera))
+	{
+		return;
+	}
+
+	for (JCameraHandle dirtyCamera : _dirtyCameras)
+	{
+		if (dirtyCamera.index == camera.index && dirtyCamera.generation == camera.generation)
+		{
+			return;
+		}
+	}
+
+	_dirtyCameras.push_back(camera);
+}
+
+void JScene::MarkCameraDirty(JEntityHandle entity)
+{
+	MarkCameraDirty(GetCameraHandle(entity));
+}
+
+std::vector<JCameraHandle> JScene::ConsumeDirtyCameras()
+{
+	std::vector<JCameraHandle> dirtyCameras = std::move(_dirtyCameras);
+	_dirtyCameras.clear();
+
+	std::vector<JCameraHandle> validCameras;
+	validCameras.reserve(dirtyCameras.size());
+	for (JCameraHandle camera : dirtyCameras)
+	{
+		if (_cameras.IsValid(camera))
+		{
+			validCameras.push_back(camera);
+		}
+	}
+	return validCameras;
+}
+
+void JScene::MarkLightDirty(JLightHandle light)
+{
+	if (!_lights.IsValid(light))
+	{
+		return;
+	}
+
+	for (JLightHandle dirtyLight : _dirtyLights)
+	{
+		if (dirtyLight.index == light.index && dirtyLight.generation == light.generation)
+		{
+			return;
+		}
+	}
+
+	_dirtyLights.push_back(light);
+}
+
+void JScene::MarkLightDirty(JEntityHandle entity)
+{
+	MarkLightDirty(GetLightHandle(entity));
+}
+
+std::vector<JLightHandle> JScene::ConsumeDirtyLights()
+{
+	std::vector<JLightHandle> dirtyLights = std::move(_dirtyLights);
+	_dirtyLights.clear();
+	return dirtyLights;
 }
 
 void JScene::MarkRenderObjectComponentModified(JRenderObjectComponentHandle handle)

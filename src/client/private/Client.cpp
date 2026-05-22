@@ -122,12 +122,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         s_WindowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
     }
 
-    J::Render::JSwapChain* swapChain = new J::Render::JSwapChain();
-    J::Render::JCommandQueue* cmdQueue = new J::Render::JCommandQueue();
+    auto swapChain = std::make_unique<J::Render::JSwapChain>();
+    auto cmdQueue = std::make_unique<J::Render::JCommandQueue>();
 
-    InitializeEngine(cmdQueue, swapChain);
+    InitializeEngine(cmdQueue.get(), swapChain.get());
 
-    cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain);
+    cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain.get());
     swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(), cmdQueue->GetCmdQueue());
 
     const float initialAspectRatio = s_WindowInfo.height > 0
@@ -186,11 +186,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 }
             }
 
-            cmdQueue->RenderBegin();
+            const uint32 frameIndex = swapChain->GetBackBufferIndex();
+            cmdQueue->RenderBegin(frameIndex);
             panel->Update();
-            cmdQueue->RenderEnd();
+            cmdQueue->RenderEnd(frameIndex);
             swapChain->Present();
-            cmdQueue->WaitSync();
             swapChain->SwapIndex();
         }
 

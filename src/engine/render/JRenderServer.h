@@ -58,7 +58,7 @@ private:
 	std::vector<JCameraHandle> collectRegisteredCameraHandles() const;
 	void syncCameraResources();
 	void syncTransformResources();
-	void syncLightResources();
+	void syncLightResources(bool forceSync);
 	void ensureMeshResources(const std::unordered_set<const JMesh*>& activeMeshes);
 	void updateDrawItemCache(JScene& scene, const std::vector<JSceneRenderObjectEvent>& events, JRenderSnapshotBuilder::Result& outResult);
 	void rebuildDrawItemCache(const JScene& scene, JRenderSnapshotBuilder::Result& outResult);

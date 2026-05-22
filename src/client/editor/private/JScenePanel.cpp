@@ -176,13 +176,17 @@ void JScenePanel::Update()
 		_viewportHeight = clientHeight;
 		if (swapChain != nullptr)
 		{
+			if (Render::JCommandQueue* commandQueue = GetEngine()->GetCmdQueue())
+			{
+				commandQueue->WaitIdle();
+			}
 			swapChain->Resize(clientWidth, clientHeight);
 		}
 
 		Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
 		if (cameraData != nullptr)
 		{
-			cameraData->aspectRatio = static_cast<float>(clientWidth) / static_cast<float>(clientHeight);
+			scene->SetCameraAspectRatio(_sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 		}
 	}
 
@@ -443,8 +447,7 @@ void JScenePanel::updateSelectedObject(float deltaTime)
 		Engine::JScene::RenderObjectComponentData* renderObject = scene->GetRenderObjectComponent(_selectedEntity);
 		if (renderObject != nullptr)
 		{
-			renderObject->visible = !renderObject->visible;
-			scene->MarkRenderObjectComponentModified(_selectedEntity);
+			scene->SetRenderObjectVisible(_selectedEntity, !renderObject->visible);
 		}
 	}
 }

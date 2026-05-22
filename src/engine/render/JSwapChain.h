@@ -22,6 +22,7 @@ public:
 
 	ComPtr<IDXGISwapChain> GetSwapChain() { return _swapChain; }
 	Engine::JRenderTarget* GetRenderTarget() { return _renderTargets[_backBufferIndex]; }
+	uint32 GetBackBufferIndex() const { return _backBufferIndex; }
 
 private:
 	void createSwapChain(const JWindowInfo& info, ComPtr<IDXGIFactory> dxgi, ComPtr<ID3D12CommandQueue> cmdQueue);

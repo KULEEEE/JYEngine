@@ -3,11 +3,11 @@
 #ifndef __J_COMMAND_QUEUE_H__
 #define __J_COMMAND_QUEUE_H__
 #include "engine/precompile.h"
+#include "engine/render/JRenderDefinition.h"
 
 /*#include "engine/render/JSwapChain.h"*/ namespace J { namespace Render { class JSwapChain; } }
 /*#include "engine/render/JDescriptorHeap.h"*/ namespace J { namespace Render { class JDescriptorHeap; } }
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
-/*#include "engine/render/JRenderDefinition.h"*/ namespace J { namespace Render { struct JPipeline; } }
 /*#include "engine/render/JRenderResource.h"*/ namespace J { namespace Engine { struct JMeshResource; } }
 /*#include "engine/asset/JShader.h"*/ namespace J { namespace Render { class JShader; } }
 /*#include "engine/render/JGraphicResource.h"*/ namespace J { namespace Render { class JGraphicResource; } }
@@ -22,6 +22,7 @@ public:
 
 	void Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChain);
 
+	void RenderBegin(uint32 frameIndex);
 	void RenderBegin();
 
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget = true);
@@ -40,25 +41,34 @@ public:
 	void DrawIndexed(const uint32& indexCount, const uint32& instanceCount, const uint32& startIndex, const uint32& baseVertex, const uint32& startInstance);
 
 	void EndRenderPass();
+	void RenderEnd(uint32 frameIndex);
 	void RenderEnd();
-	void WaitSync();
+	void WaitIdle();
 
 	ComPtr<ID3D12CommandQueue> GetCmdQueue() { return _cmdQueue; }
 	ComPtr<ID3D12GraphicsCommandList> GetCmdList() { return _cmdList; }
 
 private:
+	struct FrameResource
+	{
+		ComPtr<ID3D12CommandAllocator> commandAllocator;
+		std::vector<ComPtr<ID3D12DescriptorHeap>> transientDescriptorHeaps;
+		uint64 fenceValue = 0;
+	};
+
 	void destroy();
+	void waitForFenceValue(uint64 fenceValue);
 
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 	ComPtr<ID3D12Device> _device;
-	ComPtr<ID3D12CommandAllocator> _cmdAlloc;
 	ComPtr<ID3D12GraphicsCommandList> _cmdList;
 
 	ComPtr<ID3D12Fence> _fence;
-	uint32 _fenceValue = 0;
+	uint64 _nextFenceValue = 1;
 	HANDLE _fenceEvent = INVALID_HANDLE_VALUE;
+	FrameResource _frameResources[SWAP_CHAIN_BUFFER_COUNT];
+	uint32 _activeFrameIndex = 0;
 
-	std::vector<ComPtr<ID3D12DescriptorHeap>> _transientDescriptorHeaps;
 	Engine::JRenderTarget* _currentRenderTarget = nullptr;
 	std::vector<Engine::JRenderTarget*> _currentRenderTargets;
 };
