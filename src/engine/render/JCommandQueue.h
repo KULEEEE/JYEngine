@@ -58,6 +58,7 @@ private:
 		ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 		uint32 descriptorCapacity = 0;
 		uint32 descriptorOffset = 0;
+		std::unordered_map<size_t, D3D12_GPU_DESCRIPTOR_HANDLE> descriptorTableCache;
 		uint64 fenceValue = 0;
 	};
 
@@ -65,6 +66,7 @@ private:
 	void waitForFenceValue(uint64 fenceValue);
 	bool initializeFrameResource(FrameResource& frameResource);
 	D3D12_GPU_DESCRIPTOR_HANDLE allocateFrameTextureTable(const JGraphicResource* resource, JShader* shader);
+	size_t makeTextureTableKey(const JGraphicResource* resource, JShader* shader) const;
 
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 	ComPtr<ID3D12Device> _device;

@@ -149,7 +149,8 @@ void JScenePanel::Init()
 		renderer->SetRenderPath(Engine::JRenderer::RenderPath::Deferred);
 	}
 
-	_lastUpdateTime = std::chrono::steady_clock::now();
+	QueryPerformanceFrequency(&_timerFrequency);
+	QueryPerformanceCounter(&_lastFrameCounter);
 	_isReady = true;
 }
 
@@ -193,14 +194,7 @@ void JScenePanel::Update()
 		}
 	}
 
-	const auto now = std::chrono::steady_clock::now();
-	float deltaTime = 0.0f;
-	if (_lastUpdateTime != std::chrono::steady_clock::time_point{})
-	{
-		deltaTime = std::chrono::duration<float>(now - _lastUpdateTime).count();
-	}
-	_lastUpdateTime = now;
-	deltaTime = std::clamp(deltaTime, 0.0f, MAX_FRAME_DELTA_TIME);
+	const float deltaTime = tickFrameTimer();
 
 	updateSceneCamera(deltaTime);
 	updateSelectedObject(deltaTime);
@@ -229,6 +223,22 @@ void JScenePanel::Update()
 
 	updateStatsPopup(frameDesc, deltaTime);
 	renderer->Render(frameDesc);
+}
+
+float JScenePanel::tickFrameTimer()
+{
+	if (_timerFrequency.QuadPart == 0 || _lastFrameCounter.QuadPart == 0)
+	{
+		QueryPerformanceFrequency(&_timerFrequency);
+		QueryPerformanceCounter(&_lastFrameCounter);
+		return 0.0f;
+	}
+
+	LARGE_INTEGER now{};
+	QueryPerformanceCounter(&now);
+	const double elapsed = static_cast<double>(now.QuadPart - _lastFrameCounter.QuadPart) / static_cast<double>(_timerFrequency.QuadPart);
+	_lastFrameCounter = now;
+	return std::clamp(static_cast<float>(elapsed), 0.0f, MAX_FRAME_DELTA_TIME);
 }
 
 void JScenePanel::OnMouseWheel(short delta)
@@ -517,10 +527,11 @@ void JScenePanel::destroyStatsPopup()
 	}
 }
 
-void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float deltaTime)
+void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float rawDeltaTime)
 {
-	const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
-	const uint32 drawCallCount = static_cast<uint32>(frameDesc.opaqueDrawItemIndices.size() + frameDesc.transparentDrawItemIndices.size());
+	constexpr float STATS_UPDATE_INTERVAL = 0.25f;
+	_statsElapsed += rawDeltaTime;
+	++_statsFrameCount;
 
 	if (_statsPopup == nullptr)
 	{
@@ -538,8 +549,17 @@ void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float de
 		SetWindowPos(_statsPopup, HWND_TOPMOST, ownerRect.left + 20, ownerRect.top + 54, 260, 96, SWP_NOACTIVATE);
 	}
 
+	if (_statsElapsed >= STATS_UPDATE_INTERVAL)
+	{
+		_displayFps = _statsElapsed > 0.0f ? static_cast<float>(_statsFrameCount) / _statsElapsed : 0.0f;
+		_displayFrameMs = _displayFps > 0.0f ? 1000.0f / _displayFps : 0.0f;
+		_displayDrawCallCount = static_cast<uint32>(frameDesc.opaqueDrawItemIndices.size() + frameDesc.transparentDrawItemIndices.size());
+		_statsElapsed = 0.0f;
+		_statsFrameCount = 0;
+	}
+
 	wchar_t text[128] = {};
-	swprintf_s(text, L"FPS: %.1f\r\nDrawCalls: %u", fps, drawCallCount);
+	swprintf_s(text, L"FPS: %.1f\r\nFrame: %.2f ms\r\nDrawCalls: %u", _displayFps, _displayFrameMs, _displayDrawCallCount);
 	SetWindowTextW(_statsPopup, text);
 }
 

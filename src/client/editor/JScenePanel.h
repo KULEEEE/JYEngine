@@ -7,7 +7,6 @@
 #include "engine/core/JEngineContext.h"
 #include "engine/scene/JScene.h"
 
-#include <chrono>
 #include <memory>
 
 namespace J::Engine
@@ -38,7 +37,8 @@ private:
 	void updateSelectedObject(float deltaTime);
 	void createStatsPopup();
 	void destroyStatsPopup();
-	void updateStatsPopup(const Engine::JFrameDesc& frameDesc, float deltaTime);
+	void updateStatsPopup(const Engine::JFrameDesc& frameDesc, float rawDeltaTime);
+	float tickFrameTimer();
 	
 	JSceneManager* _sceneManager = nullptr;
 	Engine::JCameraHandle _sceneCamera = {};
@@ -53,13 +53,19 @@ private:
 	bool _showStatsPopup = true;
 	POINT _lastMousePosition = {};
 	bool _isReady = false;
-	std::chrono::steady_clock::time_point _lastUpdateTime = {};
+	LARGE_INTEGER _timerFrequency = {};
+	LARGE_INTEGER _lastFrameCounter = {};
 	float _editorCameraMoveSpeed = 6.0f;
 	HWND _mainWindow = nullptr;
 	uint32 _viewportWidth = 0;
 	uint32 _viewportHeight = 0;
 	HWND _statsPopup = nullptr;
 	HFONT _statsFont = nullptr;
+	float _statsElapsed = 0.0f;
+	uint32 _statsFrameCount = 0;
+	float _displayFps = 0.0f;
+	float _displayFrameMs = 0.0f;
+	uint32 _displayDrawCallCount = 0;
 
 };
 

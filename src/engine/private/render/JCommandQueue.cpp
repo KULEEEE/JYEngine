@@ -157,6 +157,7 @@ void JCommandQueue::RenderBegin(uint32 frameIndex)
 	waitForFenceValue(frameResource.fenceValue);
 	frameResource.uploadOffset = 0;
 	frameResource.descriptorOffset = 0;
+	frameResource.descriptorTableCache.clear();
 	frameResource.commandAllocator->Reset();
 	_cmdList->Reset(frameResource.commandAllocator.Get(), nullptr);
 }
@@ -417,6 +418,13 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 	}
 
 	FrameResource& frameResource = _frameResources[_activeFrameIndex];
+	const size_t tableKey = makeTextureTableKey(resource, shader);
+	const auto cachedIter = frameResource.descriptorTableCache.find(tableKey);
+	if (cachedIter != frameResource.descriptorTableCache.end())
+	{
+		return cachedIter->second;
+	}
+
 	if (frameResource.descriptorHeap == nullptr || frameResource.descriptorOffset + srvDescriptorCount > frameResource.descriptorCapacity)
 	{
 		std::cerr << "Frame descriptor ring overflow: requested " << srvDescriptorCount << " descriptors." << std::endl;
@@ -444,7 +452,20 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = frameResource.descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	gpuHandle.ptr += static_cast<UINT64>(tableBase) * _srvDescriptorSize;
+	frameResource.descriptorTableCache[tableKey] = gpuHandle;
 	return gpuHandle;
+}
+
+size_t JCommandQueue::makeTextureTableKey(const JGraphicResource* resource, JShader* shader) const
+{
+	size_t key = reinterpret_cast<size_t>(shader);
+	for (const JGraphicResource::TextureBinding& binding : resource->GetTextures())
+	{
+		const size_t textureKey = reinterpret_cast<size_t>(binding.texture);
+		key ^= textureKey + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+		key ^= static_cast<size_t>(binding.shaderSlot) + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
+	}
+	return key;
 }
 
 void JCommandQueue::BindVertexBuffer(const Engine::JMeshResource* meshResource)
@@ -631,6 +652,7 @@ void JCommandQueue::destroy()
 		frameResource.descriptorHeap.Reset();
 		frameResource.descriptorCapacity = 0;
 		frameResource.descriptorOffset = 0;
+		frameResource.descriptorTableCache.clear();
 		frameResource.commandAllocator.Reset();
 		frameResource.fenceValue = 0;
 	}
