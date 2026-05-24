@@ -123,6 +123,19 @@ set_target_properties(Engine PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}
 )
 
+# oneTBB (Benchmark 전용)
+include(FetchContent)
+FetchContent_Declare(
+    TBB
+    GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+    GIT_TAG        v2021.13.0
+    GIT_SHALLOW    TRUE
+)
+set(TBB_TEST     OFF CACHE BOOL "" FORCE)
+set(TBB_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(TBB_STRICT   OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(TBB)
+
 # Benchmark (콘솔 실행 파일 — Engine 의존 없음)
 file(GLOB BENCHMARK_SOURCES "benchmark/*.cpp")
 file(GLOB BENCHMARK_HEADERS "benchmark/*.h")
@@ -136,6 +149,8 @@ target_include_directories(Benchmark PRIVATE
 target_compile_options(Benchmark PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
 )
+
+target_link_libraries(Benchmark PRIVATE TBB::tbb)
 
 set_target_properties(Benchmark PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
