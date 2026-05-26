@@ -9,7 +9,6 @@
 
 #include "client/editor/JAssetManager.h"
 /*#include "engine/render/JMaterialFactory.h"*/ namespace J { namespace Engine { class JMaterialFactory; } }
-/*#include "engine/render/JRenderServer.h"*/ namespace J { namespace Engine { class JRenderServer; } }
 
 J_EDITOR_BEGIN
 
@@ -17,7 +16,6 @@ struct JSceneBuildContext
 {
 	JAssetManager* assetManager = nullptr;
 	Engine::JMaterialFactory* materialFactory = nullptr;
-	Engine::JRenderServer* renderServer = nullptr;
 	float cameraAspectRatio = 1.0f;
 };
 
@@ -31,7 +29,7 @@ public:
 	JSceneBuildResult& operator=(JSceneBuildResult&&) noexcept = default;
 
 	Engine::JScene* GetScene() const { return scene.get(); }
-	void Release(Engine::JRenderServer* renderServer);
+	void Release();
 
 	std::unique_ptr<Engine::JScene> scene;
 	std::vector<std::shared_ptr<Engine::JMaterial>> materials;

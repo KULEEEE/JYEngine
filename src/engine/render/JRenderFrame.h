@@ -28,6 +28,23 @@ struct JDrawItem
 	bool transparent = false;
 };
 
+struct JFrameTransformSnapshot
+{
+	JTransformHandle transform = {};
+	XMMATRIX world = XMMatrixIdentity();
+};
+
+struct JFrameLightSnapshot
+{
+	struct Item
+	{
+		JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
+		JVec4 position = { 0.0f, 4.0f, -4.0f, 1.0f };
+	};
+
+	std::vector<Item> items;
+};
+
 struct JFrameDesc
 {
 	JCameraHandle camera = {};
@@ -36,6 +53,9 @@ struct JFrameDesc
 	Render::JViewport viewport = {};
 	D3D12_RECT scissorRect = {};
 	const JDrawItemCache* drawItemCache = nullptr;
+	XMMATRIX cameraViewProjection = XMMatrixIdentity();
+	std::vector<JFrameTransformSnapshot> transformSnapshots;
+	JFrameLightSnapshot lightSnapshot;
 	std::vector<uint32> opaqueDrawItemIndices;
 	std::vector<uint32> transparentDrawItemIndices;
 	uint32 cullingTestedDrawItemCount = 0;

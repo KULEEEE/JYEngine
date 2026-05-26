@@ -4,13 +4,14 @@
 
 #include "client/editor/JSceneBuilder.h"
 #include "engine/scene/JSceneSerializer.h"
+#include "engine/render/JRenderer.h"
 
 J_EDITOR_BEGIN
 
 class JSceneManager
 {
 public:
-	JSceneManager(Engine::JRenderServer* renderServer, Engine::JMaterialFactory* materialFactory, float cameraAspectRatio = 1.0f);
+	JSceneManager(Engine::JRenderer* renderer, Engine::JMaterialFactory* materialFactory, float cameraAspectRatio = 1.0f);
 	~JSceneManager();
 
 	JSceneManager(const JSceneManager&) = delete;
@@ -34,10 +35,13 @@ public:
 private:
 	bool buildFromSceneData(const Engine::JSceneData& sceneData);
 	Engine::JSceneData createEmptySceneData(const std::string& sceneName) const;
+	void registerRenderAssets();
+	void unregisterRenderAssets();
 
 	JAssetManager _assetManager;
 	JSceneBuildContext _buildContext;
 	JSceneBuildResult _sceneBuild;
+	Engine::JRenderer* _renderer = nullptr;
 	Engine::JSceneData _sceneData;
 	std::filesystem::path _currentPath;
 	bool _dirty = false;

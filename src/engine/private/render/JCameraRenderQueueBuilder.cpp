@@ -2,6 +2,7 @@
 
 #include "engine/core/JJobSystem.h"
 #include "engine/render/JRenderDB.h"
+#include "engine/scene/JScene.h"
 
 J_ENGINE_BEGIN
 
@@ -20,6 +21,14 @@ namespace
 	JVec3 maxVec3(const JVec3& a, const JVec3& b)
 	{
 		return JVec3(std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z));
+	}
+
+	XMMATRIX makeWorldMatrix(const JScene::TransformData& transform)
+	{
+		const XMMATRIX scale = XMMatrixScaling(transform.scale.x, transform.scale.y, transform.scale.z);
+		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+		const XMMATRIX translation = XMMatrixTranslation(transform.translation.x, transform.translation.y, transform.translation.z);
+		return scale * rotation * translation;
 	}
 }
 
@@ -64,7 +73,7 @@ JFrustum JCameraRenderQueueBuilder::buildFrustum(const XMMATRIX& viewProjection)
 	return frustum;
 }
 
-bool JCameraRenderQueueBuilder::isVisible(const JCameraSnapshot& cameraSnapshot, const JDrawItem& drawItem, const JRenderDB* renderDB)
+bool JCameraRenderQueueBuilder::isVisible(const JCameraSnapshot& cameraSnapshot, const JDrawItem& drawItem, const Input& input)
 {
 	if (drawItem.mesh == nullptr)
 	{
@@ -72,18 +81,26 @@ bool JCameraRenderQueueBuilder::isVisible(const JCameraSnapshot& cameraSnapshot,
 	}
 
 	const JMesh::Bounds& bounds = drawItem.mesh->GetBounds();
-	if (!bounds.valid || renderDB == nullptr)
+	if (!bounds.valid)
 	{
 		return true;
 	}
 
-	const JTransformResource* transformResource = renderDB->FindTransformResource(drawItem.transform);
-	if (transformResource == nullptr)
+	if (input.renderDB != nullptr)
 	{
-		return true;
+		const JTransformResource* transformResource = input.renderDB->FindTransformResource(drawItem.transform);
+		if (transformResource != nullptr)
+		{
+			return isAABBVisible(cameraSnapshot.frustum, bounds, transformResource->world);
+		}
 	}
 
-	return isAABBVisible(cameraSnapshot.frustum, bounds, transformResource->world);
+	if (input.scene != nullptr)
+	{
+		return isAABBVisible(cameraSnapshot.frustum, bounds, makeWorldMatrix(input.scene->GetTransform(drawItem.transform)));
+	}
+
+	return true;
 }
 
 bool JCameraRenderQueueBuilder::isAABBVisible(const JFrustum& frustum, const JMesh::Bounds& bounds, const XMMATRIX& world)
@@ -160,7 +177,7 @@ void JCameraRenderQueueBuilder::buildSerial(const Input& input, JCameraSnapshot&
 
 			const JDrawItem& drawItem = drawItemCache.drawItems[drawItemIndex];
 			++cameraSnapshot.cullingTestedDrawItemCount;
-			if (!isVisible(cameraSnapshot, drawItem, input.renderDB))
+			if (!isVisible(cameraSnapshot, drawItem, input))
 			{
 				++cameraSnapshot.culledDrawItemCount;
 				continue;
@@ -205,7 +222,7 @@ void JCameraRenderQueueBuilder::buildParallel(const Input& input, JCameraSnapsho
 	std::vector<ChunkResult> chunkResults(chunkCount);
 
 	jobSystem.ParallelFor(activeCount, chunkSize,
-		[&drawItemCache, &chunkResults, &cameraSnapshot, renderDB = input.renderDB, chunkSize](uint32 begin, uint32 end)
+		[&drawItemCache, &chunkResults, &cameraSnapshot, &input, chunkSize](uint32 begin, uint32 end)
 		{
 			const uint32 chunkIndex = begin / chunkSize;
 			ChunkResult& result = chunkResults[chunkIndex];
@@ -234,7 +251,7 @@ void JCameraRenderQueueBuilder::buildParallel(const Input& input, JCameraSnapsho
 
 					const JDrawItem& drawItem = drawItemCache.drawItems[drawItemIndex];
 					++result.testedCount;
-					if (!isVisible(cameraSnapshot, drawItem, renderDB))
+					if (!isVisible(cameraSnapshot, drawItem, input))
 					{
 						++result.culledCount;
 						continue;

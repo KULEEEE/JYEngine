@@ -1,14 +1,14 @@
-#include "client/editor/JSceneManager.h"
+﻿#include "client/editor/JSceneManager.h"
 
 #include <iostream>
 #include <utility>
 
 J_EDITOR_BEGIN
 
-JSceneManager::JSceneManager(Engine::JRenderServer* renderServer, Engine::JMaterialFactory* materialFactory, float cameraAspectRatio)
+JSceneManager::JSceneManager(Engine::JRenderer* renderer, Engine::JMaterialFactory* materialFactory, float cameraAspectRatio)
 	: _assetManager(materialFactory)
+	, _renderer(renderer)
 {
-	_buildContext.renderServer = renderServer;
 	_buildContext.materialFactory = materialFactory;
 	_buildContext.assetManager = &_assetManager;
 	_buildContext.cameraAspectRatio = cameraAspectRatio;
@@ -16,12 +16,52 @@ JSceneManager::JSceneManager(Engine::JRenderServer* renderServer, Engine::JMater
 
 JSceneManager::~JSceneManager()
 {
-	_sceneBuild.Release(_buildContext.renderServer);
+	unregisterRenderAssets();
+	_sceneBuild.Release();
 }
 
 bool JSceneManager::buildFromSceneData(const Engine::JSceneData& sceneData)
 {
-	return JSceneBuilder::Build(sceneData, _buildContext, _sceneBuild);
+	unregisterRenderAssets();
+	if (!JSceneBuilder::Build(sceneData, _buildContext, _sceneBuild))
+	{
+		return false;
+	}
+
+	registerRenderAssets();
+	return true;
+}
+
+void JSceneManager::registerRenderAssets()
+{
+	if (_renderer == nullptr)
+	{
+		return;
+	}
+
+	for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : _sceneBuild.materialBundles)
+	{
+		if (bundle != nullptr && bundle->material != nullptr)
+		{
+			_renderer->RegisterMaterial(bundle->material.get());
+		}
+	}
+}
+
+void JSceneManager::unregisterRenderAssets()
+{
+	if (_renderer == nullptr)
+	{
+		return;
+	}
+
+	for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : _sceneBuild.materialBundles)
+	{
+		if (bundle != nullptr && bundle->material != nullptr)
+		{
+			_renderer->UnregisterMaterial(bundle->material->instanceID);
+		}
+	}
 }
 
 Engine::JSceneData JSceneManager::createEmptySceneData(const std::string& sceneName) const

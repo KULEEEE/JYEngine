@@ -1,7 +1,6 @@
 #include "client/editor/JSceneBuilder.h"
 
 #include "engine/render/JMaterialFactory.h"
-#include "engine/render/JRenderServer.h"
 
 #include <iostream>
 
@@ -19,32 +18,8 @@ namespace
 	}
 }
 
-void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
+void JSceneBuildResult::Release()
 {
-	if (renderServer != nullptr)
-	{
-		for (Engine::JCameraHandle camera : registeredCameras)
-		{
-			renderServer->UnregisterCamera(camera);
-		}
-
-		for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : materialBundles)
-		{
-			if (bundle != nullptr && bundle->material != nullptr)
-			{
-				renderServer->UnregisterMaterial(bundle->material->instanceID);
-			}
-		}
-
-		for (const std::shared_ptr<Engine::JMesh>& mesh : meshes)
-		{
-			if (mesh != nullptr)
-			{
-				renderServer->GetRenderDB().RemoveMeshResource(mesh.get());
-			}
-		}
-	}
-
 	registeredCameras.clear();
 	renderObjects.clear();
 	lights.clear();
@@ -63,11 +38,11 @@ void JSceneBuildResult::Release(Engine::JRenderServer* renderServer)
 
 bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuildContext& context, JSceneBuildResult& outResult)
 {
-	outResult.Release(context.renderServer);
+	outResult.Release();
 
-	if (context.materialFactory == nullptr || context.renderServer == nullptr)
+	if (context.materialFactory == nullptr)
 	{
-		std::cerr << "JSceneBuilder::Build failed: material factory or render server is null." << std::endl;
+		std::cerr << "JSceneBuilder::Build failed: material factory is null." << std::endl;
 		return false;
 	}
 
@@ -80,21 +55,21 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		if (materialData.id.empty())
 		{
 			std::cerr << "JSceneBuilder::Build failed: material id is empty." << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
 		if (materialLookup.find(materialData.id) != materialLookup.end())
 		{
 			std::cerr << "JSceneBuilder::Build failed: duplicated material id: " << materialData.id << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
 		if (context.assetManager == nullptr)
 		{
 			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
@@ -102,18 +77,15 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		if (!materialBundle || !materialBundle->material)
 		{
 			std::cerr << "JSceneBuilder::Build failed: material creation failed: " << materialData.id << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
-		context.renderServer->RegisterMaterial(materialBundle->material.get());
 		result.materialIDs[materialData.id] = materialBundle->material->instanceID;
 		materialLookup[materialData.id] = materialBundle->material.get();
 		result.materialBundles.emplace_back(materialBundle);
 		result.materials.emplace_back(materialBundle->material);
 	}
-
-	context.renderServer->Sync();
 
 	std::unordered_map<std::string, Engine::JMesh*> meshLookup;
 	for (const Engine::JSceneMeshData& meshData : sceneData.meshes)
@@ -121,21 +93,21 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		if (meshData.id.empty())
 		{
 			std::cerr << "JSceneBuilder::Build failed: mesh id is empty." << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
 		if (meshLookup.find(meshData.id) != meshLookup.end())
 		{
 			std::cerr << "JSceneBuilder::Build failed: duplicated mesh id: " << meshData.id << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
 		if (context.assetManager == nullptr)
 		{
 			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
@@ -143,7 +115,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		if (!mesh)
 		{
 			std::cerr << "JSceneBuilder::Build failed: mesh creation failed: " << meshData.id << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
@@ -157,7 +129,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		if (!entity.IsValid())
 		{
 			std::cerr << "JSceneBuilder::Build failed: entity creation failed: " << entityData.stableID << std::endl;
-			result.Release(context.renderServer);
+			result.Release();
 			return false;
 		}
 
@@ -177,7 +149,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!transform.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: transform creation failed: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 			result.transforms[entityKey] = transform;
@@ -188,7 +160,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!transform.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: camera requires transform: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -202,7 +174,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!camera.IsValid() || cameraData == nullptr)
 			{
 				std::cerr << "JSceneBuilder::Build failed: camera creation failed: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -214,7 +186,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 		
 			result.cameras[entityKey] = camera;
 			result.registeredCameras.push_back(camera);
-			context.renderServer->RegisterCamera(camera);
 
 			if (entityData.camera.primary || !result.primaryCamera.IsValid())
 			{
@@ -228,7 +199,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!transform.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: light requires transform: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -241,7 +212,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!light.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: light creation failed: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -257,7 +228,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!transform.IsValid())
 			{
 				std::cerr << "JSceneBuilder::Build failed: render object component requires transform: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -266,7 +237,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (meshIter == meshLookup.end() || materialIter == result.materialIDs.end())
 			{
 				std::cerr << "JSceneBuilder::Build failed: render object component asset reference is invalid: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -280,7 +251,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			if (!renderObject.IsValid() || renderObjectData == nullptr)
 			{
 				std::cerr << "JSceneBuilder::Build failed: render object component creation failed: " << entityData.stableID << std::endl;
-				result.Release(context.renderServer);
+				result.Release();
 				return false;
 			}
 
@@ -295,12 +266,10 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 	if (!result.primaryCamera.IsValid())
 	{
 		std::cerr << "JSceneBuilder::Build failed: scene has no camera." << std::endl;
-		result.Release(context.renderServer);
+		result.Release();
 		return false;
 	}
 
-	context.renderServer->Sync();
-	context.renderServer->SyncScene(*result.scene);
 	outResult = std::move(result);
 	return true;
 }

@@ -134,7 +134,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         ? static_cast<float>(s_WindowInfo.width) / static_cast<float>(s_WindowInfo.height)
         : 1.0f;
     {
-        J::Editor::JSceneManager sceneManager(GetEngine()->GetRenderServer(), GetEngine()->GetMaterialFactory(), initialAspectRatio);
+        J::Editor::JSceneManager sceneManager(GetEngine()->GetRenderer(), GetEngine()->GetMaterialFactory(), initialAspectRatio);
         const SceneLaunchOptions launchOptions = parseSceneLaunchOptions();
         if (launchOptions.createNew)
         {

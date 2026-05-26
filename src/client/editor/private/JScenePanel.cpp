@@ -2,7 +2,6 @@
 
 #include "engine/render/JSwapChain.h"
 #include "engine/render/JRenderDefinition.h"
-#include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderServer.h"
 #include "engine/render/JRenderer.h"
 #include "engine/render/JMaterialFactory.h"
@@ -85,9 +84,9 @@ JScenePanel::~JScenePanel()
 
 	if (_editorGridMaterial != nullptr)
 	{
-		if (Engine::JRenderServer* renderServer = GetEngine() != nullptr ? GetEngine()->GetRenderServer() : nullptr)
+		if (Engine::JRenderer* renderer = GetEngine() != nullptr ? GetEngine()->GetRenderer() : nullptr)
 		{
-			renderServer->UnregisterMaterial(_editorGridMaterial->instanceID);
+			renderer->UnregisterMaterial(_editorGridMaterial->instanceID);
 		}
 	}
 }
@@ -207,8 +206,6 @@ void JScenePanel::Update()
 		}
 	}
 
-	renderServer->MarkCameraDirty(_sceneCamera);
-	renderServer->Sync();
 	renderServer->SyncScene(*scene);
 
 	Render::JViewport viewport = { 0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight), 0, 1 };
@@ -281,8 +278,8 @@ void JScenePanel::createEditorGrid()
 	}
 
 	Engine::JMaterialFactory* materialFactory = engine->GetMaterialFactory();
-	Engine::JRenderServer* renderServer = engine->GetRenderServer();
-	if (materialFactory == nullptr || renderServer == nullptr)
+	Engine::JRenderer* renderer = engine->GetRenderer();
+	if (materialFactory == nullptr || renderer == nullptr)
 	{
 		return;
 	}
@@ -316,7 +313,7 @@ void JScenePanel::createEditorGrid()
 	transform.scale = { 1.0f, 1.0f, 1.0f };
 	scene->AddTransform(_editorGridEntity, transform);
 
-	renderServer->RegisterMaterial(_editorGridMaterial.get());
+	renderer->RegisterMaterial(_editorGridMaterial.get());
 	_editorGridRenderObject = scene->AddRenderObjectComponent(
 		_editorGridEntity,
 		_editorGridMaterial->instanceID,

@@ -28,9 +28,8 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 	_jobSystem->Initialize();
 	_renderServer = new JRenderServer();
 	_renderServer->SetJobSystem(_jobSystem);
-	_renderServer->GetRenderDB().Initialize(_renderContext);
 	_renderer = new JRenderer();
-	_renderer->Initialize(_cmdQueue, _renderContext, &_renderServer->GetRenderDB());
+	_renderer->Initialize(_cmdQueue, _renderContext);
 	_materialFactory = new JMaterialFactory(_renderContext);
 }
 
