@@ -20,9 +20,6 @@
 | **컬링** | 자체 잡 시스템 기반 병렬 frustum cull | 청크 분할 → worker별 local result → merge |
 | **셰이더** | `ID3D12ShaderReflection` 기반 root signature 자동 생성 | CBV/SRV/Sampler를 코드 변경 없이 바인딩 |
 | **드로우 캐시** | Added/Modified/Removed 이벤트 기반 incremental 갱신 | 매 프레임 전체 재구축 회피 |
-| **벤치마크** | OOP / AoS / SoA / WorldMatrix 4종 레이아웃 비교 | TBB 기반 데이터 레이아웃 측정 인프라 |
-
-> 더 깊이 있는 설계 의도는 [**Data-Oriented Engine Design 회고록**](docs/DATA_ORIENTED_ENGINE_DESIGN_2026-05-26.md)을 참고하세요.
 
 ---
 
@@ -238,41 +235,7 @@ third_party/         nlohmann/json
 
 > D3D12 디바이스를 직접 생성하므로, D3D12를 지원하지 않는 PC에서는 실행되지 않습니다.
 
-### 실행 옵션
 
-```bash
-# 기본 샘플 씬으로 실행
-JYEngine.exe
 
-# 빈 씬에서 시작
-JYEngine.exe --new
-
-# 특정 씬 파일 로드
-JYEngine.exe --scene path/to/scene.jscene.json
-```
-
----
-
-## 로드맵
-
-진행 우선순위 기준 — *작은 작업부터, 시각적 임팩트 큰 것 우선:*
-
-- [ ] **PSO / Shader 캐시** — 머터리얼 dirty 시 PSO 전체 재생성 회피
-- [ ] **DEFAULT-heap 메시 업로드** — 정적 메시를 UPLOAD heap에서 분리
-- [ ] **Shadow Mapping** — 첫 비주얼 임팩트 추가 대상
-- [ ] **PBR Material + Tone Mapping** — 머니샷 제작 목적
-- [ ] **씬 그래프 hierarchy** — 부모-자식 attach, world matrix propagation
-- [ ] **인스턴싱** — 동일 mesh+material 묶음 처리
-- [ ] **벤치마크 결과 정량화** — 10K objects 기준 SyncScene/Cull/Render ms 측정
-- [ ] **얇은 RHI 추상화** — Vulkan/Metal 백엔드 가능성 열기
-
----
-
-## 더 읽어보기
-
-- 📖 [**Data-Oriented Engine Design 회고**](docs/DATA_ORIENTED_ENGINE_DESIGN_2026-05-26.md) — 설계 의도와 시행착오 기록
-- 🔬 `benchmark/` — OOP / AoS / SoA / WorldMatrix 레이아웃 비교용 벤치마크 코드
-
----
 
 <sub>© JYEngine — 단독 개발 / 학습·포트폴리오 목적 / DirectX 12 · C++17/20</sub>
