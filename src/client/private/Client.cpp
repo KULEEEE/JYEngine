@@ -9,6 +9,7 @@
 #include "engine/core/JEngineContext.h"
 
 #include <iostream>
+#include <algorithm>
 #include <shellapi.h>
 
 J::Render::JWindowInfo s_WindowInfo;
@@ -85,6 +86,20 @@ namespace
 		const std::filesystem::path resolvedPath = engineResPath / scenePath;
 		return std::filesystem::exists(resolvedPath) ? resolvedPath : scenePath;
 	}
+
+	void getClientSize(HWND hwnd, uint32& outWidth, uint32& outHeight)
+	{
+		RECT rect{};
+		if (hwnd != nullptr && GetClientRect(hwnd, &rect))
+		{
+			outWidth = static_cast<uint32>(std::max<LONG>(rect.right - rect.left, 1));
+			outHeight = static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
+			return;
+		}
+
+		outWidth = 1;
+		outHeight = 1;
+	}
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -95,10 +110,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+#ifdef _DEBUG
     AllocConsole();
     freopen("CONIN$", "r", stdin);
     freopen("CONOUT$", "w", stdout);
     freopen("CONOUT$", "w", stderr);
+#endif
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_CLIENT, szWindowClass, MAX_LOADSTRING);
@@ -168,9 +185,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             return FALSE;
         }
 
-        unique_ptr<J::Editor::JEditorPanel> panel = make_unique<J::Editor::JScenePanel>(&sceneManager);
+        unique_ptr<J::Editor::JScenePanel> panel = make_unique<J::Editor::JScenePanel>();
         panel->Init();
         s_ActiveEditorPanel = panel.get();
+        uint32 swapChainWidth = static_cast<uint32>(std::max(s_WindowInfo.width, 1));
+        uint32 swapChainHeight = static_cast<uint32>(std::max(s_WindowInfo.height, 1));
 
         while (true)
         {
@@ -186,9 +205,49 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 }
             }
 
+            uint32 clientWidth = 1;
+            uint32 clientHeight = 1;
+            getClientSize(s_WindowInfo.hwnd, clientWidth, clientHeight);
+            if (clientWidth != swapChainWidth || clientHeight != swapChainHeight)
+            {
+                cmdQueue->WaitIdle();
+                swapChain->Resize(clientWidth, clientHeight);
+                swapChainWidth = clientWidth;
+                swapChainHeight = clientHeight;
+            }
+
             const uint32 frameIndex = swapChain->GetBackBufferIndex();
+            panel->SetRenderTarget(swapChain->GetRenderTarget());
+
             cmdQueue->RenderBegin(frameIndex);
-            panel->Update();
+            J::Engine::JScene* scene = sceneManager.GetScene();
+            if (scene != nullptr)
+            {
+                panel->Update(*scene);
+            }
+            if (scene != nullptr && panel->CanRender())
+            {
+#ifdef _DEBUG
+                J::Engine::JRenderer::FrameDesc frameDesc;
+                if (GetEngine()->RenderScene(
+                    *scene,
+                    panel->GetRenderTarget(),
+                    &frameDesc))
+                {
+                    panel->OnSceneRendered(frameDesc);
+                }
+#else
+                if (GetEngine()->RenderScene(*scene, panel->GetRenderTarget()))
+                {
+                }
+#endif
+                else
+                {
+#ifdef _DEBUG
+                    std::cerr << "Frame skipped: failed to render scene." << std::endl;
+#endif
+                }
+            }
             cmdQueue->RenderEnd(frameIndex);
             swapChain->Present();
             swapChain->SwapIndex();

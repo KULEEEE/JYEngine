@@ -31,6 +31,10 @@ public:
 	JRenderer* GetRenderer() { return _renderer; }
 	JMaterialFactory* GetMaterialFactory() { return _materialFactory; }
 	JJobSystem* GetJobSystem() { return _jobSystem; }
+	bool RenderScene(
+		JScene& scene,
+		JRenderTarget* renderTarget,
+		JRenderer::FrameDesc* outFrameDesc = nullptr);
 
 private:
 	void initialize(Render::JCommandQueue* cmdQueue, Render::JSwapChain* swapChain);

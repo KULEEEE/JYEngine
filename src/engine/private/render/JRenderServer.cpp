@@ -3,6 +3,7 @@
 #include "engine/asset/JMesh.h"
 #include "engine/core/JJobSystem.h"
 #include "engine/render/JCameraRenderQueueBuilder.h"
+#include "engine/render/JRenderTarget.h"
 #include "engine/render/JRenderSnapshotBuilder.h"
 
 J_ENGINE_BEGIN
@@ -318,9 +319,9 @@ void JRenderServer::SyncScene(JScene& scene)
 	JCameraRenderQueueBuilder::Build(queueInput, _frameSnapshot);
 }
 
-bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const
+bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc) const
 {
-	if (!_primaryCamera.IsValid())
+	if (!_primaryCamera.IsValid() || renderTarget == nullptr)
 	{
 		return false;
 	}
@@ -328,9 +329,9 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, const JColor& cl
 	outFrameDesc = {};
 	outFrameDesc.camera = _primaryCamera;
 	outFrameDesc.renderTarget = renderTarget;
-	outFrameDesc.clearColor = clearColor;
-	outFrameDesc.viewport = viewport;
-	outFrameDesc.scissorRect = scissorRect;
+	outFrameDesc.clearColor = renderTarget->GetClearColor();
+	outFrameDesc.viewport = renderTarget->GetViewport();
+	outFrameDesc.scissorRect = renderTarget->GetScissorRect();
 	outFrameDesc.drawItemCache = &_drawItemCache;
 	const JCameraSnapshot* cameraSnapshot = findCameraSnapshot(_primaryCamera);
 	if (cameraSnapshot == nullptr)

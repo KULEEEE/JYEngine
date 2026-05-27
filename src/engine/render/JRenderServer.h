@@ -24,7 +24,7 @@ public:
 
 	void SyncScene(JScene& scene);
 
-	bool BuildFrameDesc(JRenderTarget* renderTarget, const JColor& clearColor, const Render::JViewport& viewport, const D3D12_RECT& scissorRect, JRenderer::FrameDesc& outFrameDesc) const;
+	bool BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc) const;
 
 private:
 	const JCameraSnapshot* findCameraSnapshot(JCameraHandle camera) const;

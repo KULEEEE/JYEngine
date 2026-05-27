@@ -63,7 +63,9 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
 	{
 		++_lastStats.skippedDrawCount;
+#ifdef _DEBUG
 		std::cerr << GetName() << " draw skipped: failed to build graphic resource." << std::endl;
+#endif
 		return;
 	}
 

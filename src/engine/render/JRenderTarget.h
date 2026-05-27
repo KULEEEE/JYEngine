@@ -16,6 +16,8 @@ public:
 		uint32 height = 1;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		JColor clearColor = JColors::DarkGray;
+		Render::JViewport viewport = {};
+		D3D12_RECT scissorRect = {};
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		bool shaderResource = false;
 	};
@@ -34,8 +36,14 @@ public:
 	uint32 GetHeight() const { return _height; }
 	DXGI_FORMAT GetFormat() const { return _format; }
 	const JColor& GetClearColor() const { return _clearColor; }
+	const Render::JViewport& GetViewport() const { return _viewport; }
+	const D3D12_RECT& GetScissorRect() const { return _scissorRect; }
 	D3D12_RESOURCE_STATES GetResourceState() const { return _resourceState; }
 	void SetResourceState(D3D12_RESOURCE_STATES state) { _resourceState = state; }
+	void SetClearColor(const JColor& clearColor) { _clearColor = clearColor; }
+	void SetViewport(const Render::JViewport& viewport) { _viewport = viewport; }
+	void SetScissorRect(const D3D12_RECT& scissorRect) { _scissorRect = scissorRect; }
+	void SetRenderArea(uint32 width, uint32 height);
 
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& GetRTVHandle();
 	const std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& GetRTVHandle() const;
@@ -64,6 +72,8 @@ private:
 	uint32 _height = 0;
 	DXGI_FORMAT _format = DXGI_FORMAT_UNKNOWN;
 	JColor _clearColor = JColors::DarkGray;
+	Render::JViewport _viewport = {};
+	D3D12_RECT _scissorRect = {};
 	bool _isSwapChainTarget = false;
 	bool _ownsResource = false;
 	bool _shaderResource = false;

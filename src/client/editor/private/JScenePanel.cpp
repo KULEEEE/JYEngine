@@ -1,9 +1,8 @@
 #include "client/editor/JScenePanel.h"
 
-#include "engine/render/JSwapChain.h"
-#include "engine/render/JRenderDefinition.h"
-#include "engine/render/JRenderServer.h"
+#include "engine/core/JEngineContext.h"
 #include "engine/render/JRenderer.h"
+#include "engine/render/JRenderTarget.h"
 #include "engine/render/JMaterialFactory.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
@@ -65,22 +64,19 @@ namespace
 	uint32 getClientHeight(HWND hwnd)
 	{
 		RECT rect{};
-	if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
-	{
-		return 1080u;
+		if (hwnd == nullptr || !GetClientRect(hwnd, &rect))
+		{
+			return 1080u;
+		}
+		return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
 	}
-	return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
-	}
-}
-
-JScenePanel::JScenePanel(JSceneManager* sceneManager)
-	: _sceneManager(sceneManager)
-{
 }
 
 JScenePanel::~JScenePanel()
 {
+#ifdef _DEBUG
 	destroyStatsPopup();
+#endif
 
 	if (_editorGridMaterial != nullptr)
 	{
@@ -91,14 +87,12 @@ JScenePanel::~JScenePanel()
 	}
 }
 
-Engine::JScene* JScenePanel::getScene()
+bool JScenePanel::CanRender() const
 {
-	return _sceneManager != nullptr ? _sceneManager->GetScene() : nullptr;
-}
-
-const Engine::JScene* JScenePanel::getScene() const
-{
-	return _sceneManager != nullptr ? _sceneManager->GetScene() : nullptr;
+	return _isReady
+		&& _renderTarget != nullptr
+		&& _viewportWidth > 0
+		&& _viewportHeight > 0;
 }
 
 void JScenePanel::Init()
@@ -112,35 +106,14 @@ void JScenePanel::Init()
 		}
 	}
 
-	if (_sceneManager == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: scene manager is null." << std::endl;
-		return;
-	}
-
 	const uint32 initialWidth = getClientWidth(_mainWindow);
 	const uint32 initialHeight = getClientHeight(_mainWindow);
 	_viewportWidth = initialWidth;
 	_viewportHeight = initialHeight;
 
-	Engine::JScene* scene = getScene();
-	_sceneCamera = _sceneManager->GetPrimaryCamera();
-	_light = _sceneManager->GetFirstLight();
-	if (scene == nullptr || !_sceneCamera.IsValid())
-	{
-		std::cerr << "JScenePanel::Init failed: scene or camera is invalid." << std::endl;
-		return;
-	}
-
-	if (scene->GetCamera(_sceneCamera) == nullptr)
-	{
-		std::cerr << "JScenePanel::Init failed: camera data access failed." << std::endl;
-		return;
-	}
-
-	createEditorGrid();
-	selectDefaultRenderObject();
+#ifdef _DEBUG
 	createStatsPopup();
+#endif
 
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
@@ -155,20 +128,28 @@ void JScenePanel::Init()
 
 void JScenePanel::Update()
 {
+}
+
+void JScenePanel::Update(Engine::JScene& scene)
+{
 	if (!_isReady)
 	{
 		return;
 	}
 
-	Render::JSwapChain* swapChain = GetEngine()->GetSwapChain();
-	Engine::JRenderServer* renderServer = GetEngine()->GetRenderServer();
-	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
-	Engine::JScene* scene = getScene();
-	if (swapChain == nullptr || renderServer == nullptr || renderer == nullptr || scene == nullptr || !_sceneCamera.IsValid())
+	const Engine::JCameraHandle sceneCamera = scene.GetPrimaryCamera();
+	if (!sceneCamera.IsValid() || scene.GetCamera(sceneCamera) == nullptr)
 	{
-		std::cerr << "JScenePanel::Update skipped: render resources are not ready." << std::endl;
-		_isReady = false;
+#ifdef _DEBUG
+		std::cerr << "JScenePanel::Update skipped: scene camera is not ready." << std::endl;
+#endif
 		return;
+	}
+
+	createEditorGrid(scene);
+	if (!_selectedEntity.IsValid())
+	{
+		selectDefaultRenderObject(scene);
 	}
 
 	const uint32 clientWidth = getClientWidth(_mainWindow);
@@ -177,26 +158,22 @@ void JScenePanel::Update()
 	{
 		_viewportWidth = clientWidth;
 		_viewportHeight = clientHeight;
-		if (swapChain != nullptr)
-		{
-			if (Render::JCommandQueue* commandQueue = GetEngine()->GetCmdQueue())
-			{
-				commandQueue->WaitIdle();
-			}
-			swapChain->Resize(clientWidth, clientHeight);
-		}
 
-		Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
+		Engine::JScene::CameraData* cameraData = scene.GetCamera(sceneCamera);
 		if (cameraData != nullptr)
 		{
-			scene->SetCameraAspectRatio(_sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+			scene.SetCameraAspectRatio(sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 		}
 	}
 
 	const float deltaTime = tickFrameTimer();
+#ifdef _DEBUG
+	_lastDeltaTime = deltaTime;
+#endif
 
-	updateSceneCamera(deltaTime);
-	updateSelectedObject(deltaTime);
+	updateSceneCamera(scene, sceneCamera, deltaTime);
+	updateSelectedObject(scene, deltaTime);
+#ifdef _DEBUG
 	if (_mainWindow != nullptr && GetForegroundWindow() == _mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
 	{
 		_showStatsPopup = !_showStatsPopup;
@@ -205,22 +182,21 @@ void JScenePanel::Update()
 			ShowWindow(_statsPopup, _showStatsPopup ? SW_SHOWNOACTIVATE : SW_HIDE);
 		}
 	}
+#endif
 
-	renderServer->SyncScene(*scene);
-
-	Render::JViewport viewport = { 0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight), 0, 1 };
-	D3D12_RECT rect = CD3DX12_RECT(0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight));
-
-	Engine::JRenderer::FrameDesc frameDesc;
-	if (!renderServer->BuildFrameDesc(swapChain->GetRenderTarget(), JColors::DarkGray, viewport, rect, frameDesc))
+	if (_renderTarget != nullptr)
 	{
-		std::cerr << "JScenePanel::Update skipped: failed to build frame description." << std::endl;
-		return;
+		_renderTarget->SetClearColor(JColors::DarkGray);
+		_renderTarget->SetRenderArea(clientWidth, clientHeight);
 	}
-
-	updateStatsPopup(frameDesc, deltaTime);
-	renderer->Render(frameDesc);
 }
+
+#ifdef _DEBUG
+void JScenePanel::OnSceneRendered(const Engine::JFrameDesc& frameDesc)
+{
+	updateStatsPopup(frameDesc);
+}
+#endif
 
 float JScenePanel::tickFrameTimer()
 {
@@ -255,54 +231,60 @@ void JScenePanel::OnMouseWheel(short delta)
 	}
 
 	_editorCameraMoveSpeed = std::clamp(_editorCameraMoveSpeed, CAMERA_SPEED_MIN, CAMERA_SPEED_MAX);
-
-	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_sceneCamera.IsValid())
-	{
-		return;
-	}
 }
 
-void JScenePanel::createEditorGrid()
+void JScenePanel::createEditorGrid(Engine::JScene& scene)
 {
-	Engine::JScene* scene = getScene();
 	Engine::JEngine* engine = GetEngine();
-	if (scene == nullptr || engine == nullptr)
+	if (engine == nullptr)
 	{
 		return;
 	}
 
-	if (_editorGridRenderObject.IsValid())
+	if (scene.FindEntityByStableID("__editor_grid").IsValid())
 	{
 		return;
 	}
 
-	Engine::JMaterialFactory* materialFactory = engine->GetMaterialFactory();
 	Engine::JRenderer* renderer = engine->GetRenderer();
-	if (materialFactory == nullptr || renderer == nullptr)
+	if (renderer == nullptr)
 	{
 		return;
 	}
 
-	const std::string gridShaderPath = (std::filesystem::path(get_Engine_Res_Path()) / "shader" / "grid.hlsl").string();
-	_editorGridMaterial.reset(materialFactory->CreateMaterial(gridShaderPath, true));
 	if (_editorGridMaterial == nullptr)
 	{
-		std::cerr << "JScenePanel::createEditorGrid failed: grid material creation failed." << std::endl;
-		return;
+		Engine::JMaterialFactory* materialFactory = engine->GetMaterialFactory();
+		if (materialFactory == nullptr)
+		{
+			return;
+		}
+
+		const std::string gridShaderPath = (std::filesystem::path(get_Engine_Res_Path()) / "shader" / "grid.hlsl").string();
+		_editorGridMaterial.reset(materialFactory->CreateMaterial(gridShaderPath, true));
+		if (_editorGridMaterial == nullptr)
+		{
+			std::cerr << "JScenePanel::createEditorGrid failed: grid material creation failed." << std::endl;
+			return;
+		}
+
+		renderer->RegisterMaterial(_editorGridMaterial.get());
 	}
 
-	_editorGridMesh = std::make_unique<Engine::JMesh>();
-	_editorGridMesh->SetPositions({
-		-EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
-		 EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
-		 EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
-		-EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
-	});
-	_editorGridMesh->SetIndices({ 0, 1, 2, 0, 2, 3 });
+	if (_editorGridMesh == nullptr)
+	{
+		_editorGridMesh = std::make_unique<Engine::JMesh>();
+		_editorGridMesh->SetPositions({
+			-EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
+			 EDITOR_GRID_SIZE, EDITOR_GRID_Y, -EDITOR_GRID_SIZE, 1.0f,
+			 EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
+			-EDITOR_GRID_SIZE, EDITOR_GRID_Y,  EDITOR_GRID_SIZE, 1.0f,
+		});
+		_editorGridMesh->SetIndices({ 0, 1, 2, 0, 2, 3 });
+	}
 
-	_editorGridEntity = scene->CreateEntity("__editor_grid", "Editor Grid", { "editor_only" });
-	if (!_editorGridEntity.IsValid())
+	const Engine::JEntityHandle editorGridEntity = scene.CreateEntity("__editor_grid", "Editor Grid", { "editor_only" });
+	if (!editorGridEntity.IsValid())
 	{
 		return;
 	}
@@ -311,20 +293,18 @@ void JScenePanel::createEditorGrid()
 	transform.translation = { 0.0f, 0.0f, 0.0f };
 	transform.rotation = { 0.0f, 0.0f, 0.0f };
 	transform.scale = { 1.0f, 1.0f, 1.0f };
-	scene->AddTransform(_editorGridEntity, transform);
+	scene.AddTransform(editorGridEntity, transform);
 
-	renderer->RegisterMaterial(_editorGridMaterial.get());
-	_editorGridRenderObject = scene->AddRenderObjectComponent(
-		_editorGridEntity,
+	scene.AddRenderObjectComponent(
+		editorGridEntity,
 		_editorGridMaterial->instanceID,
 		_editorGridMesh.get(),
 		true);
 }
 
-void JScenePanel::updateSceneCamera(float deltaTime)
+void JScenePanel::updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle sceneCamera, float deltaTime)
 {
-	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_sceneCamera.IsValid())
+	if (!sceneCamera.IsValid())
 	{
 		return;
 	}
@@ -335,19 +315,19 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 		return;
 	}
 
-	Engine::JScene::CameraData* cameraData = scene->GetCamera(_sceneCamera);
+	Engine::JScene::CameraData* cameraData = scene.GetCamera(sceneCamera);
 	if (cameraData == nullptr)
 	{
 		return;
 	}
 
-	const Engine::JTransformHandle transformHandle = scene->GetTransformHandle(cameraData->entity);
+	const Engine::JTransformHandle transformHandle = scene.GetTransformHandle(cameraData->entity);
 	if (!transformHandle.IsValid())
 	{
 		return;
 	}
 
-	const Engine::JScene::TransformData transformData = scene->GetTransform(transformHandle);
+	const Engine::JScene::TransformData transformData = scene.GetTransform(transformHandle);
 
 	float yawInput = 0.0f;
 	float pitchInput = 0.0f;
@@ -416,19 +396,13 @@ void JScenePanel::updateSceneCamera(float deltaTime)
 	XMFLOAT3 newPosition;
 	XMStoreFloat3(&newPosition, position);
 
-	scene->SetTransformRotation(transformHandle, { newRotation.x, newRotation.y, newRotation.z });
-	scene->SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
+	scene.SetTransformRotation(transformHandle, { newRotation.x, newRotation.y, newRotation.z });
+	scene.SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
-void JScenePanel::selectDefaultRenderObject()
+void JScenePanel::selectDefaultRenderObject(Engine::JScene& scene)
 {
-	Engine::JScene* scene = getScene();
-	if (scene == nullptr)
-	{
-		return;
-	}
-
-	const std::vector<Engine::JScene::RenderObjectComponentSlot>& slots = scene->GetRenderObjectComponentSlots();
+	const std::vector<Engine::JScene::RenderObjectComponentSlot>& slots = scene.GetRenderObjectComponentSlots();
 	for (const Engine::JScene::RenderObjectComponentSlot& slot : slots)
 	{
 		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.transparent)
@@ -436,32 +410,31 @@ void JScenePanel::selectDefaultRenderObject()
 			continue;
 		}
 
-		_selectedRenderObject = { static_cast<uint32>(&slot - slots.data()), slot.generation };
 		_selectedEntity = slot.data.entity;
 		return;
 	}
 }
 
-void JScenePanel::updateSelectedObject(float deltaTime)
+void JScenePanel::updateSelectedObject(Engine::JScene& scene, float deltaTime)
 {
 	(void)deltaTime;
 
-	Engine::JScene* scene = getScene();
-	if (scene == nullptr || !_selectedEntity.IsValid() || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	if (!_selectedEntity.IsValid() || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
 	{
 		return;
 	}
 
 	if (GetAsyncKeyState('V') & 0x0001)
 	{
-		Engine::JScene::RenderObjectComponentData* renderObject = scene->GetRenderObjectComponent(_selectedEntity);
+		Engine::JScene::RenderObjectComponentData* renderObject = scene.GetRenderObjectComponent(_selectedEntity);
 		if (renderObject != nullptr)
 		{
-			scene->SetRenderObjectVisible(_selectedEntity, !renderObject->visible);
+			scene.SetRenderObjectVisible(_selectedEntity, !renderObject->visible);
 		}
 	}
 }
 
+#ifdef _DEBUG
 void JScenePanel::createStatsPopup()
 {
 	if (_statsPopup != nullptr || _mainWindow == nullptr)
@@ -524,10 +497,10 @@ void JScenePanel::destroyStatsPopup()
 	}
 }
 
-void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float rawDeltaTime)
+void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc)
 {
 	constexpr float STATS_UPDATE_INTERVAL = 0.25f;
-	_statsElapsed += rawDeltaTime;
+	_statsElapsed += _lastDeltaTime;
 	++_statsFrameCount;
 
 	if (_statsPopup == nullptr)
@@ -559,5 +532,6 @@ void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc, float ra
 	swprintf_s(text, L"FPS: %.1f\r\nFrame: %.2f ms\r\nDrawCalls: %u", _displayFps, _displayFrameMs, _displayDrawCallCount);
 	SetWindowTextW(_statsPopup, text);
 }
+#endif
 
 J_EDITOR_END

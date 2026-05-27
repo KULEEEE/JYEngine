@@ -33,6 +33,33 @@ void JEngine::initialize(JCommandQueue* cmdQueue, JSwapChain* swapChain)
 	_materialFactory = new JMaterialFactory(_renderContext);
 }
 
+bool JEngine::RenderScene(
+	JScene& scene,
+	JRenderTarget* renderTarget,
+	JRenderer::FrameDesc* outFrameDesc)
+{
+	if (_renderServer == nullptr || _renderer == nullptr)
+	{
+		return false;
+	}
+
+	_renderServer->SyncScene(scene);
+
+	JRenderer::FrameDesc frameDesc;
+	if (!_renderServer->BuildFrameDesc(renderTarget, frameDesc))
+	{
+		return false;
+	}
+
+	if (outFrameDesc != nullptr)
+	{
+		*outFrameDesc = frameDesc;
+	}
+
+	_renderer->Render(frameDesc);
+	return true;
+}
+
 void JEngine::destroy()
 {
 	delete _materialFactory;

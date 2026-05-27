@@ -520,7 +520,9 @@ public:
 	}
 	JShader* CreateShader(const std::string& path)
 	{
+#ifdef _DEBUG
 		std::cout << "Loading shader: " << path << std::endl;
+#endif
 		JShader* shader = new JShader(path);
 		shader->CompileShader();
 		if (!shader->IsReady())

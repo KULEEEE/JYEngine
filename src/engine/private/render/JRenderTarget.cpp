@@ -48,6 +48,7 @@ JRenderTarget::JRenderTarget(ID3D12Resource* resource)
 	_width = static_cast<uint32>(desc.Width);
 	_height = desc.Height;
 	_format = desc.Format;
+	SetRenderArea(_width, _height);
 	_isSwapChainTarget = true;
 	_ownsResource = false;
 	_shaderResource = false;
@@ -88,6 +89,12 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 	_height = std::max(desc.height, 1u);
 	_format = desc.format;
 	_clearColor = desc.clearColor;
+	_viewport = desc.viewport;
+	_scissorRect = desc.scissorRect;
+	if (_viewport.Width <= 0.0f || _viewport.Height <= 0.0f || _scissorRect.right <= _scissorRect.left || _scissorRect.bottom <= _scissorRect.top)
+	{
+		SetRenderArea(_width, _height);
+	}
 	_isSwapChainTarget = false;
 	_ownsResource = true;
 	_shaderResource = desc.shaderResource;
@@ -185,6 +192,14 @@ bool JRenderTarget::createShaderResourceView(ID3D12Resource* resource)
 	_textureView.texture = resource;
 	_textureView.srvHeap = _srvHeap.Get();
 	return true;
+}
+
+void JRenderTarget::SetRenderArea(uint32 width, uint32 height)
+{
+	const uint32 renderWidth = std::max(width, 1u);
+	const uint32 renderHeight = std::max(height, 1u);
+	_viewport = { 0, 0, static_cast<float>(renderWidth), static_cast<float>(renderHeight), 0, 1 };
+	_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(renderWidth), static_cast<LONG>(renderHeight));
 }
 
 std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& JRenderTarget::GetRTVHandle()
