@@ -138,32 +138,38 @@ uint64 JRenderDB::makeTransformKey(JTransformHandle transform)
 	return (static_cast<uint64>(transform.generation) << 32) | transform.index;
 }
 
+uint64 JRenderDB::makeMaterialKey(JMaterialHandle material)
+{
+	return (static_cast<uint64>(material.generation) << 32) | material.index;
+}
+
 void JRenderDB::Initialize(Render::JRenderContext* renderContext)
 {
 	_renderContext = renderContext;
 }
 
-JMaterialResource& JRenderDB::getOrCreateMaterialResource(uint32 materialID)
+JMaterialResource& JRenderDB::getOrCreateMaterialResource(JMaterialHandle material)
 {
-	const auto iter = _materialIndexMap.find(materialID);
+	const uint64 materialKey = makeMaterialKey(material);
+	const auto iter = _materialIndexMap.find(materialKey);
 	if (iter != _materialIndexMap.end())
 	{
 		return _materialResources[iter->second].resource;
 	}
 
 	MaterialResourceRecord record;
-	record.materialID = materialID;
-	record.resource.materialID = materialID;
+	record.materialKey = materialKey;
+	record.resource.material = material;
 
 	const uint32 newIndex = static_cast<uint32>(_materialResources.size());
 	_materialResources.push_back(record);
-	_materialIndexMap[materialID] = newIndex;
+	_materialIndexMap[materialKey] = newIndex;
 	return _materialResources.back().resource;
 }
 
-uint32 JRenderDB::findMaterialResourceIndex(uint32 materialID) const
+uint32 JRenderDB::findMaterialResourceIndex(JMaterialHandle material) const
 {
-	const auto iter = _materialIndexMap.find(materialID);
+	const auto iter = _materialIndexMap.find(makeMaterialKey(material));
 	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
@@ -228,15 +234,15 @@ uint32 JRenderDB::findMeshResourceIndex(const JMesh* mesh) const
 	return iter == _meshIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
 }
 
-JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID)
+JMaterialResource* JRenderDB::FindMaterialResource(JMaterialHandle material)
 {
-	const uint32 index = findMaterialResourceIndex(materialID);
+	const uint32 index = findMaterialResourceIndex(material);
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
-const JMaterialResource* JRenderDB::FindMaterialResource(uint32 materialID) const
+const JMaterialResource* JRenderDB::FindMaterialResource(JMaterialHandle material) const
 {
-	const uint32 index = findMaterialResourceIndex(materialID);
+	const uint32 index = findMaterialResourceIndex(material);
 	return index == static_cast<uint32>(-1) ? nullptr : &_materialResources[index].resource;
 }
 
@@ -301,9 +307,9 @@ const JMeshResource* JRenderDB::GetMeshResourceByIndex(uint32 index) const
 	return index < _meshResources.size() ? &_meshResources[index].resource : nullptr;
 }
 
-uint32 JRenderDB::GetMaterialResourceIndex(uint32 materialID) const
+uint32 JRenderDB::GetMaterialResourceIndex(JMaterialHandle material) const
 {
-	return findMaterialResourceIndex(materialID);
+	return findMaterialResourceIndex(material);
 }
 
 uint32 JRenderDB::GetTransformResourceIndex(JTransformHandle transform) const
@@ -316,16 +322,16 @@ uint32 JRenderDB::GetMeshResourceIndex(const JMesh* mesh) const
 	return findMeshResourceIndex(mesh);
 }
 
-void JRenderDB::SyncMaterial(const JMaterial& material)
+void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 {
-	if (_renderContext == nullptr)
+	if (_renderContext == nullptr || !handle.IsValid())
 	{
 		return;
 	}
 
-	JMaterialResource& resource = getOrCreateMaterialResource(material.instanceID);
+	JMaterialResource& resource = getOrCreateMaterialResource(handle);
 	destroyMaterialResource(_renderContext, resource);
-	resource.materialID = material.instanceID;
+	resource.material = handle;
 	resource.shader = _renderContext->CreateShader(material.GetShaderPath());
 	if (resource.shader == nullptr)
 	{
@@ -481,9 +487,10 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	return &_meshResources.back().resource;
 }
 
-void JRenderDB::RemoveMaterialResource(uint32 materialID)
+void JRenderDB::RemoveMaterialResource(JMaterialHandle material)
 {
-	const uint32 index = findMaterialResourceIndex(materialID);
+	const uint64 materialKey = makeMaterialKey(material);
+	const uint32 index = findMaterialResourceIndex(material);
 	if (index == static_cast<uint32>(-1))
 	{
 		return;
@@ -495,11 +502,11 @@ void JRenderDB::RemoveMaterialResource(uint32 materialID)
 	if (index != lastIndex)
 	{
 		_materialResources[index] = _materialResources[lastIndex];
-		_materialIndexMap[_materialResources[index].materialID] = index;
+		_materialIndexMap[_materialResources[index].materialKey] = index;
 	}
 
 	_materialResources.pop_back();
-	_materialIndexMap.erase(materialID);
+	_materialIndexMap.erase(materialKey);
 }
 
 void JRenderDB::RemoveCameraResource(JCameraHandle camera)
@@ -637,7 +644,7 @@ JRenderDB::ResolvedDrawResources JRenderDB::ResolveDrawResources(const JDrawItem
 	}
 	if (resources.material == nullptr)
 	{
-		resources.material = FindMaterialResource(drawItem.materialID);
+		resources.material = FindMaterialResource(drawItem.material);
 	}
 	if (resources.transform == nullptr)
 	{
@@ -646,9 +653,9 @@ JRenderDB::ResolvedDrawResources JRenderDB::ResolveDrawResources(const JDrawItem
 	return resources;
 }
 
-bool JRenderDB::BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const
+bool JRenderDB::BuildGraphicResource(JMaterialHandle material, Render::JShader* shader, Render::JGraphicResource& outResource) const
 {
-	const JMaterialResource* materialResource = FindMaterialResource(materialID);
+	const JMaterialResource* materialResource = FindMaterialResource(material);
 	if (materialResource == nullptr || shader == nullptr)
 	{
 		return false;

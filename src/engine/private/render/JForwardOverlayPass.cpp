@@ -59,7 +59,7 @@ void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCam
 	const JTransformResource* transformResource = resources.transform;
 
 	Render::JGraphicResource graphicResource(materialResource->shader);
-	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
+	if (!context.renderDB->BuildGraphicResource(drawItem.material, materialResource->shader, graphicResource))
 	{
 		++_lastStats.skippedDrawCount;
 		return;

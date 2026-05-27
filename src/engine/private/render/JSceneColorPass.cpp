@@ -60,7 +60,7 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 	const JTransformResource* transformResource = resources.transform;
 
 	Render::JGraphicResource graphicResource(materialResource->shader);
-	if (!context.renderDB->BuildGraphicResource(drawItem.materialID, materialResource->shader, graphicResource))
+	if (!context.renderDB->BuildGraphicResource(drawItem.material, materialResource->shader, graphicResource))
 	{
 		++_lastStats.skippedDrawCount;
 #ifdef _DEBUG

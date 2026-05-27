@@ -48,7 +48,7 @@ struct JMaterialResource
 		Render::JTexture* texture = nullptr;
 	};
 
-	uint32 materialID = 0;
+	JMaterialHandle material = {};
 	Render::JShader* shader = nullptr;
 	Render::JPipeline* pipeline = nullptr;
 	std::vector<ConstantBufferEntry> constantBuffers;

@@ -37,8 +37,6 @@ public:
 private:
 	void createEditorGrid(Engine::JScene& scene);
 	void updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle sceneCamera, float deltaTime);
-	void selectDefaultRenderObject(Engine::JScene& scene);
-	void updateSelectedObject(Engine::JScene& scene, float deltaTime);
 #ifdef _DEBUG
 	void createStatsPopup();
 	void destroyStatsPopup();
@@ -46,22 +44,23 @@ private:
 #endif
 	float tickFrameTimer();
 	
-	Engine::JEntityHandle _selectedEntity = {};
-	std::unique_ptr<Engine::JMaterial> _editorGridMaterial;
+	// Grid Pass Asset
+	std::shared_ptr<Engine::JMaterial> _editorGridMaterial;
+	Engine::JMaterialHandle _editorGridMaterialHandle = {};
 	std::unique_ptr<Engine::JMesh> _editorGridMesh;
+
+	// editor Camera Parameter
 	bool _isMouseLookActive = false;
-#ifdef _DEBUG
-	bool _showStatsPopup = true;
-#endif
 	POINT _lastMousePosition = {};
-	bool _isReady = false;
+	float _editorCameraMoveSpeed = 6.0f;
+
 	LARGE_INTEGER _timerFrequency = {};
 	LARGE_INTEGER _lastFrameCounter = {};
-	float _editorCameraMoveSpeed = 6.0f;
-	HWND _mainWindow = nullptr;
-	uint32 _viewportWidth = 0;
-	uint32 _viewportHeight = 0;
+
+	Engine::JRenderTarget* _renderTarget = nullptr;
+
 #ifdef _DEBUG
+	bool _showStatsPopup = true;
 	HWND _statsPopup = nullptr;
 	HFONT _statsFont = nullptr;
 	float _statsElapsed = 0.0f;
@@ -71,7 +70,7 @@ private:
 	uint32 _displayDrawCallCount = 0;
 	float _lastDeltaTime = 0.0f;
 #endif
-	Engine::JRenderTarget* _renderTarget = nullptr;
+	
 
 };
 

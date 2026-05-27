@@ -78,39 +78,15 @@ JScenePanel::~JScenePanel()
 	destroyStatsPopup();
 #endif
 
-	if (_editorGridMaterial != nullptr)
-	{
-		if (Engine::JRenderer* renderer = GetEngine() != nullptr ? GetEngine()->GetRenderer() : nullptr)
-		{
-			renderer->UnregisterMaterial(_editorGridMaterial->instanceID);
-		}
-	}
 }
 
 bool JScenePanel::CanRender() const
 {
-	return _isReady
-		&& _renderTarget != nullptr
-		&& _viewportWidth > 0
-		&& _viewportHeight > 0;
+	return _renderTarget != nullptr;
 }
 
 void JScenePanel::Init()
 {
-	if (_mainWindow == nullptr)
-	{
-		_mainWindow = GetActiveWindow();
-		if (_mainWindow == nullptr)
-		{
-			_mainWindow = GetForegroundWindow();
-		}
-	}
-
-	const uint32 initialWidth = getClientWidth(_mainWindow);
-	const uint32 initialHeight = getClientHeight(_mainWindow);
-	_viewportWidth = initialWidth;
-	_viewportHeight = initialHeight;
-
 #ifdef _DEBUG
 	createStatsPopup();
 #endif
@@ -123,7 +99,6 @@ void JScenePanel::Init()
 
 	QueryPerformanceFrequency(&_timerFrequency);
 	QueryPerformanceCounter(&_lastFrameCounter);
-	_isReady = true;
 }
 
 void JScenePanel::Update()
@@ -132,11 +107,6 @@ void JScenePanel::Update()
 
 void JScenePanel::Update(Engine::JScene& scene)
 {
-	if (!_isReady)
-	{
-		return;
-	}
-
 	const Engine::JCameraHandle sceneCamera = scene.GetPrimaryCamera();
 	if (!sceneCamera.IsValid() || scene.GetCamera(sceneCamera) == nullptr)
 	{
@@ -147,24 +117,11 @@ void JScenePanel::Update(Engine::JScene& scene)
 	}
 
 	createEditorGrid(scene);
-	if (!_selectedEntity.IsValid())
-	{
-		selectDefaultRenderObject(scene);
-	}
 
-	const uint32 clientWidth = getClientWidth(_mainWindow);
-	const uint32 clientHeight = getClientHeight(_mainWindow);
-	if (clientWidth != _viewportWidth || clientHeight != _viewportHeight)
-	{
-		_viewportWidth = clientWidth;
-		_viewportHeight = clientHeight;
-
-		Engine::JScene::CameraData* cameraData = scene.GetCamera(sceneCamera);
-		if (cameraData != nullptr)
-		{
-			scene.SetCameraAspectRatio(sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
-		}
-	}
+	const HWND mainWindow = GetEngineWindowHandle();
+	const uint32 clientWidth = getClientWidth(mainWindow);
+	const uint32 clientHeight = getClientHeight(mainWindow);
+	scene.SetCameraAspectRatio(sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 
 	const float deltaTime = tickFrameTimer();
 #ifdef _DEBUG
@@ -172,9 +129,8 @@ void JScenePanel::Update(Engine::JScene& scene)
 #endif
 
 	updateSceneCamera(scene, sceneCamera, deltaTime);
-	updateSelectedObject(scene, deltaTime);
 #ifdef _DEBUG
-	if (_mainWindow != nullptr && GetForegroundWindow() == _mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
+	if (mainWindow != nullptr && GetForegroundWindow() == mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
 	{
 		_showStatsPopup = !_showStatsPopup;
 		if (_statsPopup != nullptr)
@@ -216,7 +172,8 @@ float JScenePanel::tickFrameTimer()
 
 void JScenePanel::OnMouseWheel(short delta)
 {
-	if (!_isReady || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	const HWND mainWindow = GetEngineWindowHandle();
+	if (mainWindow == nullptr || GetForegroundWindow() != mainWindow)
 	{
 		return;
 	}
@@ -246,12 +203,6 @@ void JScenePanel::createEditorGrid(Engine::JScene& scene)
 		return;
 	}
 
-	Engine::JRenderer* renderer = engine->GetRenderer();
-	if (renderer == nullptr)
-	{
-		return;
-	}
-
 	if (_editorGridMaterial == nullptr)
 	{
 		Engine::JMaterialFactory* materialFactory = engine->GetMaterialFactory();
@@ -261,14 +212,29 @@ void JScenePanel::createEditorGrid(Engine::JScene& scene)
 		}
 
 		const std::string gridShaderPath = (std::filesystem::path(get_Engine_Res_Path()) / "shader" / "grid.hlsl").string();
-		_editorGridMaterial.reset(materialFactory->CreateMaterial(gridShaderPath, true));
+		_editorGridMaterial = std::shared_ptr<Engine::JMaterial>(materialFactory->CreateMaterial(gridShaderPath, true));
 		if (_editorGridMaterial == nullptr)
 		{
 			std::cerr << "JScenePanel::createEditorGrid failed: grid material creation failed." << std::endl;
 			return;
 		}
 
-		renderer->RegisterMaterial(_editorGridMaterial.get());
+		_editorGridMaterialHandle = scene.AddMaterial(_editorGridMaterial);
+		if (!_editorGridMaterialHandle.IsValid())
+		{
+			std::cerr << "JScenePanel::createEditorGrid failed: grid material registration failed." << std::endl;
+			_editorGridMaterial.reset();
+			return;
+		}
+	}
+	else if (scene.GetMaterial(_editorGridMaterialHandle) == nullptr)
+	{
+		_editorGridMaterialHandle = scene.AddMaterial(_editorGridMaterial);
+		if (!_editorGridMaterialHandle.IsValid())
+		{
+			std::cerr << "JScenePanel::createEditorGrid failed: grid material registration failed." << std::endl;
+			return;
+		}
 	}
 
 	if (_editorGridMesh == nullptr)
@@ -297,7 +263,7 @@ void JScenePanel::createEditorGrid(Engine::JScene& scene)
 
 	scene.AddRenderObjectComponent(
 		editorGridEntity,
-		_editorGridMaterial->instanceID,
+		_editorGridMaterialHandle,
 		_editorGridMesh.get(),
 		true);
 }
@@ -309,7 +275,8 @@ void JScenePanel::updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle
 		return;
 	}
 
-	if (_mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
+	const HWND mainWindow = GetEngineWindowHandle();
+	if (mainWindow == nullptr || GetForegroundWindow() != mainWindow)
 	{
 		_isMouseLookActive = false;
 		return;
@@ -400,50 +367,17 @@ void JScenePanel::updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle
 	scene.SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
-void JScenePanel::selectDefaultRenderObject(Engine::JScene& scene)
-{
-	const std::vector<Engine::JScene::RenderObjectComponentSlot>& slots = scene.GetRenderObjectComponentSlots();
-	for (const Engine::JScene::RenderObjectComponentSlot& slot : slots)
-	{
-		if (!slot.active || !slot.data.active || !slot.data.visible || slot.data.transparent)
-		{
-			continue;
-		}
-
-		_selectedEntity = slot.data.entity;
-		return;
-	}
-}
-
-void JScenePanel::updateSelectedObject(Engine::JScene& scene, float deltaTime)
-{
-	(void)deltaTime;
-
-	if (!_selectedEntity.IsValid() || _mainWindow == nullptr || GetForegroundWindow() != _mainWindow)
-	{
-		return;
-	}
-
-	if (GetAsyncKeyState('V') & 0x0001)
-	{
-		Engine::JScene::RenderObjectComponentData* renderObject = scene.GetRenderObjectComponent(_selectedEntity);
-		if (renderObject != nullptr)
-		{
-			scene.SetRenderObjectVisible(_selectedEntity, !renderObject->visible);
-		}
-	}
-}
-
 #ifdef _DEBUG
 void JScenePanel::createStatsPopup()
 {
-	if (_statsPopup != nullptr || _mainWindow == nullptr)
+	const HWND mainWindow = GetEngineWindowHandle();
+	if (_statsPopup != nullptr || mainWindow == nullptr)
 	{
 		return;
 	}
 
 	RECT ownerRect{};
-	GetWindowRect(_mainWindow, &ownerRect);
+	GetWindowRect(mainWindow, &ownerRect);
 	_statsPopup = CreateWindowExW(
 		WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
 		L"STATIC",
@@ -453,7 +387,7 @@ void JScenePanel::createStatsPopup()
 		ownerRect.top + 54,
 		260,
 		96,
-		_mainWindow,
+		mainWindow,
 		nullptr,
 		GetModuleHandleW(nullptr),
 		nullptr);
@@ -514,7 +448,8 @@ void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc)
 	}
 
 	RECT ownerRect{};
-	if (_mainWindow != nullptr && GetWindowRect(_mainWindow, &ownerRect))
+	const HWND mainWindow = GetEngineWindowHandle();
+	if (mainWindow != nullptr && GetWindowRect(mainWindow, &ownerRect))
 	{
 		SetWindowPos(_statsPopup, HWND_TOPMOST, ownerRect.left + 20, ownerRect.top + 54, 260, 96, SWP_NOACTIVATE);
 	}

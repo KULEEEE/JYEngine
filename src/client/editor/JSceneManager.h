@@ -35,8 +35,6 @@ public:
 private:
 	bool buildFromSceneData(const Engine::JSceneData& sceneData);
 	Engine::JSceneData createEmptySceneData(const std::string& sceneName) const;
-	void registerRenderAssets();
-	void unregisterRenderAssets();
 
 	JAssetManager _assetManager;
 	JSceneBuildContext _buildContext;

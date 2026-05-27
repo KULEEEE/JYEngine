@@ -16,7 +16,7 @@ namespace
 {
 	bool buildDrawGraphicResource(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
 	{
-		if (!context.renderDB->BuildGraphicResource(drawItem.materialID, graphicResource.GetShader(), graphicResource))
+		if (!context.renderDB->BuildGraphicResource(drawItem.material, graphicResource.GetShader(), graphicResource))
 		{
 			return false;
 		}

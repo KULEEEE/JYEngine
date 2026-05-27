@@ -36,7 +36,7 @@ struct JRenderObjectComponent
 {
 	JEntityHandle entity = {};
 	const JMesh* mesh = nullptr;
-	uint32 materialID = 0;
+	JMaterialHandle material = {};
 	bool visible = true;
 	bool transparent = false;
 	bool active = true;

@@ -36,7 +36,7 @@ public:
 	std::vector<std::shared_ptr<Engine::JMesh>> meshes;
 	std::vector<std::shared_ptr<JAssetManager::MaterialBundle>> materialBundles;
 
-	std::unordered_map<std::string, uint32> materialIDs;
+	std::unordered_map<std::string, Engine::JMaterialHandle> materialsByID;
 	std::unordered_map<std::string, Engine::JEntityHandle> entities;
 	std::unordered_map<std::string, Engine::JTransformHandle> transforms;
 	std::unordered_map<std::string, Engine::JCameraHandle> cameras;

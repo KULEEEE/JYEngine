@@ -26,7 +26,7 @@ void JSceneBuildResult::Release()
 	cameras.clear();
 	transforms.clear();
 	entities.clear();
-	materialIDs.clear();
+	materialsByID.clear();
 	primaryCamera = {};
 	firstLight = {};
 
@@ -49,7 +49,6 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 	JSceneBuildResult result;
 	result.scene = std::make_unique<Engine::JScene>();
 
-	std::unordered_map<std::string, Engine::JMaterial*> materialLookup;
 	for (const Engine::JSceneMaterialData& materialData : sceneData.materials)
 	{
 		if (materialData.id.empty())
@@ -59,7 +58,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			return false;
 		}
 
-		if (materialLookup.find(materialData.id) != materialLookup.end())
+		if (result.materialsByID.find(materialData.id) != result.materialsByID.end())
 		{
 			std::cerr << "JSceneBuilder::Build failed: duplicated material id: " << materialData.id << std::endl;
 			result.Release();
@@ -81,8 +80,15 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			return false;
 		}
 
-		result.materialIDs[materialData.id] = materialBundle->material->instanceID;
-		materialLookup[materialData.id] = materialBundle->material.get();
+		const Engine::JMaterialHandle materialHandle = result.scene->AddMaterial(materialBundle->material);
+		if (!materialHandle.IsValid())
+		{
+			std::cerr << "JSceneBuilder::Build failed: scene material registration failed: " << materialData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		result.materialsByID[materialData.id] = materialHandle;
 		result.materialBundles.emplace_back(materialBundle);
 		result.materials.emplace_back(materialBundle->material);
 	}
@@ -233,8 +239,8 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			}
 
 			const auto meshIter = meshLookup.find(entityData.renderObjectComponent.meshID);
-			const auto materialIter = result.materialIDs.find(entityData.renderObjectComponent.materialID);
-			if (meshIter == meshLookup.end() || materialIter == result.materialIDs.end())
+			const auto materialIter = result.materialsByID.find(entityData.renderObjectComponent.materialID);
+			if (meshIter == meshLookup.end() || materialIter == result.materialsByID.end())
 			{
 				std::cerr << "JSceneBuilder::Build failed: render object component asset reference is invalid: " << entityData.stableID << std::endl;
 				result.Release();

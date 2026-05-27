@@ -19,100 +19,6 @@ J_ENGINE_BEGIN
 
 JRenderer::~JRenderer() = default;
 
-uint32 JRenderer::findMaterialIndex(uint32 materialID) const
-{
-	const auto iter = _materialIndexMap.find(materialID);
-	return iter == _materialIndexMap.end() ? static_cast<uint32>(-1) : iter->second;
-}
-
-JMaterial* JRenderer::findMaterial(uint32 materialID) const
-{
-	const uint32 index = findMaterialIndex(materialID);
-	return index == static_cast<uint32>(-1) ? nullptr : _materials[index].source;
-}
-
-void JRenderer::RegisterMaterial(JMaterial* material)
-{
-	if (material == nullptr)
-	{
-		return;
-	}
-
-	if (findMaterialIndex(material->instanceID) != static_cast<uint32>(-1))
-	{
-		MarkMaterialDirty(material);
-		return;
-	}
-
-	const uint32 newIndex = static_cast<uint32>(_materials.size());
-	_materials.push_back({ material->instanceID, material });
-	_materialIndexMap[material->instanceID] = newIndex;
-	MarkMaterialDirty(material);
-}
-
-void JRenderer::UnregisterMaterial(uint32 materialID)
-{
-	const uint32 index = findMaterialIndex(materialID);
-	if (index != static_cast<uint32>(-1))
-	{
-		const uint32 lastIndex = static_cast<uint32>(_materials.size() - 1);
-		if (index != lastIndex)
-		{
-			_materials[index] = _materials[lastIndex];
-			_materialIndexMap[_materials[index].materialID] = index;
-		}
-		_materials.pop_back();
-		_materialIndexMap.erase(materialID);
-	}
-
-	for (auto iter = _dirtyMaterialIDs.begin(); iter != _dirtyMaterialIDs.end();)
-	{
-		if (*iter == materialID)
-		{
-			iter = _dirtyMaterialIDs.erase(iter);
-			continue;
-		}
-		++iter;
-	}
-
-	_renderDB.RemoveMaterialResource(materialID);
-}
-
-void JRenderer::MarkMaterialDirty(JMaterial* material)
-{
-	if (material == nullptr)
-	{
-		return;
-	}
-
-	material->MarkDirty();
-	for (uint32 dirtyMaterialID : _dirtyMaterialIDs)
-	{
-		if (dirtyMaterialID == material->instanceID)
-		{
-			return;
-		}
-	}
-	_dirtyMaterialIDs.push_back(material->instanceID);
-}
-
-void JRenderer::syncMaterials()
-{
-	for (uint32 materialID : _dirtyMaterialIDs)
-	{
-		JMaterial* material = findMaterial(materialID);
-		if (material == nullptr)
-		{
-			continue;
-		}
-
-		_renderDB.SyncMaterial(*material);
-		material->ClearDirty();
-	}
-
-	_dirtyMaterialIDs.clear();
-}
-
 void JRenderer::initializeDefaultPasses()
 {
 	if (_renderPath == RenderPath::Deferred)
@@ -223,7 +129,19 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 
 void JRenderer::prepareFrameResources(const FrameDesc& frameDesc)
 {
-	syncMaterials();
+	for (const JFrameMaterialSnapshot& snapshot : frameDesc.materialSnapshots)
+	{
+		if (snapshot.source == nullptr)
+		{
+			continue;
+		}
+
+		if (snapshot.source->IsDirty() || _renderDB.FindMaterialResource(snapshot.material) == nullptr)
+		{
+			_renderDB.SyncMaterial(snapshot.material, *snapshot.source);
+			snapshot.source->ClearDirty();
+		}
+	}
 
 	if (frameDesc.camera.IsValid())
 	{

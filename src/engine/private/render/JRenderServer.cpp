@@ -161,7 +161,7 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 		drawItem.entity = data->entity;
 		drawItem.renderObject = renderObject;
 		drawItem.transform = transform;
-		drawItem.materialID = data->materialID;
+		drawItem.material = data->material;
 		drawItem.mesh = data->mesh;
 		drawItem.transparent = data->transparent;
 		_drawItemCache.drawItems.push_back(drawItem);
@@ -180,7 +180,7 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 			drawItem.entity = data->entity;
 			drawItem.renderObject = renderObject;
 			drawItem.transform = transform;
-			drawItem.materialID = data->materialID;
+			drawItem.material = data->material;
 			drawItem.mesh = data->mesh;
 			drawItem.subMeshIndex = subMeshIndex;
 			drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;
@@ -257,7 +257,7 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 		drawItem.entity = data->entity;
 		drawItem.renderObject = renderObject;
 		drawItem.transform = transform;
-		drawItem.materialID = data->materialID;
+		drawItem.material = data->material;
 		drawItem.mesh = data->mesh;
 		drawItem.subMeshIndex = 0;
 		drawItem.indexCount = 0;
@@ -279,7 +279,7 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 		drawItem.entity = data->entity;
 		drawItem.renderObject = renderObject;
 		drawItem.transform = transform;
-		drawItem.materialID = data->materialID;
+		drawItem.material = data->material;
 		drawItem.mesh = data->mesh;
 		drawItem.subMeshIndex = subMeshIndex;
 		drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;
@@ -343,6 +343,23 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::Frame
 	for (const JTransformSnapshot& snapshot : _frameSnapshot.transforms)
 	{
 		outFrameDesc.transformSnapshots.push_back({ snapshot.transform, snapshot.world });
+	}
+	if (_syncedScene != nullptr)
+	{
+		const std::vector<JScene::MaterialSlot>& materialSlots = _syncedScene->GetMaterialSlots();
+		for (uint32 materialIndex : _syncedScene->GetActiveMaterialIndices())
+		{
+			if (materialIndex >= materialSlots.size())
+			{
+				continue;
+			}
+
+			const JScene::MaterialSlot& slot = materialSlots[materialIndex];
+			if (slot.active && slot.material != nullptr)
+			{
+				outFrameDesc.materialSnapshots.push_back({ { materialIndex, slot.generation }, slot.material.get() });
+			}
+		}
 	}
 	if (!_frameSnapshot.lights.empty())
 	{

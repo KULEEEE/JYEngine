@@ -16,52 +16,17 @@ JSceneManager::JSceneManager(Engine::JRenderer* renderer, Engine::JMaterialFacto
 
 JSceneManager::~JSceneManager()
 {
-	unregisterRenderAssets();
 	_sceneBuild.Release();
 }
 
 bool JSceneManager::buildFromSceneData(const Engine::JSceneData& sceneData)
 {
-	unregisterRenderAssets();
 	if (!JSceneBuilder::Build(sceneData, _buildContext, _sceneBuild))
 	{
 		return false;
 	}
 
-	registerRenderAssets();
 	return true;
-}
-
-void JSceneManager::registerRenderAssets()
-{
-	if (_renderer == nullptr)
-	{
-		return;
-	}
-
-	for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : _sceneBuild.materialBundles)
-	{
-		if (bundle != nullptr && bundle->material != nullptr)
-		{
-			_renderer->RegisterMaterial(bundle->material.get());
-		}
-	}
-}
-
-void JSceneManager::unregisterRenderAssets()
-{
-	if (_renderer == nullptr)
-	{
-		return;
-	}
-
-	for (const std::shared_ptr<JAssetManager::MaterialBundle>& bundle : _sceneBuild.materialBundles)
-	{
-		if (bundle != nullptr && bundle->material != nullptr)
-		{
-			_renderer->UnregisterMaterial(bundle->material->instanceID);
-		}
-	}
 }
 
 Engine::JSceneData JSceneManager::createEmptySceneData(const std::string& sceneName) const

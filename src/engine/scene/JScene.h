@@ -11,6 +11,7 @@
 #include "engine/scene/JRenderObjectComponentPool.h"
 #include "engine/scene/JTransformPool.h"
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
+/*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 
 J_ENGINE_BEGIN
 
@@ -72,13 +73,22 @@ public:
 
 	JScene() = default;
 
+	struct MaterialSlot
+	{
+		uint32 generation = 1;
+		bool active = false;
+		std::shared_ptr<JMaterial> material;
+	};
+
 	JEntityHandle CreateEntity(const std::string& stableID = "", const std::string& name = "", const std::vector<std::string>& tags = {});
 	bool RemoveEntity(JEntityHandle entity);
+	JMaterialHandle AddMaterial(std::shared_ptr<JMaterial> material);
+	bool RemoveMaterial(JMaterialHandle material);
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JCameraHandle AddCamera(JEntityHandle entity, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
-	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent = false);
+	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const JMesh* mesh, bool transparent = false);
 	bool RemoveTransform(JTransformHandle transform);
 	bool RemoveTransform(JEntityHandle entity);
 	bool RemoveCamera(JCameraHandle camera);
@@ -100,6 +110,8 @@ public:
 
 	EntityData* GetEntity(JEntityHandle handle);
 	const EntityData* GetEntity(JEntityHandle handle) const;
+	JMaterial* GetMaterial(JMaterialHandle handle);
+	const JMaterial* GetMaterial(JMaterialHandle handle) const;
 	TransformData GetTransform(JTransformHandle handle) const;
 	TransformData GetTransform(JEntityHandle entity) const;
 	void SetTransform(JTransformHandle handle, const TransformData& data);
@@ -156,6 +168,8 @@ public:
 	const std::vector<LightSlot>& GetLightSlots() const { return _lights.GetSlots(); }
 	const std::vector<RenderObjectComponentSlot>& GetRenderObjectComponentSlots() const { return _renderObjectComponents.GetSlots(); }
 	const std::vector<uint32>& GetActiveRenderObjectComponentIndices() const { return _renderObjectComponents.GetActiveEntityIndices(); }
+	const std::vector<MaterialSlot>& GetMaterialSlots() const { return _materials; }
+	const std::vector<uint32>& GetActiveMaterialIndices() const { return _activeMaterialIndices; }
 
 private:
 	std::string generateStableID();
@@ -170,6 +184,9 @@ private:
 	CameraPool _cameras;
 	LightPool _lights;
 	RenderObjectComponentPool _renderObjectComponents;
+	std::vector<MaterialSlot> _materials;
+	std::vector<uint32> _freeMaterialIndices;
+	std::vector<uint32> _activeMaterialIndices;
 	std::vector<JEntityMetadata> _entityMetadata;
 	std::vector<JTransformHandle> _entityTransformLookup;
 	std::vector<JSceneRenderObjectEvent> _renderObjectEvents;

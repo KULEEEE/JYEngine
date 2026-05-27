@@ -8,6 +8,7 @@
 
 /*#include "engine/render/JRenderTarget.h"*/ namespace J { namespace Engine { class JRenderTarget; } }
 /*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
+/*#include "engine/asset/JMaterial.h"*/ namespace J { namespace Engine { class JMaterial; } }
 namespace J { namespace Engine { struct JDrawItemCache; } }
 
 J_ENGINE_BEGIN
@@ -17,7 +18,7 @@ struct JDrawItem
 	JEntityHandle entity = {};
 	JRenderObjectComponentHandle renderObject = {};
 	JTransformHandle transform = {};
-	uint32 materialID = 0;
+	JMaterialHandle material = {};
 	const JMesh* mesh = nullptr;
 	uint32 meshResourceIndex = static_cast<uint32>(-1);
 	uint32 materialResourceIndex = static_cast<uint32>(-1);
@@ -45,6 +46,12 @@ struct JFrameLightSnapshot
 	std::vector<Item> items;
 };
 
+struct JFrameMaterialSnapshot
+{
+	JMaterialHandle material = {};
+	JMaterial* source = nullptr;
+};
+
 struct JFrameDesc
 {
 	JCameraHandle camera = {};
@@ -55,6 +62,7 @@ struct JFrameDesc
 	const JDrawItemCache* drawItemCache = nullptr;
 	XMMATRIX cameraViewProjection = XMMatrixIdentity();
 	std::vector<JFrameTransformSnapshot> transformSnapshots;
+	std::vector<JFrameMaterialSnapshot> materialSnapshots;
 	JFrameLightSnapshot lightSnapshot;
 	std::vector<uint32> opaqueDrawItemIndices;
 	std::vector<uint32> transparentDrawItemIndices;

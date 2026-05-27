@@ -36,7 +36,7 @@ public:
 
 	struct MaterialResourceRecord
 	{
-		uint32 materialID = 0;
+		uint64 materialKey = 0;
 		JMaterialResource resource;
 	};
 
@@ -63,8 +63,8 @@ public:
 
 	void Initialize(Render::JRenderContext* renderContext);
 
-	JMaterialResource* FindMaterialResource(uint32 materialID);
-	const JMaterialResource* FindMaterialResource(uint32 materialID) const;
+	JMaterialResource* FindMaterialResource(JMaterialHandle material);
+	const JMaterialResource* FindMaterialResource(JMaterialHandle material) const;
 	JCameraResource* FindCameraResource(JCameraHandle camera);
 	const JCameraResource* FindCameraResource(JCameraHandle camera) const;
 	JTransformResource* FindTransformResource(JTransformHandle transform);
@@ -76,16 +76,16 @@ public:
 	const JMaterialResource* GetMaterialResourceByIndex(uint32 index) const;
 	const JTransformResource* GetTransformResourceByIndex(uint32 index) const;
 	const JMeshResource* GetMeshResourceByIndex(uint32 index) const;
-	uint32 GetMaterialResourceIndex(uint32 materialID) const;
+	uint32 GetMaterialResourceIndex(JMaterialHandle material) const;
 	uint32 GetTransformResourceIndex(JTransformHandle transform) const;
 	uint32 GetMeshResourceIndex(const JMesh* mesh) const;
 
-	void SyncMaterial(const JMaterial& material);
+	void SyncMaterial(JMaterialHandle handle, const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
 	void SyncLight(const JLightSnapshot& snapshot);
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
-	void RemoveMaterialResource(uint32 materialID);
+	void RemoveMaterialResource(JMaterialHandle material);
 	void RemoveCameraResource(JCameraHandle camera);
 	void RemoveTransformResource(JTransformHandle transform);
 	void RemoveMeshResource(const JMesh* mesh);
@@ -96,23 +96,24 @@ public:
 	void Clear();
 
 	ResolvedDrawResources ResolveDrawResources(const JDrawItem& drawItem) const;
-	bool BuildGraphicResource(uint32 materialID, Render::JShader* shader, Render::JGraphicResource& outResource) const;
+	bool BuildGraphicResource(JMaterialHandle material, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:
-	JMaterialResource& getOrCreateMaterialResource(uint32 materialID);
+	JMaterialResource& getOrCreateMaterialResource(JMaterialHandle material);
 	JCameraResource& getOrCreateCameraResource(JCameraHandle camera);
 	JTransformResource& getOrCreateTransformResource(JTransformHandle transform);
 	JLightResource& getOrCreateLightResource();
-	uint32 findMaterialResourceIndex(uint32 materialID) const;
+	uint32 findMaterialResourceIndex(JMaterialHandle material) const;
 	uint32 findCameraResourceIndex(JCameraHandle camera) const;
 	uint32 findTransformResourceIndex(JTransformHandle transform) const;
 	uint32 findMeshResourceIndex(const JMesh* mesh) const;
 	static uint64 makeCameraKey(JCameraHandle camera);
 	static uint64 makeTransformKey(JTransformHandle transform);
+	static uint64 makeMaterialKey(JMaterialHandle material);
 
 	Render::JRenderContext* _renderContext = nullptr;
 	std::vector<MaterialResourceRecord> _materialResources;
-	std::unordered_map<uint32, uint32> _materialIndexMap;
+	std::unordered_map<uint64, uint32> _materialIndexMap;
 	std::vector<CameraResourceRecord> _cameraResources;
 	std::unordered_map<uint64, uint32> _cameraIndexMap;
 	std::vector<TransformResourceRecord> _transformResources;

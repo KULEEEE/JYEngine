@@ -46,6 +46,14 @@ struct JRenderObjectComponentHandle
 	bool IsValid() const { return index != static_cast<uint32>(-1); }
 };
 
+struct JMaterialHandle
+{
+	uint32 index = static_cast<uint32>(-1);
+	uint32 generation = 0;
+
+	bool IsValid() const { return index != static_cast<uint32>(-1); }
+};
+
 J_ENGINE_END
 
 #endif

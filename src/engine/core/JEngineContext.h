@@ -11,6 +11,8 @@ extern J::Engine::JEngine * s_Engine;
 void InitializeEngine(J::Render::JCommandQueue* cmdQueue, J::Render::JSwapChain* swapChain);
 
 J::Engine::JEngine* GetEngine();
+J::Render::JWindowInfo& GetEngineWindowInfo();
+HWND GetEngineWindowHandle();
 
 void DestroyEngine();
 

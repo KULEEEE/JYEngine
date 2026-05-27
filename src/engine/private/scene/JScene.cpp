@@ -1,5 +1,7 @@
 #include "engine/scene/JScene.h"
 
+#include "engine/asset/JMaterial.h"
+
 #include <iomanip>
 #include <sstream>
 
@@ -52,6 +54,61 @@ JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::strin
 	const std::string resolvedStableID = stableID.empty() ? generateStableID() : stableID;
 	SetEntityMetadata(entity, resolvedStableID, name, tags);
 	return entity;
+}
+
+JMaterialHandle JScene::AddMaterial(std::shared_ptr<JMaterial> material)
+{
+	if (material == nullptr)
+	{
+		return {};
+	}
+
+	if (!_freeMaterialIndices.empty())
+	{
+		const uint32 index = _freeMaterialIndices.back();
+		_freeMaterialIndices.pop_back();
+
+		MaterialSlot& slot = _materials[index];
+		slot.active = true;
+		slot.material = std::move(material);
+		_activeMaterialIndices.push_back(index);
+		return { index, slot.generation };
+	}
+
+	MaterialSlot slot;
+	slot.active = true;
+	slot.material = std::move(material);
+	_materials.push_back(std::move(slot));
+	const uint32 index = static_cast<uint32>(_materials.size() - 1);
+	_activeMaterialIndices.push_back(index);
+	return { index, _materials[index].generation };
+}
+
+bool JScene::RemoveMaterial(JMaterialHandle material)
+{
+	if (!material.IsValid()
+		|| material.index >= _materials.size()
+		|| !_materials[material.index].active
+		|| _materials[material.index].generation != material.generation)
+	{
+		return false;
+	}
+
+	MaterialSlot& slot = _materials[material.index];
+	slot.active = false;
+	slot.material.reset();
+	++slot.generation;
+	_freeMaterialIndices.push_back(material.index);
+	for (uint32 i = 0; i < _activeMaterialIndices.size(); ++i)
+	{
+		if (_activeMaterialIndices[i] == material.index)
+		{
+			_activeMaterialIndices[i] = _activeMaterialIndices.back();
+			_activeMaterialIndices.pop_back();
+			break;
+		}
+	}
+	return true;
 }
 
 bool JScene::RemoveEntity(JEntityHandle entity)
@@ -278,9 +335,9 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	return light;
 }
 
-JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle entity, uint32 materialID, const JMesh* mesh, bool transparent)
+JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const JMesh* mesh, bool transparent)
 {
-	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid())
+	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid() || GetMaterial(material) == nullptr)
 	{
 		return {};
 	}
@@ -288,7 +345,7 @@ JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle enti
 	RenderObjectComponentData data;
 	data.entity = entity;
 	data.mesh = mesh;
-	data.materialID = materialID;
+	data.material = material;
 	data.transparent = transparent;
 	const JRenderObjectComponentHandle renderObject = _renderObjectComponents.Add(entity, data);
 	if (!renderObject.IsValid())
@@ -410,6 +467,26 @@ JScene::EntityData* JScene::GetEntity(JEntityHandle handle)
 const JScene::EntityData* JScene::GetEntity(JEntityHandle handle) const
 {
 	return _entities.Get(handle);
+}
+
+JMaterial* JScene::GetMaterial(JMaterialHandle handle)
+{
+	return handle.IsValid()
+		&& handle.index < _materials.size()
+		&& _materials[handle.index].active
+		&& _materials[handle.index].generation == handle.generation
+		? _materials[handle.index].material.get()
+		: nullptr;
+}
+
+const JMaterial* JScene::GetMaterial(JMaterialHandle handle) const
+{
+	return handle.IsValid()
+		&& handle.index < _materials.size()
+		&& _materials[handle.index].active
+		&& _materials[handle.index].generation == handle.generation
+		? _materials[handle.index].material.get()
+		: nullptr;
 }
 
 JScene::TransformData JScene::GetTransform(JTransformHandle handle) const

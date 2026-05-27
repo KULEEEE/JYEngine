@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <shellapi.h>
 
-J::Render::JWindowInfo s_WindowInfo;
 J::Editor::JEditorPanel* s_ActiveEditorPanel = nullptr;
 
 #define MAX_LOADSTRING 100
@@ -129,14 +128,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_CLIENT));
     MSG msg;
 
-    s_WindowInfo.width = 1920;
-    s_WindowInfo.height = 1080;
-    s_WindowInfo.windowed = true;
+    J::Render::JWindowInfo& windowInfo = GetEngineWindowInfo();
+    windowInfo.width = 1920;
+    windowInfo.height = 1080;
+    windowInfo.windowed = true;
     RECT clientRect{};
-    if (GetClientRect(s_WindowInfo.hwnd, &clientRect))
+    if (GetClientRect(windowInfo.hwnd, &clientRect))
     {
-        s_WindowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
-        s_WindowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
+        windowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
+        windowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
     }
 
     auto swapChain = std::make_unique<J::Render::JSwapChain>();
@@ -145,10 +145,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     InitializeEngine(cmdQueue.get(), swapChain.get());
 
     cmdQueue->Initialize(GetEngine()->GetDevice()->GetDevice(), swapChain.get());
-    swapChain->Initialize(s_WindowInfo, s_Engine->GetDevice(), cmdQueue->GetCmdQueue());
+    swapChain->Initialize(windowInfo, s_Engine->GetDevice(), cmdQueue->GetCmdQueue());
 
-    const float initialAspectRatio = s_WindowInfo.height > 0
-        ? static_cast<float>(s_WindowInfo.width) / static_cast<float>(s_WindowInfo.height)
+    const float initialAspectRatio = windowInfo.height > 0
+        ? static_cast<float>(windowInfo.width) / static_cast<float>(windowInfo.height)
         : 1.0f;
     {
         J::Editor::JSceneManager sceneManager(GetEngine()->GetRenderer(), GetEngine()->GetMaterialFactory(), initialAspectRatio);
@@ -188,8 +188,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         unique_ptr<J::Editor::JScenePanel> panel = make_unique<J::Editor::JScenePanel>();
         panel->Init();
         s_ActiveEditorPanel = panel.get();
-        uint32 swapChainWidth = static_cast<uint32>(std::max(s_WindowInfo.width, 1));
-        uint32 swapChainHeight = static_cast<uint32>(std::max(s_WindowInfo.height, 1));
+        uint32 swapChainWidth = static_cast<uint32>(std::max(windowInfo.width, 1));
+        uint32 swapChainHeight = static_cast<uint32>(std::max(windowInfo.height, 1));
 
         while (true)
         {
@@ -207,13 +207,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
             uint32 clientWidth = 1;
             uint32 clientHeight = 1;
-            getClientSize(s_WindowInfo.hwnd, clientWidth, clientHeight);
+            getClientSize(windowInfo.hwnd, clientWidth, clientHeight);
             if (clientWidth != swapChainWidth || clientHeight != swapChainHeight)
             {
                 cmdQueue->WaitIdle();
                 swapChain->Resize(clientWidth, clientHeight);
                 swapChainWidth = clientWidth;
                 swapChainHeight = clientHeight;
+                windowInfo.width = static_cast<int32>(clientWidth);
+                windowInfo.height = static_cast<int32>(clientHeight);
             }
 
             const uint32 frameIndex = swapChain->GetBackBufferIndex();
@@ -308,12 +310,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
 
-    s_WindowInfo.hwnd = hWnd;
+    J::Render::JWindowInfo& windowInfo = GetEngineWindowInfo();
+    windowInfo.hwnd = hWnd;
     RECT clientRect{};
     if (GetClientRect(hWnd, &clientRect))
     {
-        s_WindowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
-        s_WindowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
+        windowInfo.width = static_cast<int>(clientRect.right - clientRect.left);
+        windowInfo.height = static_cast<int>(clientRect.bottom - clientRect.top);
     }
 
     return TRUE;
