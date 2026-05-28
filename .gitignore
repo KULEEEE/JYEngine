@@ -1,6 +1,8 @@
 # ========================
 # Build output
 # ========================
+/.claude/
+/.codegraph/
 /build/
 /deps/
 /out/
