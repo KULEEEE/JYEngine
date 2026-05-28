@@ -83,7 +83,7 @@ bool JGBuffer::createDepthTarget()
 
 	D3D12_CLEAR_VALUE clearValue = {};
 	clearValue.Format = _desc.depthFormat;
-	clearValue.DepthStencil.Depth = 1.0f;
+	clearValue.DepthStencil.Depth = 0.0f;
 	clearValue.DepthStencil.Stencil = 0;
 
 	CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);

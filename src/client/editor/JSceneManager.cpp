@@ -50,7 +50,7 @@ Engine::JSceneData JSceneManager::createEmptySceneData(const std::string& sceneN
 	cameraEntity.hasCamera = true;
 	cameraEntity.camera.active = true;
 	cameraEntity.camera.primary = true;
-	cameraEntity.camera.nearP = 0.5f;
+	cameraEntity.camera.nearP = 5.0f;
 	cameraEntity.camera.farP = 1000.0f;
 	sceneData.entities.push_back(cameraEntity);
 

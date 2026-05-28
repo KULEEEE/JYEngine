@@ -314,7 +314,7 @@ int main(int argc, char** argv)
 		materialJson["constants"] =
 		{
 			{ "enabled", true },
-			{ "baseColor", { 1.0f, 1.0f, 1.0f, 1.0f } },
+			{ "baseColor", { importedMaterial.baseColor.x, importedMaterial.baseColor.y, importedMaterial.baseColor.z, importedMaterial.baseColor.w } },
 			{ "roughness", 0.5f },
 			{ "metallic", 0.0f },
 		};

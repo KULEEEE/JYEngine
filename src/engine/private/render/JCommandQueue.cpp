@@ -208,7 +208,7 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	}
 	if (dsvHandle != nullptr && clearDepth)
 	{
-		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, rectCount, nullptr);
+		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, rectCount, nullptr);
 	}
 
 	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, dsvHandle);
@@ -283,10 +283,29 @@ void JCommandQueue::BeginRenderPass(const std::vector<Engine::JRenderTarget*>& r
 	}
 	if (dsvHandle != nullptr && clearDepth)
 	{
-		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, rectCount, nullptr);
+		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, rectCount, nullptr);
 	}
 
 	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, dsvHandle);
+}
+
+void JCommandQueue::BeginDepthPass(D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, uint32 rectCount, bool clearDepth)
+{
+	if (_cmdList == nullptr || dsvHandle == nullptr)
+	{
+		std::cerr << "BeginDepthPass skipped: command list or DSV handle is null." << std::endl;
+		return;
+	}
+
+	_currentRenderTarget = nullptr;
+	_currentRenderTargets.clear();
+
+	if (clearDepth)
+	{
+		_cmdList->ClearDepthStencilView(*dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, rectCount, nullptr);
+	}
+
+	_cmdList->OMSetRenderTargets(0, nullptr, FALSE, dsvHandle);
 }
 
 void JCommandQueue::TransitionRenderTarget(Engine::JRenderTarget* renderTarget, D3D12_RESOURCE_STATES targetState)
@@ -388,7 +407,7 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 		_cmdList->SetGraphicsRootConstantBufferView(binding.rootParameterIndex, binding.buffer->buffer->GetGPUVirtualAddress());
 	}
 
-	if (!resource->GetTextures().empty())
+	if (!shader->bindingInfo.textures.empty())
 	{
 		const D3D12_GPU_DESCRIPTOR_HANDLE tableHandle = allocateFrameTextureTable(resource, shader);
 		if (tableHandle.ptr != 0)
@@ -433,6 +452,21 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 
 	const uint32 tableBase = frameResource.descriptorOffset;
 	frameResource.descriptorOffset += srvDescriptorCount;
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
+	nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	nullSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	nullSrvDesc.Texture2D.MostDetailedMip = 0;
+	nullSrvDesc.Texture2D.MipLevels = 1;
+	D3D12_CPU_DESCRIPTOR_HANDLE tableStart = frameResource.descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	tableStart.ptr += static_cast<SIZE_T>(tableBase) * _srvDescriptorSize;
+	for (uint32 descriptorIndex = 0; descriptorIndex < srvDescriptorCount; ++descriptorIndex)
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE dest = tableStart;
+		dest.ptr += static_cast<SIZE_T>(descriptorIndex) * _srvDescriptorSize;
+		_device->CreateShaderResourceView(nullptr, &nullSrvDesc, dest);
+	}
 
 	for (const JGraphicResource::TextureBinding& binding : resource->GetTextures())
 	{
@@ -537,9 +571,14 @@ D3D12_GPU_VIRTUAL_ADDRESS JCommandQueue::UploadFrameConstantBuffer(const void* d
 
 void JCommandQueue::EndRenderPass()
 {
-	if (_cmdList == nullptr || _currentRenderTarget == nullptr)
+	if (_cmdList == nullptr)
 	{
-		std::cerr << "EndRenderPass skipped: command list or current render target is null." << std::endl;
+		std::cerr << "EndRenderPass skipped: command list is null." << std::endl;
+		return;
+	}
+
+	if (_currentRenderTargets.empty())
+	{
 		return;
 	}
 

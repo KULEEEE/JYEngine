@@ -567,7 +567,17 @@ public:
 	}
 	void DestroyShader(JShader* shader) { delete shader; }
 
-	JPipeline* CreatePipeline(JShader* shader, bool enableAlphaBlend = false, bool useVertexInput = true, bool useNormalInput = false, bool useTexcoordInput = false, const std::vector<DXGI_FORMAT>& rtvFormats = {}, bool enableDepth = true)
+	JPipeline* CreatePipeline(
+		JShader* shader,
+		bool enableAlphaBlend = false,
+		bool useVertexInput = true,
+		bool useNormalInput = false,
+		bool useTexcoordInput = false,
+		const std::vector<DXGI_FORMAT>& rtvFormats = {},
+		bool enableDepth = true,
+		D3D12_DEPTH_WRITE_MASK depthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL,
+		D3D12_COMPARISON_FUNC depthFunc = D3D12_COMPARISON_FUNC_GREATER,
+		bool useDefaultRtvFormat = true)
 	{
 		if (shader == nullptr || shader->GetRootSignature() == nullptr)
 		{
@@ -639,10 +649,15 @@ public:
 			pipelineDesc.DepthStencilState.DepthEnable = FALSE;
 			pipelineDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 		}
+		else
+		{
+			pipelineDesc.DepthStencilState.DepthWriteMask = depthWriteMask;
+			pipelineDesc.DepthStencilState.DepthFunc = depthFunc;
+		}
 		pipelineDesc.DSVFormat = enableDepth ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_UNKNOWN;
 		pipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		const std::vector<DXGI_FORMAT> defaultRtvFormats = { DXGI_FORMAT_R8G8B8A8_UNORM };
-		const std::vector<DXGI_FORMAT>& activeRtvFormats = rtvFormats.empty() ? defaultRtvFormats : rtvFormats;
+		const std::vector<DXGI_FORMAT>& activeRtvFormats = (rtvFormats.empty() && useDefaultRtvFormat) ? defaultRtvFormats : rtvFormats;
 		pipelineDesc.NumRenderTargets = static_cast<UINT>(activeRtvFormats.size());
 		for (UINT rtvIndex = 0; rtvIndex < pipelineDesc.NumRenderTargets && rtvIndex < _countof(pipelineDesc.RTVFormats); ++rtvIndex)
 		{

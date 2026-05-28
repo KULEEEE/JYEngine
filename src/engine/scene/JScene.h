@@ -85,8 +85,8 @@ public:
 	JMaterialHandle AddMaterial(std::shared_ptr<JMaterial> material);
 	bool RemoveMaterial(JMaterialHandle material);
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
-	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
-	JCameraHandle AddCamera(JEntityHandle entity, float aspectRatio = 1.0f, float nearP = 0.5f, float farP = 1000.0f);
+	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 5.0f, float farP = 1000.0f);
+	JCameraHandle AddCamera(JEntityHandle entity, float aspectRatio = 1.0f, float nearP = 5.0f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
 	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const JMesh* mesh, bool transparent = false);
 	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const std::vector<JMaterialHandle>& subMeshMaterials, const JMesh* mesh, bool transparent = false);

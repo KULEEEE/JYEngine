@@ -71,7 +71,7 @@ namespace
 
 		const float nearPlane = std::max(0.001f, cameraData->nearP);
 		const float farPlane = std::max(nearPlane + 0.001f, cameraData->farP);
-		return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, nearPlane, farPlane);
+		return XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), cameraData->aspectRatio, farPlane, nearPlane);
 	}
 
 	uint64 makeCameraKey(JCameraHandle camera)

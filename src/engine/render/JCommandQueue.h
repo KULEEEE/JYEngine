@@ -28,6 +28,7 @@ public:
 	void BeginRenderPass(Engine::JRenderTarget* renderTarget, const JColor& clearColor, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget = true, bool clearDepth = false);
 	void BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, bool clearRenderTarget = true);
 	void BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, bool clearRenderTarget = true, bool clearDepth = false);
+	void BeginDepthPass(D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle, uint32 rectCount, bool clearDepth = true);
 	void TransitionRenderTarget(Engine::JRenderTarget* renderTarget, D3D12_RESOURCE_STATES targetState);
 	void SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport);
 	void SetScissorRects(const uint32& rectCount, const D3D12_RECT* rect);

@@ -5,6 +5,8 @@
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
+#include <sstream>
+
 J_ENGINE_BEGIN
 
 namespace
@@ -122,6 +124,33 @@ namespace
 
 		return {};
 	}
+
+#ifdef _DEBUG
+	void logMaterialTextureIssue(
+		const char* reason,
+		JMaterialHandle material,
+		const std::string& materialName,
+		const std::string& shaderPath,
+		const std::string& textureName,
+		const std::string& path)
+	{
+		std::ostringstream oss;
+		oss << "JRenderDB::SyncMaterial texture " << reason
+			<< ". material=" << static_cast<uint32>(material.index)
+			<< ", materialName=" << materialName
+			<< ", shader=" << shaderPath
+			<< ", textureName=" << textureName;
+		if (!path.empty())
+		{
+			oss << ", path=" << path;
+		}
+		oss << std::endl;
+
+		const std::string message = oss.str();
+		std::cerr << message;
+		OutputDebugStringA(message.c_str());
+	}
+#endif
 
 	void releaseShaderResource(
 		Render::JRenderContext* renderContext,
@@ -484,6 +513,9 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 	{
 		if (param.path.empty())
 		{
+#ifdef _DEBUG
+			logMaterialTextureIssue("skipped: empty path", handle, material.GetName(), resource.shaderPath, param.name, param.path);
+#endif
 			continue;
 		}
 
@@ -506,6 +538,9 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 		}
 		if (!isShaderTexture)
 		{
+#ifdef _DEBUG
+			logMaterialTextureIssue("skipped: not used by shader", handle, material.GetName(), resource.shaderPath, param.name, param.path);
+#endif
 			continue;
 		}
 
@@ -523,12 +558,37 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 			{
 				_textureCache[param.path] = { texture, 1 };
 			}
+#ifdef _DEBUG
+			else
+			{
+				logMaterialTextureIssue("load failed", handle, material.GetName(), resource.shaderPath, param.name, param.path);
+			}
+#endif
 		}
 		if (texture != nullptr)
 		{
 			resource.textures.push_back({ param.name, param.nameHash, texture, param.path });
 		}
 	}
+
+#ifdef _DEBUG
+	for (const Render::JShader::BindingInfo::Resource& textureBinding : resource.shader->bindingInfo.textures)
+	{
+		bool bound = false;
+		for (const JMaterialResource::TextureEntry& entry : resource.textures)
+		{
+			if (entry.nameHash == textureBinding.nameHash)
+			{
+				bound = true;
+				break;
+			}
+		}
+		if (!bound)
+		{
+			logMaterialTextureIssue("missing shader binding", handle, material.GetName(), resource.shaderPath, textureBinding.name, "");
+		}
+	}
+#endif
 }
 
 void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection)

@@ -63,7 +63,7 @@ struct JSceneCameraData
 {
 	bool active = true;
 	bool primary = false;
-	float nearP = 0.5f;
+	float nearP = 5.0f;
 	float farP = 1000.0f;
 };
 

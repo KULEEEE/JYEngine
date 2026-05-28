@@ -1,4 +1,4 @@
-#include "engine/render/JGBufferPass.h"
+#include "engine/render/JDepthPass.h"
 
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JDrawItemCache.h"
@@ -8,13 +8,11 @@
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"
 
-#include <iostream>
-
 J_ENGINE_BEGIN
 
 namespace
 {
-	bool buildDrawGraphicResource(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
+	bool buildDepthGraphicResource(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
 	{
 		if (!context.renderDB->BuildGraphicResource(drawItem.material, graphicResource.GetShader(), graphicResource))
 		{
@@ -39,13 +37,13 @@ namespace
 	}
 }
 
-JGBufferPass::~JGBufferPass()
+JDepthPass::~JDepthPass()
 {
 	delete _pipeline;
 	delete _shader;
 }
 
-bool JGBufferPass::ensureResources(const JRenderPassContext& context)
+bool JDepthPass::ensureResources(const JRenderPassContext& context)
 {
 	if (_shader != nullptr && _pipeline != nullptr)
 	{
@@ -59,34 +57,29 @@ bool JGBufferPass::ensureResources(const JRenderPassContext& context)
 
 	if (_shader == nullptr)
 	{
-		const std::string shaderPath = get_Engine_Shader_Path() + "\\gbuffer_albedo.hlsl";
+		const std::string shaderPath = get_Engine_Shader_Path() + "\\depth_prepass.hlsl";
 		_shader = context.renderContext->CreateShader(shaderPath);
 	}
 
 	if (_shader != nullptr && _pipeline == nullptr)
 	{
-		const std::vector<DXGI_FORMAT> gBufferFormats =
-		{
-			context.gBuffer != nullptr ? context.gBuffer->GetDesc().albedoFormat : DXGI_FORMAT_R8G8B8A8_UNORM,
-			context.gBuffer != nullptr ? context.gBuffer->GetDesc().normalFormat : DXGI_FORMAT_R16G16B16A16_FLOAT,
-			context.gBuffer != nullptr ? context.gBuffer->GetDesc().materialFormat : DXGI_FORMAT_R8G8B8A8_UNORM
-		};
 		_pipeline = context.renderContext->CreatePipeline(
 			_shader,
 			false,
 			true,
+			false,
+			false,
+			{},
 			true,
-			true,
-			gBufferFormats,
-			true,
-			D3D12_DEPTH_WRITE_MASK_ZERO,
-			D3D12_COMPARISON_FUNC_EQUAL);
+			D3D12_DEPTH_WRITE_MASK_ALL,
+			D3D12_COMPARISON_FUNC_GREATER,
+			false);
 	}
 
 	return _shader != nullptr && _pipeline != nullptr;
 }
 
-void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& frameDesc)
+void JDepthPass::Execute(const JRenderPassContext& context, const JFrameDesc& frameDesc)
 {
 	_lastStats = {};
 	_lastStats.name = GetName();
@@ -101,11 +94,8 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 		return;
 	}
 
-	JRenderTarget* albedoTarget = context.gBuffer->GetAlbedoTarget();
-	JRenderTarget* normalTarget = context.gBuffer->GetNormalTarget();
-	JRenderTarget* materialTarget = context.gBuffer->GetMaterialTarget();
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = context.gBuffer->GetDSVHandle();
-	context.commandQueue->BeginRenderPass({ albedoTarget, normalTarget, materialTarget }, 0, &dsvHandle, true, false);
+	context.commandQueue->BeginDepthPass(&dsvHandle, 0, true);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
@@ -130,15 +120,8 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 			continue;
 		}
 
-		const JMeshResource* meshResource = resources.mesh;
-		if (!meshResource->hasNormals || !meshResource->hasTexcoords)
-		{
-			++_lastStats.skippedDrawCount;
-			continue;
-		}
-
 		Render::JGraphicResource graphicResource(_shader);
-		if (!buildDrawGraphicResource(context, frameDesc.camera, drawItem, graphicResource))
+		if (!buildDepthGraphicResource(context, frameDesc.camera, drawItem, graphicResource))
 		{
 			++_lastStats.skippedDrawCount;
 			continue;
@@ -146,16 +129,13 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 
 		context.commandQueue->SetPipeline(_pipeline);
 		context.commandQueue->SetGraphicResources(&graphicResource);
-		context.commandQueue->BindVertexBuffer(meshResource);
-		const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(meshResource->indexSize);
+		context.commandQueue->BindVertexBuffer(resources.mesh);
+		const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(resources.mesh->indexSize);
 		context.commandQueue->DrawIndexed(indexCount, 1, drawItem.startIndex, 0, 0);
 		++_lastStats.drawCallCount;
 	}
 
 	context.commandQueue->EndRenderPass();
-	context.commandQueue->TransitionRenderTarget(albedoTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	context.commandQueue->TransitionRenderTarget(normalTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	context.commandQueue->TransitionRenderTarget(materialTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 J_ENGINE_END

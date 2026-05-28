@@ -19,7 +19,7 @@ struct JCameraComponents
 {
 	JEntityHandle entity = {};
 	float aspectRatio = 1.0f;
-	float nearP = 0.5f;
+	float nearP = 5.0f;
 	float farP = 1000.0f;
 	bool active = true;
 };

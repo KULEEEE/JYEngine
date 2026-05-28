@@ -6,6 +6,7 @@
 #include "engine/render/JRenderTarget.h"
 #include "engine/render/JSceneColorPass.h"
 #include "engine/render/JDrawItemCache.h"
+#include "engine/render/JDepthPass.h"
 #include "engine/render/JGBuffer.h"
 #include "engine/render/JGBufferPass.h"
 #include "engine/render/JLightingPass.h"
@@ -39,6 +40,7 @@ void JRenderer::initializeForwardPasses()
 void JRenderer::initializeDeferredPasses()
 {
 	_passes.clear();
+	_passes.push_back(std::make_unique<JDepthPass>());
 	_passes.push_back(std::make_unique<JGBufferPass>());
 	_passes.push_back(std::make_unique<JLightingPass>());
 	_passes.push_back(std::make_unique<JForwardOverlayPass>());
