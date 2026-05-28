@@ -64,6 +64,12 @@ public:
 		uint32 refCount = 0;
 	};
 
+	struct ShaderResourceRecord
+	{
+		Render::JShader* shader = nullptr;
+		uint32 refCount = 0;
+	};
+
 	JRenderDB() = default;
 	~JRenderDB();
 
@@ -128,6 +134,7 @@ private:
 	std::vector<MeshResourceRecord> _meshResources;
 	std::unordered_map<const JMesh*, uint32> _meshIndexMap;
 	std::unordered_map<std::string, TextureResourceRecord> _textureCache;
+	std::unordered_map<std::string, ShaderResourceRecord> _shaderCache;
 };
 
 J_ENGINE_END

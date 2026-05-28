@@ -85,6 +85,79 @@ namespace
 		texture = nullptr;
 	}
 
+	void destroyShader(Render::JRenderContext* renderContext, Render::JShader*& shader)
+	{
+		if (shader == nullptr)
+		{
+			return;
+		}
+
+		if (renderContext != nullptr)
+		{
+			renderContext->DestroyShader(shader);
+		}
+		else
+		{
+			delete shader;
+		}
+		shader = nullptr;
+	}
+
+	bool isGBufferShaderPath(const std::string& shaderPath)
+	{
+		return shaderPath.find("gbuffer_albedo.hlsl") != std::string::npos;
+	}
+
+	std::vector<DXGI_FORMAT> getPipelineRtvFormats(const std::string& shaderPath)
+	{
+		if (isGBufferShaderPath(shaderPath))
+		{
+			return
+			{
+				DXGI_FORMAT_R8G8B8A8_UNORM,
+				DXGI_FORMAT_R16G16B16A16_FLOAT,
+				DXGI_FORMAT_R8G8B8A8_UNORM
+			};
+		}
+
+		return {};
+	}
+
+	void releaseShaderResource(
+		Render::JRenderContext* renderContext,
+		std::unordered_map<std::string, JRenderDB::ShaderResourceRecord>& shaderCache,
+		JMaterialResource& resource)
+	{
+		if (resource.shader == nullptr)
+		{
+			resource.shaderPath.clear();
+			return;
+		}
+
+		if (!resource.shaderPath.empty())
+		{
+			const auto iter = shaderCache.find(resource.shaderPath);
+			if (iter != shaderCache.end() && iter->second.shader == resource.shader)
+			{
+				if (iter->second.refCount > 0)
+				{
+					--iter->second.refCount;
+				}
+				if (iter->second.refCount == 0)
+				{
+					destroyShader(renderContext, iter->second.shader);
+					shaderCache.erase(iter);
+				}
+				resource.shader = nullptr;
+				resource.shaderPath.clear();
+				return;
+			}
+		}
+
+		destroyShader(renderContext, resource.shader);
+		resource.shaderPath.clear();
+	}
+
 	void releaseTextureEntry(
 		Render::JRenderContext* renderContext,
 		std::unordered_map<std::string, JRenderDB::TextureResourceRecord>& textureCache,
@@ -119,6 +192,7 @@ namespace
 
 	void destroyMaterialResource(
 		Render::JRenderContext* renderContext,
+		std::unordered_map<std::string, JRenderDB::ShaderResourceRecord>& shaderCache,
 		std::unordered_map<std::string, JRenderDB::TextureResourceRecord>& textureCache,
 		JMaterialResource& resource)
 	{
@@ -145,18 +219,7 @@ namespace
 			resource.pipeline = nullptr;
 		}
 
-		if (resource.shader != nullptr)
-		{
-			if (renderContext != nullptr)
-			{
-				renderContext->DestroyShader(resource.shader);
-			}
-			else
-			{
-				delete resource.shader;
-			}
-			resource.shader = nullptr;
-		}
+		releaseShaderResource(renderContext, shaderCache, resource);
 
 		resource.constantBuffers.clear();
 		resource.textures.clear();
@@ -370,18 +433,34 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 	}
 
 	JMaterialResource& resource = getOrCreateMaterialResource(handle);
-	destroyMaterialResource(_renderContext, _textureCache, resource);
+	destroyMaterialResource(_renderContext, _shaderCache, _textureCache, resource);
 	resource.material = handle;
-	resource.shader = _renderContext->CreateShader(material.GetShaderPath());
+	resource.shaderPath = material.GetShaderPath();
+	auto shaderIter = _shaderCache.find(resource.shaderPath);
+	if (shaderIter != _shaderCache.end() && shaderIter->second.shader != nullptr)
+	{
+		resource.shader = shaderIter->second.shader;
+		++shaderIter->second.refCount;
+	}
+	else
+	{
+		resource.shader = _renderContext->CreateShader(resource.shaderPath);
+		if (resource.shader != nullptr)
+		{
+			_shaderCache[resource.shaderPath] = { resource.shader, 1 };
+		}
+	}
 	if (resource.shader == nullptr)
 	{
+		resource.shaderPath.clear();
 		return;
 	}
 
-	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled(), true, true, true);
+	const std::vector<DXGI_FORMAT> rtvFormats = getPipelineRtvFormats(resource.shaderPath);
+	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled(), true, true, true, rtvFormats);
 	if (resource.pipeline == nullptr)
 	{
-		destroyMaterialResource(_renderContext, _textureCache, resource);
+		destroyMaterialResource(_renderContext, _shaderCache, _textureCache, resource);
 		return;
 	}
 
@@ -572,7 +651,7 @@ void JRenderDB::RemoveMaterialResource(JMaterialHandle material)
 		return;
 	}
 
-	destroyMaterialResource(_renderContext, _textureCache, _materialResources[index].resource);
+	destroyMaterialResource(_renderContext, _shaderCache, _textureCache, _materialResources[index].resource);
 
 	const uint32 lastIndex = static_cast<uint32>(_materialResources.size() - 1);
 	if (index != lastIndex)
@@ -695,7 +774,13 @@ void JRenderDB::Clear()
 
 	for (MaterialResourceRecord& record : _materialResources)
 	{
-		destroyMaterialResource(_renderContext, _textureCache, record.resource);
+		destroyMaterialResource(_renderContext, _shaderCache, _textureCache, record.resource);
+	}
+
+	for (auto& [path, record] : _shaderCache)
+	{
+		(void)path;
+		destroyShader(_renderContext, record.shader);
 	}
 
 	for (auto& [path, record] : _textureCache)
@@ -708,6 +793,7 @@ void JRenderDB::Clear()
 	_meshIndexMap.clear();
 	_materialResources.clear();
 	_materialIndexMap.clear();
+	_shaderCache.clear();
 	_textureCache.clear();
 	_cameraResources.clear();
 	_cameraIndexMap.clear();
