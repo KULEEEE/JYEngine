@@ -1,241 +1,270 @@
 # JYEngine
 
-> **DirectX 12 기반 데이터 지향(DOD) 미니 렌더링 엔진** — Scene/Snapshot/Renderer 단방향 데이터 흐름과 ECS-lite 컴포넌트 풀, 병렬 frustum culling을 직접 설계·구현했습니다.
+DirectX 12 기반의 미니 렌더링 엔진입니다. Scene 권위 모델과 GPU 렌더러 사이를 **불변(immutable) 프레임 스냅샷**으로 분리한 단방향 데이터 흐름 위에서, ECS-lite 컴포넌트 풀과 SoA 기반 Transform, 병렬 frustum culling, 셰이더 리플렉션 기반 root signature를 결합한 구조로 동작합니다.
 
-[![C++](https://img.shields.io/badge/C%2B%2B-17%2F20-blue)]()
-[![DirectX](https://img.shields.io/badge/DirectX-12-green)]()
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2B-lightgrey)]()
-[![Solo](https://img.shields.io/badge/Solo%20Project-1%20developer-purple)]()
-
----
-
-## 한눈에 보는 특징
-
-| 영역 | 패턴 | 한 줄 요약 |
-|---|---|---|
-| **씬 ↔ 렌더 분리** | Immutable `JFrameDesc` snapshot | Scene의 mutable 상태가 Renderer로 새지 않는 단방향 흐름 |
-| **ECS-lite** | `{index, generation}` handle + 컴포넌트별 Pool | dangling reference 방지 + SoA 친화 레이아웃 |
-| **Transform** | SoA 분리 + dirty index ring | 변경된 transform만 GPU에 동기화 |
-| **렌더 패스** | Forward / Deferred 동시 지원 | `JRenderPass` 인터페이스로 통일, 런타임 전환 가능 |
-| **컬링** | 자체 잡 시스템 기반 병렬 frustum cull | 청크 분할 → worker별 local result → merge |
-| **셰이더** | `ID3D12ShaderReflection` 기반 root signature 자동 생성 | CBV/SRV/Sampler를 코드 변경 없이 바인딩 |
-| **드로우 캐시** | Added/Modified/Removed 이벤트 기반 incremental 갱신 | 매 프레임 전체 재구축 회피 |
-
----
-
-## 아키텍처 다이어그램
-
-### 1. 한 프레임의 데이터 흐름 (핵심)
-
-씬은 mutable, 프레임은 immutable — 둘을 잇는 것이 `JRenderServer`의 책임입니다.
-
-```mermaid
-flowchart TD
-    subgraph Authoring["🎨 Authoring Layer (mutable)"]
-        Scene["JScene<br/>📦 Entity / Transform / Camera / Light / RenderObject Pools"]
-        Scene -. dirty events .-> Events["ConsumeRenderObjectEvents<br/>ConsumeDirtyCameras<br/>ConsumeDirtyTransformIndices"]
-    end
-
-    subgraph Frontend["⚙️ Render Frontend (CPU compute)"]
-        Server["JRenderServer<br/>SyncScene orchestration"]
-        SnapshotBuilder["JRenderSnapshotBuilder<br/>view-proj / world matrix / light"]
-        QueueBuilder["JCameraRenderQueueBuilder<br/>🧵 parallel frustum cull"]
-        Cache["JDrawItemCache<br/>incremental Added/Modified/Removed"]
-    end
-
-    FrameDesc["📋 JFrameDesc<br/>(immutable per-frame snapshot)"]:::immutable
-
-    subgraph Backend["🖼️ Render Backend (GPU)"]
-        Renderer["JRenderer<br/>prepareFrameResources"]
-        RenderDB["JRenderDB<br/>💾 GPU resource cache<br/>Material · Mesh · Transform · Camera · Light"]
-        Passes["RenderPass[]"]
-        ForwardPath["Forward: SceneColorPass"]
-        DeferredPath["Deferred:<br/>GBufferPass → LightingPass → ForwardOverlayPass"]
-        CmdQueue["JCommandQueue<br/>(DX12: fence · upload ring · descriptor heap)"]
-    end
-
-    Events --> Server
-    Server --> SnapshotBuilder
-    Server --> QueueBuilder
-    Server --> Cache
-    SnapshotBuilder --> FrameDesc
-    QueueBuilder --> FrameDesc
-    Cache --> FrameDesc
-    FrameDesc --> Renderer
-    Renderer <--> RenderDB
-    Renderer --> Passes
-    Passes --> ForwardPath
-    Passes --> DeferredPath
-    ForwardPath --> CmdQueue
-    DeferredPath --> CmdQueue
-
-    classDef immutable fill:#1a3a52,stroke:#58a6ff,color:#fff,stroke-width:2px
 ```
-
-**이 다이어그램이 왜 중요한가** — 대부분의 토이 엔진은 `Scene → Renderer`가 직접 결합되어 있어, 렌더 스레드 분리·리플레이·헤드리스 렌더링 같은 확장이 어렵습니다. JYEngine은 `JFrameDesc`라는 **불변 프레임 스냅샷**을 경계에 둠으로써 향후 멀티스레드 렌더링이나 GPU-driven 파이프라인으로 확장할 수 있는 토대를 만들어 두었습니다. (UE5의 `ENQUEUE_RENDER_COMMAND`, Frostbite의 render-thread 분리와 같은 발상.)
-
----
-
-### 2. 모듈 계층
-
-```mermaid
-flowchart TB
-    subgraph Client["Client / Editor"]
-        SceneManager["JSceneManager<br/>open · save · new"]
-        ScenePanel["JScenePanel<br/>editor camera · input · stats popup"]
-        SceneBuilder["JSceneBuilder<br/>JSceneData → JScene"]
-        FBXLoader["JFBXLoader<br/>OpenFBX import"]
-        Serializer["JSceneSerializer<br/>JSON ⇄ JSceneData"]
-    end
-
-    subgraph SceneECS["Scene · ECS"]
-        JScene["JScene"]
-        Pools["TransformPool · CameraPool · LightPool · RenderObjectComponentPool"]
-        Handles["JEntityHandle = {index, generation}"]
-    end
-
-    subgraph RenderFE["Render Frontend"]
-        RServer["JRenderServer"]
-        SnapB["JRenderSnapshotBuilder"]
-        QB["JCameraRenderQueueBuilder"]
-    end
-
-    subgraph RenderBE["Render Backend"]
-        RDB["JRenderDB"]
-        Rndr["JRenderer"]
-        Pass["JRenderPass × 4"]
-        CmdQ["JCommandQueue"]
-        RCtx["JRenderContext"]
-    end
-
-    subgraph Foundation["Foundation"]
-        Job["JJobSystem<br/>thread pool · ParallelFor"]
-        Pool["JEntityPool · JEntityComponentPool"]
-        Hash["JHashFunction<br/>CRC32 / FNV"]
-    end
-
-    RHI["DirectX 12 · Win32"]
-
-    Client --> SceneECS
-    Client --> RenderBE
-    SceneECS --> RenderFE
-    RenderFE --> RenderBE
-    RenderBE --> RHI
-    SceneECS --> Foundation
-    RenderFE --> Foundation
+Windows 10+  ·  Direct3D 12 (FL 11.0+)  ·  C++17  ·  Visual Studio + Win10 SDK
 ```
 
 ---
 
-### 3. ECS-lite 핸들 모델
+## 동작 개요
 
-```mermaid
-flowchart LR
-    Entity["JEntityHandle<br/>{index: 5, generation: 3}"]
-    T["TransformPool[5]<br/>generation: 3 ✅"]
-    C["CameraPool[5]<br/>generation: 3 ✅"]
-    L["LightPool[5]"]
-    R["RenderObjectComponentPool[5]<br/>generation: 3 ✅"]
+엔진은 한 프레임을 세 단계로 처리합니다.
 
-    Entity --> T
-    Entity --> C
-    Entity --> L
-    Entity --> R
+```
+[Authoring · mutable]            [Render Frontend · CPU]              [Render Backend · GPU]
 
-    Stale["⚠️ Stale handle<br/>{index: 5, generation: 1}"]:::stale
-    Stale -.-> T
-    T -.-> X["IsValid() = false<br/>(generation mismatch)"]:::stale
-
-    classDef stale fill:#3a1a1a,stroke:#f85149,color:#fff
+  JScene  ──events──▶  JRenderServer::SyncScene
+                          │
+                          ├──▶ JRenderSnapshotBuilder
+                          │     · 카메라 view·projection
+                          │     · dirty transform → world matrix
+                          │     · light snapshot
+                          │
+                          ├──▶ JDrawItemCache 증분 갱신
+                          │     · Added / Modified → patch
+                          │     · Removed          → rebuild
+                          │
+                          └──▶ JCameraRenderQueueBuilder
+                                · frustum 6-plane 추출
+                                · ParallelFor 기반 AABB 컬링
+                          ▼
+                  ── JFrameDesc (immutable) ──
+                          ▼
+                JRenderer::Render(frameDesc)
+                          │
+                          ├──▶ prepareFrameResources
+                          │     · Material / Camera / Transform / Light 동기화
+                          │
+                          └──▶ pass[i].Execute()
+                                · Forward  : SceneColorPass
+                                · Deferred : GBufferPass → LightingPass → ForwardOverlayPass
 ```
 
-**Entity index = Component slot index** 라는 강한 규약을 둬서 lookup 비용을 없앴습니다. 하나의 엔티티에 같은 종류 컴포넌트는 하나만 — Unity의 `GetComponent<T>()`처럼 다중 인스턴스 시나리오는 의도적으로 배제했습니다.
+`JScene`의 변경사항은 이벤트(`ConsumeRenderObjectEvents`)와 dirty 인덱스(`ConsumeDirtyTransformIndices`, `ConsumeDirtyCameras`, `ConsumeDirtyLights`)로 누적되며, `JRenderServer::SyncScene`이 이를 소비해 `JFrameDesc`를 만듭니다. 이후 백엔드는 `JFrameDesc`를 `const`로 받아 mutable한 Scene 상태를 직접 참조하지 않습니다.
 
 ---
 
-### 4. 병렬 Frustum Culling 흐름
+## 주요 기능
 
-```mermaid
-sequenceDiagram
-    participant Main as Main Thread
-    participant Job as JJobSystem
-    participant W1 as Worker 1
-    participant W2 as Worker 2
-    participant Wn as Worker N
+### 단방향 데이터 흐름
 
-    Main->>Job: ParallelFor(activeCount, chunkSize)
-    Note over Main,Job: chunkSize = max(256, count / (workers × 2))
+`JScene`은 권위(authoritative) 모델이고, 백엔드 패스(`JRenderPass`)는 immutable `JFrameDesc`만 받습니다.
 
-    par 청크 분산
-        Job->>W1: chunk[0..k]
-        Job->>W2: chunk[k..2k]
-        Job->>Wn: chunk[...]
-    end
-
-    W1->>W1: 로컬 ChunkResult에<br/>opaque/transparent push
-    W2->>W2: 로컬 ChunkResult에<br/>opaque/transparent push
-    Wn->>Wn: 로컬 ChunkResult에<br/>opaque/transparent push
-
-    W1-->>Job: done
-    W2-->>Job: done
-    Wn-->>Job: done
-
-    Job-->>Main: Wait() unblocks
-    Main->>Main: merge → CameraSnapshot
+```cpp
+// JRenderPass.h
+virtual void Execute(const JRenderPassContext&, const JFrameDesc&) = 0;
 ```
 
-Worker간 공유 자료구조 lock 경합을 없애기 위해 **chunk별 local result**를 쓰고 main thread에서 merge합니다.
+Scene의 mutable 상태가 렌더 코드로 새지 않으므로 패스를 다른 스레드에서 record하거나, 같은 `JFrameDesc`로 반복 재생(리플레이·헤드리스 렌더링)하는 확장이 구조적으로 가능합니다.
+
+### ECS-lite 핸들 모델
+
+엔티티와 컴포넌트는 `{index, generation}` 핸들로만 식별합니다. 풀에서 슬롯을 제거하면 generation이 증가하므로, 같은 인덱스를 가리키는 옛 핸들은 `IsValid()`에서 거짓이 됩니다.
+
+```cpp
+// JPool.h
+bool IsValid(JEntityHandle handle) const {
+    return handle.IsValid()
+        && handle.index < _slots.size()
+        && _slots[handle.index].active
+        && _slots[handle.index].generation == handle.generation;
+}
+```
+
+Entity index를 그대로 컴포넌트 슬롯 인덱스로 사용합니다. 즉 한 엔티티당 같은 종류의 컴포넌트는 하나만 가질 수 있고, 컴포넌트 lookup은 해시 없이 인덱싱만으로 수행됩니다.
+
+### SoA Transform + dirty index ring
+
+`JTransformPool`은 translation / rotation / scale을 각각 `std::vector<JVec3>` 세 개로 분리해 저장합니다. 변경된 인덱스만 `_dirtyIndices`에 누적되며, `_dirtyFlags`로 중복 push를 방지합니다.
+
+```cpp
+// JTransformPool.h
+std::vector<JVec3>  _translations;
+std::vector<JVec3>  _rotations;
+std::vector<JVec3>  _scales;
+std::vector<uint8>  _dirtyFlags;
+std::vector<uint32> _dirtyIndices;
+```
+
+스냅샷 빌더는 `ConsumeDirtyTransformIndices()`로 변경된 transform만 가져와 world matrix를 계산합니다.
+
+### 병렬 frustum culling (chunk-local merge)
+
+카메라마다 view·projection으로부터 6개의 평면을 추출하고, draw item에 대해 AABB 컬링을 수행합니다.
+worker 간 lock 경합을 피하기 위해, 각 청크는 **자기만의 로컬 결과 버퍼**에 push하고 메인 스레드가 마지막에 병합합니다.
+
+```cpp
+// JCameraRenderQueueBuilder.cpp
+const uint32 chunkSize = std::max<uint32>(
+    MIN_CHUNK_SIZE,
+    (activeCount + targetChunkCount - 1) / targetChunkCount);
+
+jobSystem.ParallelFor(activeCount, chunkSize, [&](uint32 begin, uint32 end) {
+    ChunkResult& result = chunkResults[begin / chunkSize];
+    // 로컬 버퍼에만 push
+});
+```
+
+활성 draw item 수가 임계치(256) 이하이면 직렬 경로(`buildSerial`)로 자동 폴백합니다.
+
+### Draw item incremental cache
+
+`JDrawItemCache`는 한 엔티티가 만든 모든 sub-mesh draw item을 `JDrawRange { start, count, generation }`로 묶어 추적합니다. Scene의 이벤트를 받아:
+
+- `Added`    → 새 entity의 draw item을 append
+- `Modified` → 기존 range를 in-place로 patch
+- `Removed`  → 전체 rebuild
+
+매 프레임 전체 재구축을 피하기 위한 구조입니다.
+
+### 셰이더 리플렉션 기반 root signature
+
+`JShader::CompileShader`가 VS/PS 양쪽에 `D3DReflect`를 적용해 cbuffer / texture / sampler 바인딩을 수집하고, 이를 바탕으로 `JRenderContext::CreateRootSignature`가 root signature를 자동 생성합니다. 이름은 CRC32 해시로 보관됩니다.
+
+```cpp
+// JShader.cpp
+for (uint32 i = 0; i < shaderDesc.BoundResources; ++i) {
+    D3D12_SHADER_INPUT_BIND_DESC bindDesc;
+    shaderReflection->GetResourceBindingDesc(i, &bindDesc);
+    // D3D_SIT_CBUFFER / D3D_SIT_TEXTURE / D3D_SIT_SAMPLER 별로 분류
+}
+```
+
+`JGraphicResource::SetConstantBuffer("PerObject", buffer)`처럼 셰이더와 동일한 이름만 맞춰 주면, 슬롯 인덱스를 코드로 지정하지 않고도 바인딩이 연결됩니다.
+
+### Per-frame upload ring + descriptor cache
+
+`JCommandQueue`는 swap-chain 버퍼 수만큼 `FrameResource`를 보유합니다. 각 frame resource는
+
+- 자체 command allocator
+- 16 MB 상수 버퍼 업로드 링 (CPU 매핑)
+- shader-visible CBV/SRV/UAV descriptor heap
+- fence value
+
+를 들고 있으며, `RenderBegin(frameIndex)`이 이전 프레임 fence를 기다린 뒤 offset을 0으로 리셋합니다. 같은 머터리얼이 한 프레임 안에서 여러 번 그려질 때를 위해 `(shader, texture set)` 키로 GPU descriptor table을 캐시합니다.
+
+```cpp
+// JCommandQueue.cpp
+const auto cached = frameResource.descriptorTableCache.find(tableKey);
+if (cached != frameResource.descriptorTableCache.end()) {
+    return cached->second;
+}
+```
+
+### Forward / Deferred 양쪽 지원
+
+`JRenderer::SetRenderPath(RenderPath::Forward | Deferred)`로 런타임 전환됩니다.
+
+- **Forward**  : `JSceneColorPass`가 opaque → transparent 순으로 draw
+- **Deferred** : `JGBufferPass` (Albedo / Normal / Material MRT) → `JLightingPass` (full-screen triangle로 G-buffer 샘플링) → `JForwardOverlayPass`
+
+### JSON 직렬화
+
+`JSceneSerializer`가 nlohmann/json으로 씬을 `.jscene.json`으로 저장 / 로드합니다. 알 수 없는 필드는 무시되며, 누락된 필드는 기본값으로 채워집니다. (`value("key", default)` 패턴)
+
+### FBX 임포터 (별도 실행 파일)
+
+`JAssetImporter`는 OpenFBX를 사용해 FBX → 메시 / 머터리얼 / 텍스처 / 씬 JSON으로 변환하는 별도 실행 파일입니다. 런타임에 FBX 의존을 두지 않기 위해 빌드와 임포트를 분리했습니다.
+
+```
+JAssetImporter <source.fbx> <projectDir>
+```
 
 ---
 
-## 모듈 구조
+## 모듈 구성
 
 ```
 src/
 ├── engine/
 │   ├── core/        JEngine, JJobSystem, JPool, JHashFunction
-│   ├── scene/       JScene, *Pool, JSceneSerializer
-│   ├── render/      JRenderer, JRenderServer, JRenderDB,
-│   │                JRenderPass, JCommandQueue, JRenderContext
+│   ├── scene/       JScene, JTransformPool, JCameraPool, JLightPool,
+│   │                JRenderObjectComponentPool, JSceneSerializer
+│   ├── render/      JRenderer, JRenderServer, JRenderSnapshotBuilder,
+│   │                JCameraRenderQueueBuilder, JDrawItemCache,
+│   │                JRenderDB, JCommandQueue, JSwapChain,
+│   │                JRenderPass (SceneColor / GBuffer / Lighting / ForwardOverlay),
+│   │                JGBuffer, JRenderTarget, JGraphicResource
 │   ├── asset/       JMaterial, JMesh, JShader
 │   ├── platform/    JDevice
 │   └── dx12/        JDx12Helper, d3dx12 wrapper
 ├── client/
 │   ├── editor/      JSceneManager, JScenePanel, JSceneBuilder,
 │   │                JFBXLoader, JAssetManager
-│   └── OpenFBX/     vendored FBX 임포터
-benchmark/           OOP / AoS / SoA / WorldMatrix 데이터 레이아웃 비교
-docs/                설계 회고 문서
-third_party/         nlohmann/json
+│   └── OpenFBX/     vendored OpenFBX
+tools/
+└── JAssetImporter/  FBX → 프로젝트 JSON 변환기
+benchmark/           OOP / AoS / SoA / WorldMatrix 데이터 레이아웃 비교 (옵션)
+third_party/
+└── nlohmann/json
 ```
 
----
+빌드 타겟은 세 개입니다.
 
-## 핵심 설계 결정과 트레이드오프
-
-| 결정 | 채택한 것 | 의도적으로 버린 것 | 이유 |
-|---|---|---|---|
-| Scene ↔ Renderer 결합 | `JFrameDesc` immutable snapshot | Scene을 Renderer가 직접 읽기 | 멀티스레드 렌더·리플레이 확장성 |
-| Entity-Component 매핑 | Entity index = Component slot | hash map lookup | O(1) 접근, 캐시 친화 |
-| Transform 레이아웃 | SoA (`vector<JVec3>` × 3) | AoS struct | culling/sync hot path 가속 |
-| 드로우 큐 갱신 | 이벤트 기반 incremental | 매 프레임 rebuild | 변경 비율이 낮은 일반 케이스 최적화 |
-| Root signature | 셰이더 리플렉션 자동 생성 | 수동 정의 | 머터리얼 데이터 드리븐화 |
-| 잡 시스템 | std::thread + condition_variable | TBB 의존 | 벤더 lock-in 회피 (TBB는 측정용으로만 사용) |
+| 타겟              | 형태          | 비고                                       |
+|------------------|--------------|-------------------------------------------|
+| `Engine`         | static lib   | DX12 / DXGI / D3DCompiler / WindowsCodecs |
+| `Client`         | WIN32 exe    | 에디터/뷰어를 겸하는 호스트 응용              |
+| `JAssetImporter` | console exe  | FBX → 프로젝트 변환 도구                    |
+| `Benchmark`      | console exe  | `BUILD_BENCHMARK=ON` 옵션. oneTBB FetchContent |
 
 ---
 
-## 빌드 & 실행
+## 빌드
 
 ### 요구 사항
 
-- **OS**: Windows 10 이상
-- **Graphics API**: Direct3D 12 (`D3D_FEATURE_LEVEL_11_0` 이상)
-- **Toolchain**: Visual Studio + C++ desktop workload, Windows 10 SDK
-- **선택**: `Graphics Tools` (D3D12 debug layer)
+- Windows 10 이상
+- Direct3D 12 지원 GPU (`D3D_FEATURE_LEVEL_11_0`+)
+- Visual Studio 2019/2022 + C++ desktop workload, Windows 10 SDK
+- 선택: *Graphics Tools* (D3D12 debug layer)
 
-> D3D12 디바이스를 직접 생성하므로, D3D12를 지원하지 않는 PC에서는 실행되지 않습니다.
+### 빌드 절차
 
+```bat
+cmake -S . -B build
+cmake --build build --config Release
+```
 
+벤치마크까지 빌드하려면:
 
+```bat
+cmake -S . -B build -DBUILD_BENCHMARK=ON
+cmake --build build --config Release
+```
 
-<sub>© JYEngine — 단독 개발 / 학습·포트폴리오 목적 / DirectX 12 · C++17/20</sub>
+`Client`가 Visual Studio의 기본 시작 프로젝트로 설정되어 있습니다.
+
+---
+
+## 실행
+
+`Client` 실행 시 명령줄 옵션:
+
+```
+Client.exe                       # 기본 샘플 씬 (res/scene/sample.jscene.json)
+Client.exe --new                 # 빈 씬으로 시작
+Client.exe --scene <path>        # 특정 .jscene.json 파일
+Client.exe --project <path>      # 프로젝트 폴더 (scenes/ 하위를 탐색)
+Client.exe <projectPath>         # 위치 인자도 프로젝트 폴더로 해석
+```
+
+FBX를 프로젝트로 임포트:
+
+```
+JAssetImporter <source.fbx> <projectDir>
+```
+
+`<projectDir>` 아래에 `scenes/`, `meshes/`, `materials/`, `textures/`, `shader/` 디렉터리가 생성되고, 머터리얼·메시가 JSON으로 저장됩니다.
+
+---
+
+## 제3자 코드
+
+- [nlohmann/json](https://github.com/nlohmann/json) — `third_party/nlohmann/`
+- [OpenFBX](https://github.com/nem0/OpenFBX) — `src/client/OpenFBX/`
+- [oneTBB](https://github.com/oneapi-src/oneTBB) — 벤치마크 타겟 한정, CMake FetchContent로 가져옴
+
+각 라이브러리의 라이선스를 따릅니다.
