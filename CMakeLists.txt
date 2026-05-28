@@ -144,7 +144,7 @@ add_dependencies(JAssetImporter Engine)
 
 # 리소스 복사
 # 모든 빌드 구성이 동일한 출력 디렉토리를 사용하도록 설정
-set_target_properties(Client PROPERTIES 
+set_target_properties(Client PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
@@ -158,64 +158,70 @@ set_target_properties(JAssetImporter PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL}
 )
 
-set_target_properties(Engine PROPERTIES 
+set_target_properties(Engine PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_DEBUG          ${JY_ARCHIVE_OUTPUT_DIRECTORY_DEBUG}
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE        ${JY_ARCHIVE_OUTPUT_DIRECTORY_RELEASE}
     ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO}
     ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL}
 )
 
-# oneTBB (Benchmark 전용)
-include(FetchContent)
-FetchContent_Declare(
-    TBB
-    GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-    GIT_TAG        v2021.13.0
-    GIT_SHALLOW    TRUE
-)
-set(TBB_TEST     OFF CACHE BOOL "" FORCE)
-set(TBB_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(TBB_STRICT   OFF CACHE BOOL "" FORCE)
-set(TBB_BUILD    ON  CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(TBB)
+option(BUILD_BENCHMARK "Build the Benchmark target (downloads oneTBB via FetchContent)" OFF)
 
-# Benchmark (콘솔 실행 파일 — Engine 의존 없음)
-file(GLOB BENCHMARK_SOURCES "benchmark/*.cpp")
-file(GLOB BENCHMARK_HEADERS "benchmark/*.h")
+if(BUILD_BENCHMARK)
+    # oneTBB (Benchmark 전용)
+    include(FetchContent)
+    FetchContent_Declare(
+        TBB
+        GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
+        GIT_TAG        v2021.13.0
+        GIT_SHALLOW    TRUE
+    )
+    set(TBB_TEST     OFF CACHE BOOL "" FORCE)
+    set(TBB_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(TBB_STRICT   OFF CACHE BOOL "" FORCE)
+    set(TBB_BUILD    ON  CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(TBB)
 
-add_executable(Benchmark ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
+    # Benchmark (콘솔 실행 파일 — Engine 의존 없음)
+    file(GLOB BENCHMARK_SOURCES "benchmark/*.cpp")
+    file(GLOB BENCHMARK_HEADERS "benchmark/*.h")
 
-target_include_directories(Benchmark PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/benchmark
-)
+    add_executable(Benchmark ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
 
-target_compile_options(Benchmark PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
-)
+    target_include_directories(Benchmark PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/benchmark
+    )
 
-target_link_libraries(Benchmark PRIVATE TBB::tbb)
+    target_compile_options(Benchmark PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+    )
 
-set_target_properties(Benchmark PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
-    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
-    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL}
-)
+    target_link_libraries(Benchmark PRIVATE TBB::tbb)
+
+    set_target_properties(Benchmark PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL}
+    )
+endif()
 
 # Visual Studio 프로젝트 설정
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # 모든 프로젝트를 "Projects" 폴더에 배치
-set_property(TARGET Engine     PROPERTY FOLDER "Projects")
-set_property(TARGET Client    PROPERTY FOLDER "Projects")
-set_property(TARGET Benchmark PROPERTY FOLDER "Projects")
+set_property(TARGET Engine PROPERTY FOLDER "Projects")
+set_property(TARGET Client PROPERTY FOLDER "Projects")
 set_property(TARGET JAssetImporter PROPERTY FOLDER "Projects")
+if(BUILD_BENCHMARK)
+    set_property(TARGET Benchmark PROPERTY FOLDER "Projects")
+endif()
 
 # Client를 시작 프로젝트로 설정 (Visual Studio에서 작동)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Client)
 
 # CMake 관련 타겟들을 별도 폴더로 이동
-set(CMAKE_TARGETS 
+set(CMAKE_TARGETS
     ALL_BUILD
     INSTALL
     PACKAGE
@@ -232,5 +238,7 @@ endforeach()
 # IDE에서 소스 그룹 구조 설정
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src FILES ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS})
 source_group("tools" FILES tools/JAssetImporter/main.cpp)
-source_group("benchmark" FILES ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
 source_group("Resource Files" FILES ${CLIENT_RESOURCES})
+if(BUILD_BENCHMARK)
+    source_group("benchmark" FILES ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
+endif()

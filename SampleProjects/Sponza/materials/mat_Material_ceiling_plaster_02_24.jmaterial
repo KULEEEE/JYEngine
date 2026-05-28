@@ -1,0 +1,34 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 0.0,
+    "roughness": 0.5
+  },
+  "enableAlphaBlend": false,
+  "name": "Material::ceiling_plaster_02",
+  "shaderPath": "shader/gbuffer_albedo.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/ceiling_plaster_02_BaseColor.png"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/ceiling_plaster_02_Normal.png"
+    },
+    {
+      "name": "RoughnessTexture",
+      "path": "textures/ceiling_plaster_02_Roughness.png"
+    },
+    {
+      "name": "MetallicTexture",
+      "path": "textures/ceiling_plaster_02_Metalness.png"
+    }
+  ]
+}

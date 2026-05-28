@@ -1,0 +1,34 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 0.0,
+    "roughness": 0.5
+  },
+  "enableAlphaBlend": false,
+  "name": "Material::column_head_2ndfloor_03",
+  "shaderPath": "shader/gbuffer_albedo.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/col_head_2ndfloor_03_BaseColor.png"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/col_head_2ndfloor_03_Normal.png"
+    },
+    {
+      "name": "RoughnessTexture",
+      "path": "textures/col_head_2ndfloor_03_Roughness.png"
+    },
+    {
+      "name": "MetallicTexture",
+      "path": "textures/col_head_2ndfloor_03_Metalness.png"
+    }
+  ]
+}

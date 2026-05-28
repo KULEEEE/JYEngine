@@ -1,0 +1,17 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 0.0,
+    "roughness": 0.5
+  },
+  "enableAlphaBlend": false,
+  "name": "Material::glass",
+  "shaderPath": "shader/gbuffer_albedo.hlsl",
+  "textures": []
+}

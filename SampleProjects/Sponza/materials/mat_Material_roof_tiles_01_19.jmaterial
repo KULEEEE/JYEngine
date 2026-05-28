@@ -1,0 +1,34 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 0.0,
+    "roughness": 0.5
+  },
+  "enableAlphaBlend": false,
+  "name": "Material::roof_tiles_01",
+  "shaderPath": "shader/gbuffer_albedo.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/roof_tiles_01_BaseColor.png"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/roof_tiles_01_Normal.png"
+    },
+    {
+      "name": "RoughnessTexture",
+      "path": "textures/roof_tiles_01_Roughness.png"
+    },
+    {
+      "name": "MetallicTexture",
+      "path": "textures/roof_tiles_01_Metalness.png"
+    }
+  ]
+}
