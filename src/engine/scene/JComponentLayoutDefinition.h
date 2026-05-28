@@ -37,6 +37,7 @@ struct JRenderObjectComponent
 	JEntityHandle entity = {};
 	const JMesh* mesh = nullptr;
 	JMaterialHandle material = {};
+	std::vector<JMaterialHandle> subMeshMaterials;
 	bool visible = true;
 	bool transparent = false;
 	bool active = true;

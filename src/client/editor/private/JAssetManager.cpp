@@ -30,6 +30,7 @@ void JAssetManager::Clear()
 {
 	_materialCache.clear();
 	_meshCache.clear();
+	_importedMaterialCache.clear();
 	_knownTextureKeys.clear();
 }
 
@@ -154,6 +155,13 @@ bool JAssetManager::HasMaterialBundle(const Engine::JSceneMaterialData& material
 	return !cachedIter->second.expired();
 }
 
+const std::vector<std::shared_ptr<JAssetManager::MaterialBundle>>* JAssetManager::GetImportedMaterialBundles(const Engine::JSceneMeshData& meshData) const
+{
+	const size_t key = std::hash<std::string>{}(makeMeshKey(meshData));
+	const auto iter = _importedMaterialCache.find(key);
+	return iter != _importedMaterialCache.end() ? &iter->second : nullptr;
+}
+
 std::shared_ptr<Engine::JMesh> JAssetManager::AcquireMesh(const Engine::JSceneMeshData& meshData)
 {
 	const size_t key = std::hash<std::string>{}(makeMeshKey(meshData));
@@ -190,7 +198,92 @@ std::shared_ptr<Engine::JMesh> JAssetManager::AcquireMesh(const Engine::JSceneMe
 	{
 		const std::string meshPath = resolveResourcePath(meshData.path);
 		JFBXLoader fbxLoader;
-		mesh = adoptMesh(fbxLoader.LoadFBX(meshPath.c_str()));
+		std::vector<JFBXLoader::ImportedMaterial> importedMaterials;
+		mesh = adoptMesh(fbxLoader.LoadFBX(meshPath.c_str(), &importedMaterials));
+		if (_materialFactory != nullptr && !importedMaterials.empty())
+		{
+			std::vector<std::shared_ptr<MaterialBundle>> materialBundles;
+			materialBundles.reserve(importedMaterials.size());
+			const std::filesystem::path meshDirectory = std::filesystem::path(meshPath).parent_path();
+			for (uint32 materialIndex = 0; materialIndex < importedMaterials.size(); ++materialIndex)
+			{
+				const JFBXLoader::ImportedMaterial& imported = importedMaterials[materialIndex];
+
+				Engine::JSceneMaterialData materialData;
+				materialData.id = meshData.id + "_fbx_mat_" + std::to_string(materialIndex);
+				materialData.name = !imported.name.empty() ? imported.name : materialData.id;
+				materialData.shaderPath = "shader/base.hlsl";
+				materialData.enableAlphaBlend = false;
+				materialData.constants.enabled = true;
+				materialData.constants.baseColor = imported.baseColor;
+				materialData.constants.roughness = 0.5f;
+				materialData.constants.metallic = 0.0f;
+
+				auto resolveImportedTexturePath = [&meshDirectory](const std::string& texturePath) -> std::string
+				{
+					if (texturePath.empty())
+					{
+						return {};
+					}
+
+					const std::filesystem::path sourcePath(texturePath);
+					if (sourcePath.is_absolute())
+					{
+						return sourcePath.string();
+					}
+
+					const std::filesystem::path meshRelativePath = meshDirectory / sourcePath;
+					if (std::filesystem::exists(meshRelativePath))
+					{
+						return meshRelativePath.string();
+					}
+
+					const std::filesystem::path fileName = sourcePath.filename();
+					const std::filesystem::path engineTexturePath = std::filesystem::path(get_Engine_Res_Path()) / "texture" / fileName;
+					if (std::filesystem::exists(engineTexturePath))
+					{
+						return engineTexturePath.string();
+					}
+
+					const std::filesystem::path engineTexturesPath = std::filesystem::path(get_Engine_Res_Path()) / "textures" / fileName;
+					if (std::filesystem::exists(engineTexturesPath))
+					{
+						return engineTexturesPath.string();
+					}
+
+					return (std::filesystem::path(get_Engine_Res_Path()) / sourcePath).string();
+				};
+
+				const std::string diffuseTexturePath = resolveImportedTexturePath(imported.diffuseTexturePath);
+				if (!diffuseTexturePath.empty())
+				{
+					materialData.textures.push_back({ "BaseTexture", diffuseTexturePath });
+				}
+
+				const std::string normalTexturePath = resolveImportedTexturePath(imported.normalTexturePath);
+				if (!normalTexturePath.empty())
+				{
+					materialData.textures.push_back({ "NormalTexture", normalTexturePath });
+				}
+
+				const std::string specularTexturePath = resolveImportedTexturePath(imported.specularTexturePath);
+				if (!specularTexturePath.empty())
+				{
+					materialData.textures.push_back({ "SpecularTexture", specularTexturePath });
+				}
+
+				std::shared_ptr<MaterialBundle> materialBundle = AcquireMaterialBundle(materialData);
+				if (materialBundle && materialBundle->material)
+				{
+					materialBundles.push_back(materialBundle);
+				}
+			}
+
+			if (!materialBundles.empty())
+			{
+				_importedMaterialCache[key] = std::move(materialBundles);
+			}
+		}
 	}
 
 	if (!mesh)

@@ -94,6 +94,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 	}
 
 	std::unordered_map<std::string, Engine::JMesh*> meshLookup;
+	std::unordered_map<std::string, std::vector<Engine::JMaterialHandle>> importedSubMeshMaterialsByMeshID;
 	for (const Engine::JSceneMeshData& meshData : sceneData.meshes)
 	{
 		if (meshData.id.empty())
@@ -127,6 +128,39 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 
 		meshLookup[meshData.id] = mesh.get();
 		result.meshes.emplace_back(mesh);
+
+		const std::vector<std::shared_ptr<JAssetManager::MaterialBundle>>* importedMaterialBundles =
+			context.assetManager->GetImportedMaterialBundles(meshData);
+		if (importedMaterialBundles != nullptr && !importedMaterialBundles->empty())
+		{
+			std::vector<Engine::JMaterialHandle> importedMaterialHandles;
+			importedMaterialHandles.reserve(importedMaterialBundles->size());
+			for (const std::shared_ptr<JAssetManager::MaterialBundle>& materialBundle : *importedMaterialBundles)
+			{
+				if (!materialBundle || !materialBundle->material)
+				{
+					importedMaterialHandles.push_back({});
+					continue;
+				}
+
+				const Engine::JMaterialHandle materialHandle = result.scene->AddMaterial(materialBundle->material);
+				if (!materialHandle.IsValid())
+				{
+					std::cerr << "JSceneBuilder::Build failed: imported material registration failed: " << meshData.id << std::endl;
+					result.Release();
+					return false;
+				}
+
+				importedMaterialHandles.push_back(materialHandle);
+				result.materialBundles.emplace_back(materialBundle);
+				result.materials.emplace_back(materialBundle->material);
+			}
+
+			if (!importedMaterialHandles.empty())
+			{
+				importedSubMeshMaterialsByMeshID[meshData.id] = std::move(importedMaterialHandles);
+			}
+		}
 	}
 
 	for (const Engine::JSceneEntityData& entityData : sceneData.entities)
@@ -239,17 +273,60 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			}
 
 			const auto meshIter = meshLookup.find(entityData.renderObjectComponent.meshID);
-			const auto materialIter = result.materialsByID.find(entityData.renderObjectComponent.materialID);
-			if (meshIter == meshLookup.end() || materialIter == result.materialsByID.end())
+			if (meshIter == meshLookup.end())
 			{
 				std::cerr << "JSceneBuilder::Build failed: render object component asset reference is invalid: " << entityData.stableID << std::endl;
 				result.Release();
 				return false;
 			}
 
+			std::vector<Engine::JMaterialHandle> subMeshMaterials;
+			if (!entityData.renderObjectComponent.subMeshMaterialIDs.empty())
+			{
+				subMeshMaterials.reserve(entityData.renderObjectComponent.subMeshMaterialIDs.size());
+				for (const std::string& materialID : entityData.renderObjectComponent.subMeshMaterialIDs)
+				{
+					const auto subMeshMaterialIter = result.materialsByID.find(materialID);
+					if (subMeshMaterialIter == result.materialsByID.end())
+					{
+						std::cerr << "JSceneBuilder::Build failed: submesh material reference is invalid: " << entityData.stableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					subMeshMaterials.push_back(subMeshMaterialIter->second);
+				}
+			}
+			else
+			{
+				const auto importedIter = importedSubMeshMaterialsByMeshID.find(entityData.renderObjectComponent.meshID);
+				if (importedIter != importedSubMeshMaterialsByMeshID.end())
+				{
+					subMeshMaterials = importedIter->second;
+				}
+			}
+
+			Engine::JMaterialHandle fallbackMaterial = {};
+			const auto materialIter = result.materialsByID.find(entityData.renderObjectComponent.materialID);
+			if (materialIter != result.materialsByID.end())
+			{
+				fallbackMaterial = materialIter->second;
+			}
+			else if (!subMeshMaterials.empty() && subMeshMaterials.front().IsValid())
+			{
+				fallbackMaterial = subMeshMaterials.front();
+			}
+			else
+			{
+				std::cerr << "JSceneBuilder::Build failed: render object component material reference is invalid: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
 			Engine::JRenderObjectComponentHandle renderObject = result.scene->AddRenderObjectComponent(
 				entity,
-				materialIter->second,
+				fallbackMaterial,
+				subMeshMaterials,
 				meshIter->second,
 				entityData.renderObjectComponent.transparent);
 

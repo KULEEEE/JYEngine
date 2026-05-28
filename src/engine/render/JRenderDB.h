@@ -58,6 +58,12 @@ public:
 		JMeshResource resource;
 	};
 
+	struct TextureResourceRecord
+	{
+		Render::JTexture* texture = nullptr;
+		uint32 refCount = 0;
+	};
+
 	JRenderDB() = default;
 	~JRenderDB();
 
@@ -121,6 +127,7 @@ private:
 	JLightResource _lightResource;
 	std::vector<MeshResourceRecord> _meshResources;
 	std::unordered_map<const JMesh*, uint32> _meshIndexMap;
+	std::unordered_map<std::string, TextureResourceRecord> _textureCache;
 };
 
 J_ENGINE_END

@@ -337,15 +337,29 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 
 JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const JMesh* mesh, bool transparent)
 {
+	return AddRenderObjectComponent(entity, material, {}, mesh, transparent);
+}
+
+JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const std::vector<JMaterialHandle>& subMeshMaterials, const JMesh* mesh, bool transparent)
+{
 	if (!_entities.IsValid(entity) || !GetTransformHandle(entity).IsValid() || GetMaterial(material) == nullptr)
 	{
 		return {};
+	}
+
+	for (JMaterialHandle subMeshMaterial : subMeshMaterials)
+	{
+		if (subMeshMaterial.IsValid() && GetMaterial(subMeshMaterial) == nullptr)
+		{
+			return {};
+		}
 	}
 
 	RenderObjectComponentData data;
 	data.entity = entity;
 	data.mesh = mesh;
 	data.material = material;
+	data.subMeshMaterials = subMeshMaterials;
 	data.transparent = transparent;
 	const JRenderObjectComponentHandle renderObject = _renderObjectComponents.Add(entity, data);
 	if (!renderObject.IsValid())

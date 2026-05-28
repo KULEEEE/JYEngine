@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 using namespace std;
@@ -12,6 +13,57 @@ JFBXLoader::JFBXLoader() {}
 JFBXLoader::~JFBXLoader() {}
 
 J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename)
+{
+	return LoadFBX(filename, nullptr);
+}
+
+namespace
+{
+	std::string toString(const ofbx::DataView& value)
+	{
+		if (value.begin == nullptr || value.end == nullptr || value.end <= value.begin)
+		{
+			return {};
+		}
+
+		return std::string(reinterpret_cast<const char*>(value.begin), reinterpret_cast<const char*>(value.end));
+	}
+
+	std::string texturePath(const ofbx::Texture* texture)
+	{
+		if (texture == nullptr)
+		{
+			return {};
+		}
+
+		std::string path = toString(texture->getRelativeFileName());
+		if (path.empty())
+		{
+			path = toString(texture->getFileName());
+		}
+		return path;
+	}
+
+	JFBXLoader::ImportedMaterial importMaterial(const ofbx::Material& material)
+	{
+		JFBXLoader::ImportedMaterial imported;
+		imported.name = material.name;
+		const ofbx::Color diffuse = material.getDiffuseColor();
+		const float diffuseFactor = static_cast<float>(material.getDiffuseFactor());
+		imported.baseColor = {
+			diffuse.r * diffuseFactor,
+			diffuse.g * diffuseFactor,
+			diffuse.b * diffuseFactor,
+			1.0f
+		};
+		imported.diffuseTexturePath = texturePath(material.getTexture(ofbx::Texture::DIFFUSE));
+		imported.normalTexturePath = texturePath(material.getTexture(ofbx::Texture::NORMAL));
+		imported.specularTexturePath = texturePath(material.getTexture(ofbx::Texture::SPECULAR));
+		return imported;
+	}
+}
+
+J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename, std::vector<ImportedMaterial>* outMaterials)
 {
 	printf("LoadFBX: %s\n", filename);
 	FILE* fp = nullptr;
@@ -34,12 +86,10 @@ J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename)
 		ofbx::LoadFlags::IGNORE_BLEND_SHAPES |
 		ofbx::LoadFlags::IGNORE_CAMERAS |
 		ofbx::LoadFlags::IGNORE_LIGHTS |
-		ofbx::LoadFlags::IGNORE_TEXTURES |
 		ofbx::LoadFlags::IGNORE_SKIN |
 		ofbx::LoadFlags::IGNORE_BONES |
 		ofbx::LoadFlags::IGNORE_PIVOTS |
 		ofbx::LoadFlags::IGNORE_ANIMATIONS |
-		ofbx::LoadFlags::IGNORE_MATERIALS |
 		ofbx::LoadFlags::IGNORE_POSES |
 		ofbx::LoadFlags::IGNORE_VIDEOS |
 		ofbx::LoadFlags::IGNORE_LIMBS;
@@ -52,13 +102,29 @@ J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename)
 	}
 
 	ParsingData parsingData;
+	if (outMaterials != nullptr)
+	{
+		outMaterials->clear();
+	}
 
 	const int meshCount = scene->getMeshCount();
 	for (int m = 0; m < meshCount; ++m)
 	{
 		const ofbx::Mesh* mesh = scene->getMesh(m);
 		if (!mesh) continue;
-		extractMesh(*mesh, parsingData);
+
+		const uint32_t materialBaseIndex = outMaterials != nullptr ? static_cast<uint32_t>(outMaterials->size()) : 0;
+		if (outMaterials != nullptr)
+		{
+			const int materialCount = mesh->getMaterialCount();
+			for (int materialIndex = 0; materialIndex < materialCount; ++materialIndex)
+			{
+				const ofbx::Material* material = mesh->getMaterial(materialIndex);
+				outMaterials->push_back(material != nullptr ? importMaterial(*material) : ImportedMaterial{});
+			}
+		}
+
+		extractMesh(*mesh, materialBaseIndex, parsingData);
 	}
 
 	J::Engine::JMesh* outMesh = new J::Engine::JMesh;
@@ -69,7 +135,7 @@ J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename)
 	return outMesh;
 }
 
-void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData)
+void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData)
 {
 	const ofbx::GeometryData& geom = mesh.getGeometryData();
 
@@ -92,7 +158,7 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData)
 		const ofbx::GeometryPartition partition = geom.getPartition(p);
 
 		J::Engine::JMesh::SubMeshInfo subMesh;
-		subMesh.materialIndex = static_cast<uint32_t>(p);
+		subMesh.materialIndex = materialBaseIndex + static_cast<uint32_t>(p);
 		subMesh.startIndex = static_cast<uint32_t>(parsingData.indices.size());
 
 		vector<int> triIndices(partition.max_polygon_triangles * 3);

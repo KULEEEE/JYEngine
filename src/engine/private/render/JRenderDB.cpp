@@ -66,7 +66,61 @@ namespace
 		resource.hasTexcoords = false;
 	}
 
-	void destroyMaterialResource(Render::JRenderContext* renderContext, JMaterialResource& resource)
+	void destroyTexture(Render::JRenderContext* renderContext, Render::JTexture*& texture)
+	{
+		if (texture == nullptr)
+		{
+			return;
+		}
+
+		if (renderContext != nullptr)
+		{
+			renderContext->DestroyTexture(texture);
+		}
+		else
+		{
+			texture->Destroy();
+			delete texture;
+		}
+		texture = nullptr;
+	}
+
+	void releaseTextureEntry(
+		Render::JRenderContext* renderContext,
+		std::unordered_map<std::string, JRenderDB::TextureResourceRecord>& textureCache,
+		JMaterialResource::TextureEntry& entry)
+	{
+		if (entry.texture == nullptr)
+		{
+			return;
+		}
+
+		if (!entry.path.empty())
+		{
+			const auto iter = textureCache.find(entry.path);
+			if (iter != textureCache.end() && iter->second.texture == entry.texture)
+			{
+				if (iter->second.refCount > 0)
+				{
+					--iter->second.refCount;
+				}
+				if (iter->second.refCount == 0)
+				{
+					destroyTexture(renderContext, iter->second.texture);
+					textureCache.erase(iter);
+				}
+				entry.texture = nullptr;
+				return;
+			}
+		}
+
+		destroyTexture(renderContext, entry.texture);
+	}
+
+	void destroyMaterialResource(
+		Render::JRenderContext* renderContext,
+		std::unordered_map<std::string, JRenderDB::TextureResourceRecord>& textureCache,
+		JMaterialResource& resource)
 	{
 		for (JMaterialResource::ConstantBufferEntry& entry : resource.constantBuffers)
 		{
@@ -75,21 +129,7 @@ namespace
 
 		for (JMaterialResource::TextureEntry& entry : resource.textures)
 		{
-			if (entry.texture == nullptr)
-			{
-				continue;
-			}
-
-			if (renderContext != nullptr)
-			{
-				renderContext->DestroyTexture(entry.texture);
-			}
-			else
-			{
-				entry.texture->Destroy();
-				delete entry.texture;
-			}
-			entry.texture = nullptr;
+			releaseTextureEntry(renderContext, textureCache, entry);
 		}
 
 		if (resource.pipeline != nullptr)
@@ -330,7 +370,7 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 	}
 
 	JMaterialResource& resource = getOrCreateMaterialResource(handle);
-	destroyMaterialResource(_renderContext, resource);
+	destroyMaterialResource(_renderContext, _textureCache, resource);
 	resource.material = handle;
 	resource.shader = _renderContext->CreateShader(material.GetShaderPath());
 	if (resource.shader == nullptr)
@@ -338,10 +378,10 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 		return;
 	}
 
-	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled());
+	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled(), true, true, true);
 	if (resource.pipeline == nullptr)
 	{
-		destroyMaterialResource(_renderContext, resource);
+		destroyMaterialResource(_renderContext, _textureCache, resource);
 		return;
 	}
 
@@ -368,10 +408,38 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 			continue;
 		}
 
-		Render::JTexture* texture = _renderContext->CreateTextureFromFile(param.path);
+		bool isShaderTexture = false;
+		for (const Render::JShader::BindingInfo::Resource& textureBinding : resource.shader->bindingInfo.textures)
+		{
+			if (textureBinding.nameHash == param.nameHash)
+			{
+				isShaderTexture = true;
+				break;
+			}
+		}
+		if (!isShaderTexture)
+		{
+			continue;
+		}
+
+		Render::JTexture* texture = nullptr;
+		auto textureIter = _textureCache.find(param.path);
+		if (textureIter != _textureCache.end() && textureIter->second.texture != nullptr)
+		{
+			texture = textureIter->second.texture;
+			++textureIter->second.refCount;
+		}
+		else
+		{
+			texture = _renderContext->CreateTextureFromFile(param.path);
+			if (texture != nullptr)
+			{
+				_textureCache[param.path] = { texture, 1 };
+			}
+		}
 		if (texture != nullptr)
 		{
-			resource.textures.push_back({ param.name, param.nameHash, texture });
+			resource.textures.push_back({ param.name, param.nameHash, texture, param.path });
 		}
 	}
 }
@@ -496,7 +564,7 @@ void JRenderDB::RemoveMaterialResource(JMaterialHandle material)
 		return;
 	}
 
-	destroyMaterialResource(_renderContext, _materialResources[index].resource);
+	destroyMaterialResource(_renderContext, _textureCache, _materialResources[index].resource);
 
 	const uint32 lastIndex = static_cast<uint32>(_materialResources.size() - 1);
 	if (index != lastIndex)
@@ -619,13 +687,20 @@ void JRenderDB::Clear()
 
 	for (MaterialResourceRecord& record : _materialResources)
 	{
-		destroyMaterialResource(_renderContext, record.resource);
+		destroyMaterialResource(_renderContext, _textureCache, record.resource);
+	}
+
+	for (auto& [path, record] : _textureCache)
+	{
+		(void)path;
+		destroyTexture(_renderContext, record.texture);
 	}
 
 	_meshResources.clear();
 	_meshIndexMap.clear();
 	_materialResources.clear();
 	_materialIndexMap.clear();
+	_textureCache.clear();
 	_cameraResources.clear();
 	_cameraIndexMap.clear();
 	_transformResources.clear();

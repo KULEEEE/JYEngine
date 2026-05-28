@@ -8,6 +8,23 @@
 
 J_ENGINE_BEGIN
 
+namespace
+{
+	JMaterialHandle resolveDrawMaterial(const JScene::RenderObjectComponentData& data, const JMesh::SubMeshInfo& subMesh)
+	{
+		if (subMesh.materialIndex < data.subMeshMaterials.size())
+		{
+			const JMaterialHandle material = data.subMeshMaterials[subMesh.materialIndex];
+			if (material.IsValid())
+			{
+				return material;
+			}
+		}
+
+		return data.material;
+	}
+}
+
 JRenderServer::~JRenderServer()
 {
 }
@@ -180,7 +197,7 @@ void JRenderServer::appendDrawItems(const JScene& scene, JRenderObjectComponentH
 			drawItem.entity = data->entity;
 			drawItem.renderObject = renderObject;
 			drawItem.transform = transform;
-			drawItem.material = data->material;
+			drawItem.material = resolveDrawMaterial(*data, subMesh);
 			drawItem.mesh = data->mesh;
 			drawItem.subMeshIndex = subMeshIndex;
 			drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;
@@ -279,7 +296,7 @@ void JRenderServer::patchDrawItems(const JScene& scene, JRenderObjectComponentHa
 		drawItem.entity = data->entity;
 		drawItem.renderObject = renderObject;
 		drawItem.transform = transform;
-		drawItem.material = data->material;
+		drawItem.material = resolveDrawMaterial(*data, subMesh);
 		drawItem.mesh = data->mesh;
 		drawItem.subMeshIndex = subMeshIndex;
 		drawItem.indexCount = subMesh.endIndex - subMesh.startIndex;

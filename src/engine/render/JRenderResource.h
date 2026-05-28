@@ -46,6 +46,7 @@ struct JMaterialResource
 		std::string name;
 		uint32 nameHash = 0;
 		Render::JTexture* texture = nullptr;
+		std::string path;
 	};
 
 	JMaterialHandle material = {};

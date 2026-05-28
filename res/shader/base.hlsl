@@ -27,11 +27,13 @@ SamplerState LinearSampler : register(s0);
 
 struct VS_INPUT {
     float4 Pos : POSITION;
+    float2 TexCoord : TEXCOORD0;
 };
 
 struct PS_INPUT {
     float4 Pos : SV_POSITION;
     float3 WorldPos : TEXCOORD0;
+    float2 TexCoord : TEXCOORD1;
 };
 
 PS_INPUT vMain(VS_INPUT input)
@@ -40,12 +42,13 @@ PS_INPUT vMain(VS_INPUT input)
     float4 worldPos = mul(input.Pos, World);
     output.Pos = mul(worldPos, ViewProjection);
     output.WorldPos = worldPos.xyz;
+    output.TexCoord = input.TexCoord;
     return output;
 }
 
 float4 pMain(PS_INPUT input) : SV_TARGET
 {
-    float4 texColor = BaseTexture.Sample(LinearSampler, float2(0.5f, 0.5f));
+    float4 texColor = BaseTexture.Sample(LinearSampler, input.TexCoord);
     float3 baseColor = texColor.rgb * BaseColor.rgb;
     float3 litColor = baseColor * 0.15f;
 

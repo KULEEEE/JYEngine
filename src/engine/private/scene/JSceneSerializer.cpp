@@ -236,6 +236,13 @@ namespace
 			data.renderObjectComponent.visible = renderObjectComponent->value("visible", data.renderObjectComponent.visible);
 			data.renderObjectComponent.transparent = renderObjectComponent->value("transparent", data.renderObjectComponent.transparent);
 			data.renderObjectComponent.materialID = renderObjectComponent->value("materialID", data.renderObjectComponent.materialID);
+			if (renderObjectComponent->contains("subMeshMaterialIDs") && renderObjectComponent->at("subMeshMaterialIDs").is_array())
+			{
+				for (const json& materialID : renderObjectComponent->at("subMeshMaterialIDs"))
+				{
+					data.renderObjectComponent.subMeshMaterialIDs.push_back(materialID.get<std::string>());
+				}
+			}
 			data.renderObjectComponent.meshID = renderObjectComponent->value("meshID", data.renderObjectComponent.meshID);
 		}
 
@@ -297,6 +304,10 @@ namespace
 				{ "materialID", data.renderObjectComponent.materialID },
 				{ "meshID", data.renderObjectComponent.meshID },
 			};
+			if (!data.renderObjectComponent.subMeshMaterialIDs.empty())
+			{
+				value["renderObjectComponent"]["subMeshMaterialIDs"] = data.renderObjectComponent.subMeshMaterialIDs;
+			}
 		}
 
 		return value;

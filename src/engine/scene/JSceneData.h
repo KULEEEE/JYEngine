@@ -79,6 +79,7 @@ struct JSceneRenderObjectComponentData
 	bool visible = true;
 	bool transparent = false;
 	std::string materialID;
+	std::vector<std::string> subMeshMaterialIDs;
 	std::string meshID;
 };
 

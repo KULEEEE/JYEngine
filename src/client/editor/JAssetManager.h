@@ -25,6 +25,7 @@ public:
 
 	std::shared_ptr<MaterialBundle> AcquireMaterialBundle(const Engine::JSceneMaterialData& materialData);
 	std::shared_ptr<Engine::JMesh> AcquireMesh(const Engine::JSceneMeshData& meshData);
+	const std::vector<std::shared_ptr<MaterialBundle>>* GetImportedMaterialBundles(const Engine::JSceneMeshData& meshData) const;
 	bool HasMaterialBundle(const Engine::JSceneMaterialData& materialData) const;
 	bool HasMesh(const Engine::JSceneMeshData& meshData) const;
 	bool HasTexture(const std::string& path) const;
@@ -40,6 +41,7 @@ private:
 	Engine::JMaterialFactory* _materialFactory = nullptr;
 	std::unordered_map<size_t, std::weak_ptr<MaterialBundle>> _materialCache;
 	std::unordered_map<size_t, std::weak_ptr<Engine::JMesh>> _meshCache;
+	std::unordered_map<size_t, std::vector<std::shared_ptr<MaterialBundle>>> _importedMaterialCache;
 	std::unordered_set<size_t> _knownTextureKeys;
 };
 

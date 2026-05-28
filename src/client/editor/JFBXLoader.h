@@ -37,11 +37,21 @@ public:
 	};
 
 
+	struct ImportedMaterial
+	{
+		std::string name;
+		JVec4 baseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+		std::string diffuseTexturePath;
+		std::string normalTexturePath;
+		std::string specularTexturePath;
+	};
+
 	J::Engine::JMesh* LoadFBX(const char* filename);
+	J::Engine::JMesh* LoadFBX(const char* filename, std::vector<ImportedMaterial>* outMaterials);
 
 private:
 
-	void extractMesh(const ofbx::Mesh& mesh, ParsingData& parsingData);
+	void extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData);
 	void setMesh(J::Engine::JMesh* mesh, ParsingData& parsingData);
 };
 
