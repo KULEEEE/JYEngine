@@ -22,6 +22,11 @@ public:
 	template<typename T>
 	JVertexBuffer* CreateVertexBuffer(const std::vector<T>& data, size_t vertexCount)
 	{
+		if (data.empty() || vertexCount == 0)
+		{
+			return nullptr;
+		}
+
 		size_t size = sizeof(T) * data.size();
 
 		ComPtr<ID3D12Device> device = _device->GetDevice();
@@ -33,16 +38,27 @@ public:
 		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
 		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
 
-		device->CreateCommittedResource(
+		HRESULT hr = device->CreateCommittedResource(
 			&heapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&bufferDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&buffer));
+		if (FAILED(hr) || buffer == nullptr)
+		{
+			delete vBuffer;
+			return nullptr;
+		}
 
-		void* pData;
-		(buffer)->Map(0, nullptr, &pData);
+		void* pData = nullptr;
+		hr = buffer->Map(0, nullptr, &pData);
+		if (FAILED(hr) || pData == nullptr)
+		{
+			vBuffer->Destroy();
+			delete vBuffer;
+			return nullptr;
+		}
 		memcpy(pData, data.data(), size);
 		(buffer)->Unmap(0, nullptr);
 
@@ -55,6 +71,11 @@ public:
 
 	JIndexBuffer* CreateIndexBuffer(const std::vector<uint32>& data)
 	{
+		if (data.empty())
+		{
+			return nullptr;
+		}
+
 		size_t size = sizeof(uint32) * data.size();
 		ComPtr<ID3D12Device> device = _device->GetDevice();
 
@@ -65,16 +86,27 @@ public:
 		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
 		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
 
-		device->CreateCommittedResource(
+		HRESULT hr = device->CreateCommittedResource(
 			&heapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&bufferDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&buffer));
+		if (FAILED(hr) || buffer == nullptr)
+		{
+			delete iBuffer;
+			return nullptr;
+		}
 
-		void* pData;
-		(buffer)->Map(0, nullptr, &pData);
+		void* pData = nullptr;
+		hr = buffer->Map(0, nullptr, &pData);
+		if (FAILED(hr) || pData == nullptr)
+		{
+			iBuffer->Destroy();
+			delete iBuffer;
+			return nullptr;
+		}
 		memcpy(pData, data.data(), size);
 		(buffer)->Unmap(0, nullptr);
 

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -273,6 +274,12 @@ int main(int argc, char** argv)
 	{
 		std::cerr << "Failed to import FBX: " << fbxPath.string() << "\n";
 		return 2;
+	}
+	std::vector<std::unique_ptr<J::Engine::JMesh>> importedMeshOwners;
+	importedMeshOwners.reserve(importedScene.nodes.size());
+	for (JFBXLoader::ImportedNode& node : importedScene.nodes)
+	{
+		importedMeshOwners.emplace_back(node.mesh);
 	}
 
 	const std::string projectName = sanitizeName(fbxPath.stem().string());

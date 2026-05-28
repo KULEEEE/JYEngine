@@ -157,47 +157,108 @@ std::shared_ptr<Engine::JMesh> JAssetManager::loadMeshAsset(const std::string& p
 		return {};
 	}
 
-	auto readFloatVector = [&stream]()
+	const uint64 fileSize = static_cast<uint64>(std::filesystem::file_size(path));
+	auto remainingBytes = [&stream, fileSize]() -> uint64
+	{
+		const std::streampos current = stream.tellg();
+		if (current < 0)
+		{
+			return 0;
+		}
+		const uint64 offset = static_cast<uint64>(current);
+		return offset <= fileSize ? fileSize - offset : 0;
+	};
+
+	bool valid = true;
+	auto readFloatVectorChecked = [&stream, &remainingBytes, &valid]()
 	{
 		uint64 count = 0;
 		stream.read(reinterpret_cast<char*>(&count), sizeof(count));
+		if (!stream || count > remainingBytes() / sizeof(float))
+		{
+			valid = false;
+			return std::vector<float>{};
+		}
+
 		std::vector<float> values(static_cast<size_t>(count));
 		if (count > 0)
 		{
 			stream.read(reinterpret_cast<char*>(values.data()), sizeof(float) * values.size());
+			valid = valid && static_cast<bool>(stream);
 		}
 		return values;
 	};
-	auto readUIntVector = [&stream]()
+	auto readUIntVectorChecked = [&stream, &remainingBytes, &valid]()
 	{
 		uint64 count = 0;
 		stream.read(reinterpret_cast<char*>(&count), sizeof(count));
+		if (!stream || count > remainingBytes() / sizeof(uint32))
+		{
+			valid = false;
+			return std::vector<uint32>{};
+		}
+
 		std::vector<uint32> values(static_cast<size_t>(count));
 		if (count > 0)
 		{
 			stream.read(reinterpret_cast<char*>(values.data()), sizeof(uint32) * values.size());
+			valid = valid && static_cast<bool>(stream);
 		}
 		return values;
 	};
 
 	auto mesh = std::make_shared<Engine::JMesh>();
-	mesh->SetPositions(readFloatVector());
-	mesh->SetNormals(readFloatVector());
-	mesh->SetTexcoords(readFloatVector(), 0);
-	mesh->SetColors(readFloatVector());
-	mesh->SetTangents(readFloatVector());
-	mesh->SetBitangents(readFloatVector());
-	mesh->SetIndices(readUIntVector());
+	std::vector<float> positions = readFloatVectorChecked();
+	std::vector<float> normals = readFloatVectorChecked();
+	std::vector<float> texcoords = readFloatVectorChecked();
+	std::vector<float> colors = readFloatVectorChecked();
+	std::vector<float> tangents = readFloatVectorChecked();
+	std::vector<float> bitangents = readFloatVectorChecked();
+	std::vector<uint32> indices = readUIntVectorChecked();
+	const size_t vertexCount = positions.size() / 4;
+	if (!valid
+		|| positions.empty()
+		|| indices.empty()
+		|| positions.size() % 4 != 0
+		|| (!normals.empty() && normals.size() != vertexCount * 3)
+		|| (!texcoords.empty() && texcoords.size() != vertexCount * 2)
+		|| (!colors.empty() && colors.size() != vertexCount * 4)
+		|| (!tangents.empty() && tangents.size() != vertexCount * 4)
+		|| (!bitangents.empty() && bitangents.size() != vertexCount * 3))
+	{
+		return {};
+	}
+
+	mesh->SetPositions(std::move(positions));
+	mesh->SetNormals(std::move(normals));
+	mesh->SetTexcoords(std::move(texcoords), 0);
+	mesh->SetColors(std::move(colors));
+	mesh->SetTangents(std::move(tangents));
+	mesh->SetBitangents(std::move(bitangents));
+	mesh->SetIndices(std::move(indices));
 
 	uint64 subMeshCount = 0;
 	stream.read(reinterpret_cast<char*>(&subMeshCount), sizeof(subMeshCount));
+	if (!stream || subMeshCount > remainingBytes() / sizeof(Engine::JMesh::SubMeshInfo))
+	{
+		return {};
+	}
+
 	std::vector<Engine::JMesh::SubMeshInfo> subMeshes(static_cast<size_t>(subMeshCount));
 	if (subMeshCount > 0)
 	{
 		stream.read(reinterpret_cast<char*>(subMeshes.data()), sizeof(Engine::JMesh::SubMeshInfo) * subMeshes.size());
+		valid = valid && static_cast<bool>(stream);
+	}
+	for (const Engine::JMesh::SubMeshInfo& subMesh : subMeshes)
+	{
+		if (subMesh.startIndex > subMesh.endIndex || subMesh.endIndex > mesh->GetIndices().size())
+		{
+			return {};
+		}
 	}
 	mesh->SetSubMeshes(std::move(subMeshes));
-	return stream ? mesh : std::shared_ptr<Engine::JMesh>{};
+	return valid ? mesh : std::shared_ptr<Engine::JMesh>{};
 }
 
 std::shared_ptr<Engine::JMesh> JAssetManager::adoptMesh(Engine::JMesh* mesh)
@@ -266,7 +327,8 @@ std::shared_ptr<JAssetManager::MaterialBundle> JAssetManager::AcquireMaterialBun
 
 bool JAssetManager::HasMaterialBundle(const Engine::JSceneMaterialData& materialData) const
 {
-	const size_t key = std::hash<std::string>{}(makeMaterialKey(materialData));
+	const Engine::JSceneMaterialData resolvedMaterialData = loadMaterialData(materialData);
+	const size_t key = std::hash<std::string>{}(makeMaterialKey(resolvedMaterialData));
 	const auto cachedIter = _materialCache.find(key);
 	if (cachedIter == _materialCache.end())
 	{

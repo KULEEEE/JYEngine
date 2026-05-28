@@ -22,18 +22,6 @@ public:
 		std::vector<float> bitangents;
 		std::vector<uint32_t> indices;
 		std::vector<J::Engine::JMesh::SubMeshInfo> subMeshes;
-
-		void clear()
-		{
-			positions.clear();
-			normals.clear();
-			texcoords.clear();
-			colors.clear();
-			tangents.clear();
-			bitangents.clear();
-			indices.clear();
-			subMeshes.clear();
-		}
 	};
 
 

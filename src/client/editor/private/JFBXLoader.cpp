@@ -292,8 +292,6 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex,
 	const bool hasColors = colors.values != nullptr && colors.count > 0;
 	const bool hasTangents = tangents.values != nullptr && tangents.count > 0;
 
-	const uint32_t baseVertex = static_cast<uint32_t>(parsingData.positions.size() / 4);
-
 	const int partitionCount = geom.getPartitionCount();
 	for (int p = 0; p < partitionCount; ++p)
 	{
@@ -370,8 +368,6 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex,
 		subMesh.endIndex = static_cast<uint32_t>(parsingData.indices.size());
 		parsingData.subMeshes.push_back(subMesh);
 	}
-
-	(void)baseVertex;
 }
 
 void JFBXLoader::setMesh(J::Engine::JMesh* mesh, ParsingData& parsingData)
