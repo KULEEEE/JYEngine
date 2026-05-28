@@ -321,19 +321,36 @@ inline std::string get_Engine_Path()
 	return get_Engine_Executable_Path().string();
 }
 
+inline std::filesystem::path& get_Engine_Res_Path_Override()
+{
+	static std::filesystem::path overridePath;
+	return overridePath;
+}
+
+inline void set_Engine_Res_Path_Override(const std::filesystem::path& path)
+{
+	get_Engine_Res_Path_Override() = path;
+}
+
+inline std::filesystem::path get_Engine_Res_Root_Path()
+{
+	const std::filesystem::path& overridePath = get_Engine_Res_Path_Override();
+	return overridePath.empty() ? (get_Engine_Executable_Path() / "res") : overridePath;
+}
+
 inline std::string get_Engine_Res_Path()
 {
-	return (get_Engine_Executable_Path() / "res").string();
+	return get_Engine_Res_Root_Path().string();
 }
 
 inline std::string get_Engine_Shader_Path()
 {
-	return (get_Engine_Executable_Path() / "res" / "shader").string();
+	return (get_Engine_Res_Root_Path() / "shader").string();
 }
 
 inline std::string get_Engine_Mesh_Path()
 {
-	return (get_Engine_Executable_Path() / "res" / "mesh").string();
+	return (get_Engine_Res_Root_Path() / "mesh").string();
 }
 
 

@@ -74,7 +74,7 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
 
     float3 viewDir = normalize(float3(0.0f, 0.25f, -1.0f));
     float3 f0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-    float3 ambient = albedo * 0.08f * (1.0f - metallic);
+    float3 ambient = albedo * 0.28f * (1.0f - metallic);
     float3 direct = float3(0.0f, 0.0f, 0.0f);
 
     int lightCount = min((int)LightInfo.x, MAX_RENDER_LIGHTS);

@@ -101,6 +101,8 @@ add_executable(Client WIN32 ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCE
 
 target_include_directories(Client PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 target_compile_options(Client PRIVATE
@@ -113,16 +115,43 @@ target_link_libraries(Client PRIVATE Engine)
 target_link_libraries(Client PRIVATE shell32.lib)
 add_dependencies(Client Engine)
 
-# 리소스 복사
-add_custom_command(
-    TARGET Client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_CURRENT_SOURCE_DIR}/res
-    $<TARGET_FILE_DIR:Client>/res
+set(ASSET_IMPORTER_SOURCES
+    "tools/JAssetImporter/main.cpp"
+    "src/client/editor/private/JFBXLoader.cpp"
+    ${OPENFBX_SOURCES}
 )
 
+set(ASSET_IMPORTER_HEADERS
+    "src/client/editor/JFBXLoader.h"
+    ${OPENFBX_HEADERS}
+)
+
+add_executable(JAssetImporter ${ASSET_IMPORTER_SOURCES} ${ASSET_IMPORTER_HEADERS})
+
+target_include_directories(JAssetImporter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+)
+
+target_compile_options(JAssetImporter PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+    $<$<COMPILE_LANGUAGE:C>:/utf-8>
+)
+
+target_link_libraries(JAssetImporter PRIVATE Engine)
+add_dependencies(JAssetImporter Engine)
+
+# 리소스 복사
 # 모든 빌드 구성이 동일한 출력 디렉토리를 사용하도록 설정
 set_target_properties(Client PROPERTIES 
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL}
+)
+
+set_target_properties(JAssetImporter PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
@@ -180,6 +209,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET Engine     PROPERTY FOLDER "Projects")
 set_property(TARGET Client    PROPERTY FOLDER "Projects")
 set_property(TARGET Benchmark PROPERTY FOLDER "Projects")
+set_property(TARGET JAssetImporter PROPERTY FOLDER "Projects")
 
 # Client를 시작 프로젝트로 설정 (Visual Studio에서 작동)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Client)
@@ -201,5 +231,6 @@ endforeach()
 
 # IDE에서 소스 그룹 구조 설정
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src FILES ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS})
+source_group("tools" FILES tools/JAssetImporter/main.cpp)
 source_group("benchmark" FILES ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
 source_group("Resource Files" FILES ${CLIENT_RESOURCES})

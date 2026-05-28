@@ -29,6 +29,7 @@ struct JSceneMaterialConstantsData
 struct JSceneMaterialData
 {
 	std::string id;
+	std::string path;
 	std::string name;
 	std::string shaderPath;
 	bool enableAlphaBlend = false;

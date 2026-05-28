@@ -417,6 +417,14 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 				break;
 			}
 		}
+		if (!isShaderTexture
+			&& (param.name == "BaseTexture"
+				|| param.name == "NormalTexture"
+				|| param.name == "RoughnessTexture"
+				|| param.name == "MetallicTexture"))
+		{
+			isShaderTexture = true;
+		}
 		if (!isShaderTexture)
 		{
 			continue;

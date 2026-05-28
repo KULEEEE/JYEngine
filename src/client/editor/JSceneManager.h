@@ -18,6 +18,7 @@ public:
 	JSceneManager& operator=(const JSceneManager&) = delete;
 
 	bool Open(const std::filesystem::path& filePath);
+	bool OpenProject(const std::filesystem::path& projectPath);
 	bool Save();
 	bool SaveAs(const std::filesystem::path& filePath);
 	bool New(const std::string& sceneName = "Untitled Scene");

@@ -31,6 +31,7 @@ namespace
 	{
 		bool createNew = false;
 		std::filesystem::path scenePath;
+		std::filesystem::path projectPath;
 	};
 
 	SceneLaunchOptions parseSceneLaunchOptions()
@@ -59,9 +60,16 @@ namespace
 				continue;
 			}
 
-			if (!arg.empty() && arg[0] != L'-' && options.scenePath.empty())
+			if ((arg == L"--project" || arg == L"-p") && i + 1 < argc)
 			{
-				options.scenePath = arg;
+				options.projectPath = argv[++i];
+				options.scenePath.clear();
+				continue;
+			}
+
+			if (!arg.empty() && arg[0] != L'-' && options.scenePath.empty() && options.projectPath.empty())
+			{
+				options.projectPath = arg;
 			}
 		}
 
@@ -162,20 +170,31 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
-            std::filesystem::path scenePath = launchOptions.scenePath;
-            if (scenePath.empty())
+            if (!launchOptions.projectPath.empty())
             {
-                scenePath = std::filesystem::path(get_Engine_Res_Path()) / "scene" / "sample.jscene.json";
+                if (!sceneManager.OpenProject(launchOptions.projectPath))
+                {
+                    std::cerr << "Failed to open project: " << launchOptions.projectPath.string() << ". Falling back to a new scene." << std::endl;
+                    sceneManager.New();
+                }
             }
             else
             {
-                scenePath = resolveScenePath(scenePath);
-            }
+                std::filesystem::path scenePath = launchOptions.scenePath;
+                if (scenePath.empty())
+                {
+                    scenePath = std::filesystem::path(get_Engine_Res_Path()) / "scene" / "sample.jscene.json";
+                }
+                else
+                {
+                    scenePath = resolveScenePath(scenePath);
+                }
 
-            if (!sceneManager.Open(scenePath))
-            {
-                std::cerr << "Failed to open scene: " << scenePath.string() << ". Falling back to a new scene." << std::endl;
-                sceneManager.New();
+                if (!sceneManager.Open(scenePath))
+                {
+                    std::cerr << "Failed to open scene: " << scenePath.string() << ". Falling back to a new scene." << std::endl;
+                    sceneManager.New();
+                }
             }
         }
 

@@ -1,5 +1,8 @@
 ﻿#include "client/editor/JSceneManager.h"
 
+#include "third_party/nlohmann/json.hpp"
+
+#include <fstream>
 #include <iostream>
 #include <utility>
 
@@ -68,6 +71,8 @@ Engine::JSceneData JSceneManager::createEmptySceneData(const std::string& sceneN
 
 bool JSceneManager::Open(const std::filesystem::path& filePath)
 {
+	set_Engine_Res_Path_Override({});
+	_assetManager.SetResourceRoot(filePath.parent_path());
 	Engine::JSceneData sceneData;
 	if (!Engine::JSceneSerializer::LoadFromFile(filePath, sceneData))
 	{
@@ -83,6 +88,48 @@ bool JSceneManager::Open(const std::filesystem::path& filePath)
 
 	_sceneData = std::move(sceneData);
 	_currentPath = filePath;
+	_dirty = false;
+	return true;
+}
+
+bool JSceneManager::OpenProject(const std::filesystem::path& projectPath)
+{
+	const std::filesystem::path absoluteProjectPath = std::filesystem::absolute(projectPath);
+	const std::filesystem::path projectFilePath = std::filesystem::is_directory(absoluteProjectPath)
+		? absoluteProjectPath / "project.json"
+		: absoluteProjectPath;
+
+	std::ifstream stream(projectFilePath);
+	if (!stream)
+	{
+		std::cerr << "JSceneManager::OpenProject failed: project file not found: " << projectFilePath.string() << std::endl;
+		return false;
+	}
+
+	nlohmann::json root;
+	stream >> root;
+
+	const std::filesystem::path projectRoot = projectFilePath.parent_path();
+	const std::filesystem::path startupScene = root.value("startupScene", "scenes/main.scene.json");
+	const std::filesystem::path scenePath = startupScene.is_absolute() ? startupScene : projectRoot / startupScene;
+
+	Engine::JSceneData sceneData;
+	if (!Engine::JSceneSerializer::LoadFromFile(scenePath, sceneData))
+	{
+		std::cerr << "JSceneManager::OpenProject failed: scene load failed: " << scenePath.string() << std::endl;
+		return false;
+	}
+
+	set_Engine_Res_Path_Override(projectRoot);
+	_assetManager.SetResourceRoot(projectRoot);
+	if (!buildFromSceneData(sceneData))
+	{
+		std::cerr << "JSceneManager::OpenProject failed: build failed: " << scenePath.string() << std::endl;
+		return false;
+	}
+
+	_sceneData = std::move(sceneData);
+	_currentPath = scenePath;
 	_dirty = false;
 	return true;
 }

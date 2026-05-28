@@ -52,6 +52,7 @@ namespace
 	{
 		JSceneMaterialData data;
 		data.id = value.value("id", "");
+		data.path = value.value("path", "");
 		data.name = value.value("name", "");
 		data.shaderPath = value.value("shaderPath", "");
 		data.enableAlphaBlend = value.value("enableAlphaBlend", false);
@@ -84,17 +85,23 @@ namespace
 		json value =
 		{
 			{ "id", data.id },
-			{ "name", data.name },
-			{ "shaderPath", data.shaderPath },
-			{ "enableAlphaBlend", data.enableAlphaBlend },
-			{ "constants",
-				{
-					{ "enabled", data.constants.enabled },
-					{ "baseColor", vec4ToJson(data.constants.baseColor) },
-					{ "roughness", data.constants.roughness },
-					{ "metallic", data.constants.metallic },
-				}
-			},
+		};
+
+		if (!data.path.empty())
+		{
+			value["path"] = data.path;
+			return value;
+		}
+
+		value["name"] = data.name;
+		value["shaderPath"] = data.shaderPath;
+		value["enableAlphaBlend"] = data.enableAlphaBlend;
+		value["constants"] =
+		{
+			{ "enabled", data.constants.enabled },
+			{ "baseColor", vec4ToJson(data.constants.baseColor) },
+			{ "roughness", data.constants.roughness },
+			{ "metallic", data.constants.metallic },
 		};
 
 		if (!data.textures.empty())

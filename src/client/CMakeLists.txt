@@ -35,9 +35,3 @@ target_link_libraries(Client PRIVATE
 )
 
 # 리소스 파일 복사
-add_custom_command(
-    TARGET Client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../res
-    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/res
-)

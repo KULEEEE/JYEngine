@@ -16,6 +16,11 @@ namespace
 		transform.scale = source.scale;
 		return transform;
 	}
+
+	Engine::JScene::TransformData combineTransforms(const Engine::JScene::TransformData& parent, const Engine::JSceneTransformData&)
+	{
+		return parent;
+	}
 }
 
 void JSceneBuildResult::Release()
@@ -321,6 +326,73 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 				std::cerr << "JSceneBuilder::Build failed: render object component material reference is invalid: " << entityData.stableID << std::endl;
 				result.Release();
 				return false;
+			}
+
+			const Engine::JSceneMeshData* renderMeshData = nullptr;
+			for (const Engine::JSceneMeshData& meshData : sceneData.meshes)
+			{
+				if (meshData.id == entityData.renderObjectComponent.meshID)
+				{
+					renderMeshData = &meshData;
+					break;
+				}
+			}
+
+			const JAssetManager::ImportedScene* importedScene = renderMeshData != nullptr && context.assetManager != nullptr
+				? context.assetManager->GetImportedScene(*renderMeshData)
+				: nullptr;
+			if (importedScene != nullptr && !importedScene->nodes.empty())
+			{
+				const Engine::JScene::TransformData parentTransform = transform.IsValid()
+					? result.scene->GetTransform(transform)
+					: Engine::JScene::TransformData{};
+
+				for (uint32 nodeIndex = 0; nodeIndex < importedScene->nodes.size(); ++nodeIndex)
+				{
+					const JAssetManager::ImportedSceneNode& node = importedScene->nodes[nodeIndex];
+					if (!node.mesh)
+					{
+						continue;
+					}
+
+					std::string nodeStableID = entityKey + "_fbx_node_" + std::to_string(nodeIndex);
+					std::string nodeName = !node.name.empty() ? node.name : nodeStableID;
+					Engine::JEntityHandle nodeEntity = result.scene->CreateEntity(nodeStableID, nodeName, entityData.tags);
+					if (!nodeEntity.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node entity creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					Engine::JTransformHandle nodeTransform = result.scene->AddTransform(nodeEntity, combineTransforms(parentTransform, node.transform));
+					if (!nodeTransform.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node transform creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					Engine::JRenderObjectComponentHandle nodeRenderObject = result.scene->AddRenderObjectComponent(
+						nodeEntity,
+						fallbackMaterial,
+						subMeshMaterials,
+						node.mesh.get(),
+						entityData.renderObjectComponent.transparent);
+					if (!nodeRenderObject.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node render object creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					result.entities[nodeStableID] = nodeEntity;
+					result.transforms[nodeStableID] = nodeTransform;
+					result.renderObjects[nodeStableID] = nodeRenderObject;
+					result.meshes.emplace_back(node.mesh);
+				}
+
+				continue;
 			}
 
 			Engine::JRenderObjectComponentHandle renderObject = result.scene->AddRenderObjectComponent(

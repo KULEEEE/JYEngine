@@ -46,12 +46,28 @@ public:
 		std::string specularTexturePath;
 	};
 
+	struct ImportedNode
+	{
+		std::string name;
+		JVec3 translation = { 0.0f, 0.0f, 0.0f };
+		JVec3 rotation = { 0.0f, 0.0f, 0.0f };
+		JVec3 scale = { 1.0f, 1.0f, 1.0f };
+		J::Engine::JMesh* mesh = nullptr;
+	};
+
+	struct ImportedScene
+	{
+		std::vector<ImportedMaterial> materials;
+		std::vector<ImportedNode> nodes;
+	};
+
 	J::Engine::JMesh* LoadFBX(const char* filename);
 	J::Engine::JMesh* LoadFBX(const char* filename, std::vector<ImportedMaterial>* outMaterials);
+	bool LoadFBXScene(const char* filename, ImportedScene& outScene);
 
 private:
 
-	void extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData);
+	void extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData, bool bakeNodeTransform = false);
 	void setMesh(J::Engine::JMesh* mesh, ParsingData& parsingData);
 };
 

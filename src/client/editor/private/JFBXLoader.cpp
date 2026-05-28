@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -60,6 +61,70 @@ namespace
 		imported.normalTexturePath = texturePath(material.getTexture(ofbx::Texture::NORMAL));
 		imported.specularTexturePath = texturePath(material.getTexture(ofbx::Texture::SPECULAR));
 		return imported;
+	}
+
+	JFBXLoader::ImportedNode importNode(const ofbx::Mesh& mesh)
+	{
+		JFBXLoader::ImportedNode node;
+		node.name = mesh.name;
+		return node;
+	}
+
+	ofbx::DMatrix multiplyMatrix(const ofbx::DMatrix& lhs, const ofbx::DMatrix& rhs)
+	{
+		ofbx::DMatrix result = {};
+		for (int column = 0; column < 4; ++column)
+		{
+			for (int row = 0; row < 4; ++row)
+			{
+				double value = 0.0;
+				for (int k = 0; k < 4; ++k)
+				{
+					value += lhs.m[row + k * 4] * rhs.m[k + column * 4];
+				}
+				result.m[row + column * 4] = value;
+			}
+		}
+		return result;
+	}
+
+	ofbx::DMatrix identityMatrix()
+	{
+		return ofbx::DMatrix{ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 };
+	}
+
+	ofbx::DVec3 transformPoint(const ofbx::DMatrix& matrix, const ofbx::Vec3& point)
+	{
+		return {
+			matrix.m[0] * point.x + matrix.m[4] * point.y + matrix.m[8] * point.z + matrix.m[12],
+			matrix.m[1] * point.x + matrix.m[5] * point.y + matrix.m[9] * point.z + matrix.m[13],
+			matrix.m[2] * point.x + matrix.m[6] * point.y + matrix.m[10] * point.z + matrix.m[14]
+		};
+	}
+
+	ofbx::DVec3 toDVec3(const ofbx::Vec3& vector)
+	{
+		return { vector.x, vector.y, vector.z };
+	}
+
+	ofbx::DVec3 transformVector(const ofbx::DMatrix& matrix, const ofbx::Vec3& vector)
+	{
+		return {
+			matrix.m[0] * vector.x + matrix.m[4] * vector.y + matrix.m[8] * vector.z,
+			matrix.m[1] * vector.x + matrix.m[5] * vector.y + matrix.m[9] * vector.z,
+			matrix.m[2] * vector.x + matrix.m[6] * vector.y + matrix.m[10] * vector.z
+		};
+	}
+
+	ofbx::DVec3 normalizeVector(const ofbx::DVec3& vector)
+	{
+		const double length = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+		if (length <= 0.000001)
+		{
+			return { 0.0, 1.0, 0.0 };
+		}
+
+		return { vector.x / length, vector.y / length, vector.z / length };
 	}
 }
 
@@ -135,9 +200,86 @@ J::Engine::JMesh* JFBXLoader::LoadFBX(const char* filename, std::vector<Imported
 	return outMesh;
 }
 
-void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData)
+bool JFBXLoader::LoadFBXScene(const char* filename, ImportedScene& outScene)
+{
+	outScene = {};
+
+	printf("LoadFBXScene: %s\n", filename);
+	FILE* fp = nullptr;
+	fopen_s(&fp, filename, "rb");
+	if (!fp)
+	{
+		printf("LoadFBXScene failed to open file: %s\n", filename);
+		return false;
+	}
+
+	fseek(fp, 0, SEEK_END);
+	long fileSize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	vector<ofbx::u8> buffer(fileSize);
+	fread(buffer.data(), 1, fileSize, fp);
+	fclose(fp);
+
+	ofbx::LoadFlags flags =
+		ofbx::LoadFlags::IGNORE_BLEND_SHAPES |
+		ofbx::LoadFlags::IGNORE_CAMERAS |
+		ofbx::LoadFlags::IGNORE_LIGHTS |
+		ofbx::LoadFlags::IGNORE_SKIN |
+		ofbx::LoadFlags::IGNORE_BONES |
+		ofbx::LoadFlags::IGNORE_PIVOTS |
+		ofbx::LoadFlags::IGNORE_ANIMATIONS |
+		ofbx::LoadFlags::IGNORE_POSES |
+		ofbx::LoadFlags::IGNORE_VIDEOS |
+		ofbx::LoadFlags::IGNORE_LIMBS;
+
+	ofbx::IScene* scene = ofbx::load(buffer.data(), static_cast<int>(fileSize), static_cast<ofbx::u16>(flags));
+	if (!scene)
+	{
+		printf("OpenFBX scene load failed: %s\n", ofbx::getError());
+		return false;
+	}
+
+	const int meshCount = scene->getMeshCount();
+	for (int m = 0; m < meshCount; ++m)
+	{
+		const ofbx::Mesh* fbxMesh = scene->getMesh(m);
+		if (fbxMesh == nullptr)
+		{
+			continue;
+		}
+
+		const uint32_t materialBaseIndex = static_cast<uint32_t>(outScene.materials.size());
+		const int materialCount = fbxMesh->getMaterialCount();
+		for (int materialIndex = 0; materialIndex < materialCount; ++materialIndex)
+		{
+			const ofbx::Material* material = fbxMesh->getMaterial(materialIndex);
+			outScene.materials.push_back(material != nullptr ? importMaterial(*material) : ImportedMaterial{});
+		}
+
+		ParsingData parsingData;
+		extractMesh(*fbxMesh, materialBaseIndex, parsingData, true);
+		if (parsingData.positions.empty() || parsingData.indices.empty())
+		{
+			continue;
+		}
+
+		ImportedNode node = importNode(*fbxMesh);
+		node.mesh = new J::Engine::JMesh;
+		setMesh(node.mesh, parsingData);
+		outScene.nodes.push_back(node);
+	}
+
+	scene->destroy();
+	return !outScene.nodes.empty();
+}
+
+void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex, ParsingData& parsingData, bool bakeNodeTransform)
 {
 	const ofbx::GeometryData& geom = mesh.getGeometryData();
+	const ofbx::DMatrix nodeMatrix = bakeNodeTransform
+		? multiplyMatrix(mesh.getGlobalTransform(), mesh.getGeometricMatrix())
+		: identityMatrix();
 
 	const ofbx::Vec3Attributes positions = geom.getPositions();
 	const ofbx::Vec3Attributes normals = geom.getNormals();
@@ -177,7 +319,8 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex,
 				{
 					const int vi = triangle[k];
 
-					const ofbx::Vec3 pos = positions.get(vi);
+					const ofbx::Vec3 rawPos = positions.get(vi);
+					const ofbx::DVec3 pos = bakeNodeTransform ? transformPoint(nodeMatrix, rawPos) : toDVec3(rawPos);
 					parsingData.positions.push_back(static_cast<float>(pos.x) * s_scaleFactor);
 					parsingData.positions.push_back(static_cast<float>(pos.y) * s_scaleFactor);
 					parsingData.positions.push_back(static_cast<float>(-pos.z) * s_scaleFactor);
@@ -185,7 +328,8 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex,
 
 					if (hasNormals)
 					{
-						const ofbx::Vec3 n = normals.get(vi);
+						const ofbx::Vec3 rawNormal = normals.get(vi);
+						const ofbx::DVec3 n = normalizeVector(bakeNodeTransform ? transformVector(nodeMatrix, rawNormal) : toDVec3(rawNormal));
 						parsingData.normals.push_back(static_cast<float>(n.x));
 						parsingData.normals.push_back(static_cast<float>(n.y));
 						parsingData.normals.push_back(static_cast<float>(-n.z));
@@ -209,7 +353,8 @@ void JFBXLoader::extractMesh(const ofbx::Mesh& mesh, uint32_t materialBaseIndex,
 
 					if (hasTangents)
 					{
-						const ofbx::Vec3 tan = tangents.get(vi);
+						const ofbx::Vec3 rawTangent = tangents.get(vi);
+						const ofbx::DVec3 tan = normalizeVector(bakeNodeTransform ? transformVector(nodeMatrix, rawTangent) : toDVec3(rawTangent));
 						parsingData.tangents.push_back(static_cast<float>(tan.x));
 						parsingData.tangents.push_back(static_cast<float>(tan.y));
 						parsingData.tangents.push_back(static_cast<float>(-tan.z));
