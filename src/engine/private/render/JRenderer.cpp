@@ -165,18 +165,11 @@ void JRenderer::prepareFrameResources(const FrameDesc& frameDesc)
 	std::unordered_set<const JMesh*> activeMeshes;
 	if (frameDesc.drawItemCache != nullptr)
 	{
-		for (uint32 drawItemIndex : frameDesc.opaqueDrawItemIndices)
+		for (const JDrawItem& drawItem : frameDesc.drawItemCache->drawItems)
 		{
-			if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
+			if (drawItem.mesh != nullptr)
 			{
-				activeMeshes.insert(frameDesc.drawItemCache->drawItems[drawItemIndex].mesh);
-			}
-		}
-		for (uint32 drawItemIndex : frameDesc.transparentDrawItemIndices)
-		{
-			if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
-			{
-				activeMeshes.insert(frameDesc.drawItemCache->drawItems[drawItemIndex].mesh);
+				activeMeshes.insert(drawItem.mesh);
 			}
 		}
 	}

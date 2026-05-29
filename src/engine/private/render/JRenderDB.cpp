@@ -653,6 +653,7 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	}
 
 	JMeshResource resource;
+	const bool uploadBatchStarted = _renderContext->BeginUploadBatch();
 	Render::JVertexBuffer* vertexBuffer = _renderContext->CreateVertexBuffer(mesh->GetPositions(), mesh->GetVertexCount());
 	Render::JVertexBuffer* normalBuffer = nullptr;
 	Render::JVertexBuffer* texcoordBuffer = nullptr;
@@ -665,7 +666,16 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 		texcoordBuffer = _renderContext->CreateVertexBuffer(mesh->GetTexcoords(0), mesh->GetVertexCount());
 	}
 	Render::JIndexBuffer* indexBuffer = _renderContext->CreateIndexBuffer(mesh->GetIndices());
+	const bool uploadBatchSucceeded = uploadBatchStarted ? _renderContext->EndUploadBatch() : true;
 	if (vertexBuffer == nullptr || indexBuffer == nullptr)
+	{
+		_renderContext->DestroyVertexBuffer(vertexBuffer);
+		_renderContext->DestroyVertexBuffer(normalBuffer);
+		_renderContext->DestroyVertexBuffer(texcoordBuffer);
+		_renderContext->DestroyIndexBuffer(indexBuffer);
+		return nullptr;
+	}
+	if (!uploadBatchSucceeded)
 	{
 		_renderContext->DestroyVertexBuffer(vertexBuffer);
 		_renderContext->DestroyVertexBuffer(normalBuffer);

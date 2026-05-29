@@ -19,6 +19,9 @@ public:
 	JRenderContext(JDevice* device);
 	~JRenderContext();
 
+	bool BeginUploadBatch();
+	bool EndUploadBatch();
+
 	template<typename T>
 	JVertexBuffer* CreateVertexBuffer(const std::vector<T>& data, size_t vertexCount)
 	{
@@ -35,32 +38,11 @@ public:
 		ID3D12Resource*& buffer = vBuffer->buffer;
 		D3D12_VERTEX_BUFFER_VIEW& view = vBuffer->view;
 
-		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
-
-		HRESULT hr = device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&buffer));
-		if (FAILED(hr) || buffer == nullptr)
+		if (!createDefaultBuffer(data.data(), size, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, &buffer))
 		{
 			delete vBuffer;
 			return nullptr;
 		}
-
-		void* pData = nullptr;
-		hr = buffer->Map(0, nullptr, &pData);
-		if (FAILED(hr) || pData == nullptr)
-		{
-			vBuffer->Destroy();
-			delete vBuffer;
-			return nullptr;
-		}
-		memcpy(pData, data.data(), size);
-		(buffer)->Unmap(0, nullptr);
 
 		view.BufferLocation = (buffer)->GetGPUVirtualAddress();
 		view.StrideInBytes = static_cast<uint32>(size / vertexCount);
@@ -83,32 +65,11 @@ public:
 		ID3D12Resource*& buffer = iBuffer->buffer;
 		D3D12_INDEX_BUFFER_VIEW& view = iBuffer->view;
 
-		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
-
-		HRESULT hr = device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&buffer));
-		if (FAILED(hr) || buffer == nullptr)
+		if (!createDefaultBuffer(data.data(), size, D3D12_RESOURCE_STATE_INDEX_BUFFER, &buffer))
 		{
 			delete iBuffer;
 			return nullptr;
 		}
-
-		void* pData = nullptr;
-		hr = buffer->Map(0, nullptr, &pData);
-		if (FAILED(hr) || pData == nullptr)
-		{
-			iBuffer->Destroy();
-			delete iBuffer;
-			return nullptr;
-		}
-		memcpy(pData, data.data(), size);
-		(buffer)->Unmap(0, nullptr);
 
 		view.BufferLocation = (buffer)->GetGPUVirtualAddress();
 		view.Format = DXGI_FORMAT_R32_UINT;
@@ -745,7 +706,89 @@ public:
 	void DestroyRootSignature(JRootSignature* rootSignature) { delete rootSignature; }
 
 private:
+	bool createDefaultBuffer(const void* sourceData, size_t size, D3D12_RESOURCE_STATES finalState, ID3D12Resource** outBuffer)
+	{
+		if (sourceData == nullptr || size == 0 || outBuffer == nullptr)
+		{
+			return false;
+		}
+
+		*outBuffer = nullptr;
+
+		ComPtr<ID3D12Device> device = _device->GetDevice();
+		if (device == nullptr)
+		{
+			return false;
+		}
+
+		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
+		CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
+		HRESULT hr = device->CreateCommittedResource(
+			&defaultHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(outBuffer));
+		if (FAILED(hr) || *outBuffer == nullptr)
+		{
+			return false;
+		}
+
+		ComPtr<ID3D12Resource> uploadBuffer;
+		CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD);
+		hr = device->CreateCommittedResource(
+			&uploadHeapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&uploadBuffer));
+		if (FAILED(hr) || uploadBuffer == nullptr)
+		{
+			(*outBuffer)->Release();
+			*outBuffer = nullptr;
+			return false;
+		}
+
+		void* mappedData = nullptr;
+		D3D12_RANGE readRange = {};
+		hr = uploadBuffer->Map(0, &readRange, &mappedData);
+		if (FAILED(hr) || mappedData == nullptr)
+		{
+			(*outBuffer)->Release();
+			*outBuffer = nullptr;
+			return false;
+		}
+		memcpy(mappedData, sourceData, size);
+		uploadBuffer->Unmap(0, nullptr);
+
+		if (!recordBufferUpload(*outBuffer, uploadBuffer, size, finalState))
+		{
+			(*outBuffer)->Release();
+			*outBuffer = nullptr;
+			return false;
+		}
+
+		return true;
+	}
+
+	bool ensureImmediateUploadContext();
+	bool beginUploadCommandList();
+	bool recordBufferUpload(ID3D12Resource* destination, ComPtr<ID3D12Resource> uploadBuffer, size_t size, D3D12_RESOURCE_STATES finalState);
+	bool executeUploadCommandList();
+	void destroyImmediateUploadContext();
+
 	JDevice* _device;
+	ComPtr<ID3D12CommandQueue> _uploadCommandQueue;
+	ComPtr<ID3D12CommandAllocator> _uploadCommandAllocator;
+	ComPtr<ID3D12GraphicsCommandList> _uploadCommandList;
+	ComPtr<ID3D12Fence> _uploadFence;
+	uint64 _uploadFenceValue = 1;
+	HANDLE _uploadFenceEvent = INVALID_HANDLE_VALUE;
+	bool _uploadBatchActive = false;
+	bool _uploadCommandListOpen = false;
+	std::vector<ComPtr<ID3D12Resource>> _batchedUploadBuffers;
 };
 
 J_RENDER_END

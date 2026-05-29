@@ -14,7 +14,7 @@ J_ENGINE_BEGIN
 
 namespace
 {
-	bool buildDrawGraphicResource(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource)
+	bool buildDrawGraphicResource(const JRenderPassContext& context, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
 	{
 		if (!context.renderDB->BuildGraphicResource(drawItem.material, graphicResource.GetShader(), graphicResource))
 		{
@@ -28,11 +28,9 @@ namespace
 			graphicResource.SetConstantBufferAddress("PerObject", gpuAddress);
 		}
 
-		const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-		if (cameraResource != nullptr)
+		if (cameraGpuAddress != 0)
 		{
-			const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
-			graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
+			graphicResource.SetConstantBufferAddress("PerFrame", cameraGpuAddress);
 		}
 
 		return true;
@@ -109,6 +107,13 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
+	D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress = 0;
+	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(frameDesc.camera);
+	if (cameraResource != nullptr)
+	{
+		cameraGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+	}
+
 	if (frameDesc.drawItemCache == nullptr)
 	{
 		context.commandQueue->EndRenderPass();
@@ -138,7 +143,7 @@ void JGBufferPass::Execute(const JRenderPassContext& context, const JFrameDesc& 
 		}
 
 		Render::JGraphicResource graphicResource(_shader);
-		if (!buildDrawGraphicResource(context, frameDesc.camera, drawItem, graphicResource))
+		if (!buildDrawGraphicResource(context, drawItem, graphicResource, cameraGpuAddress))
 		{
 			++_lastStats.skippedDrawCount;
 			continue;

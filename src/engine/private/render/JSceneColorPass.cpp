@@ -24,13 +24,27 @@ void JSceneColorPass::Execute(const JRenderPassContext& context, const JFrameDes
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
-	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.opaqueDrawItemIndices);
-	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.transparentDrawItemIndices);
+	D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress = 0;
+	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(frameDesc.camera);
+	if (cameraResource != nullptr)
+	{
+		cameraGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress = 0;
+	const JLightResource* lightResource = context.renderDB->FindLightResource();
+	if (lightResource != nullptr && lightResource->initialized)
+	{
+		lightGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&lightResource->constants, sizeof(lightResource->constants));
+	}
+
+	renderDrawItems(context, frameDesc, frameDesc.opaqueDrawItemIndices, cameraGpuAddress, lightGpuAddress);
+	renderDrawItems(context, frameDesc, frameDesc.transparentDrawItemIndices, cameraGpuAddress, lightGpuAddress);
 
 	context.commandQueue->EndRenderPass();
 }
 
-void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices)
+void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress, D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress)
 {
 	if (frameDesc.drawItemCache == nullptr)
 	{
@@ -41,12 +55,12 @@ void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, JCamera
 	{
 		if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
 		{
-			renderDrawItem(context, camera, frameDesc.drawItemCache->drawItems[drawItemIndex]);
+			renderDrawItem(context, frameDesc.drawItemCache->drawItems[drawItemIndex], cameraGpuAddress, lightGpuAddress);
 		}
 	}
 }
 
-void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
+void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, const JDrawItem& drawItem, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress, D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress)
 {
 	const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
 	if (!resources.IsValid())
@@ -72,18 +86,14 @@ void JSceneColorPass::renderDrawItem(const JRenderPassContext& context, JCameraH
 	const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
 	graphicResource.SetConstantBufferAddress("PerObject", objectGpuAddress);
 
-	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-	if (cameraResource != nullptr)
+	if (cameraGpuAddress != 0)
 	{
-		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
-		graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
+		graphicResource.SetConstantBufferAddress("PerFrame", cameraGpuAddress);
 	}
 
-	const JLightResource* lightResource = context.renderDB != nullptr ? context.renderDB->FindLightResource() : nullptr;
-	if (lightResource != nullptr && lightResource->initialized)
+	if (lightGpuAddress != 0)
 	{
-		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&lightResource->constants, sizeof(lightResource->constants));
-		if (graphicResource.SetConstantBufferAddress("PerLights", gpuAddress))
+		if (graphicResource.SetConstantBufferAddress("PerLights", lightGpuAddress))
 		{
 			++_lastStats.lightBindingCount;
 		}

@@ -25,11 +25,19 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0, context.gBuffer != nullptr ? &dsvHandle : nullptr, false, false);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
-	renderDrawItems(context, frameDesc.camera, frameDesc, frameDesc.transparentDrawItemIndices);
+
+	D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress = 0;
+	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(frameDesc.camera);
+	if (cameraResource != nullptr)
+	{
+		cameraGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+	}
+
+	renderDrawItems(context, frameDesc, frameDesc.transparentDrawItemIndices, cameraGpuAddress);
 	context.commandQueue->EndRenderPass();
 }
 
-void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, JCameraHandle camera, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices)
+void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
 {
 	if (frameDesc.drawItemCache == nullptr)
 	{
@@ -40,12 +48,12 @@ void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, JCa
 	{
 		if (drawItemIndex < frameDesc.drawItemCache->drawItems.size())
 		{
-			renderDrawItem(context, camera, frameDesc.drawItemCache->drawItems[drawItemIndex]);
+			renderDrawItem(context, frameDesc.drawItemCache->drawItems[drawItemIndex], cameraGpuAddress);
 		}
 	}
 }
 
-void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCameraHandle camera, const JDrawItem& drawItem)
+void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, const JDrawItem& drawItem, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
 {
 	const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
 	if (!resources.IsValid())
@@ -68,11 +76,9 @@ void JForwardOverlayPass::renderDrawItem(const JRenderPassContext& context, JCam
 	const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
 	graphicResource.SetConstantBufferAddress("PerObject", objectGpuAddress);
 
-	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(camera);
-	if (cameraResource != nullptr)
+	if (cameraGpuAddress != 0)
 	{
-		const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
-		graphicResource.SetConstantBufferAddress("PerFrame", gpuAddress);
+		graphicResource.SetConstantBufferAddress("PerFrame", cameraGpuAddress);
 	}
 
 	context.commandQueue->SetPipeline(materialResource->pipeline);
