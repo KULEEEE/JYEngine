@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef __J_SCENE_H__
 #define __J_SCENE_H__
 
@@ -82,14 +82,17 @@ public:
 
 	JEntityHandle CreateEntity(const std::string& stableID = "", const std::string& name = "", const std::vector<std::string>& tags = {});
 	bool RemoveEntity(JEntityHandle entity);
+
 	JMaterialHandle AddMaterial(std::shared_ptr<JMaterial> material);
 	bool RemoveMaterial(JMaterialHandle material);
+
 	JTransformHandle AddTransform(JEntityHandle entity, const TransformData& data = {});
 	JCameraHandle AddCamera(JEntityHandle entity, JTransformHandle transform, float aspectRatio = 1.0f, float nearP = 5.0f, float farP = 1000.0f);
 	JCameraHandle AddCamera(JEntityHandle entity, float aspectRatio = 1.0f, float nearP = 5.0f, float farP = 1000.0f);
 	JLightHandle AddLight(JEntityHandle entity, const LightData& data = {});
 	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const JMesh* mesh, bool transparent = false);
 	JRenderObjectComponentHandle AddRenderObjectComponent(JEntityHandle entity, JMaterialHandle material, const std::vector<JMaterialHandle>& subMeshMaterials, const JMesh* mesh, bool transparent = false);
+
 	bool RemoveTransform(JTransformHandle transform);
 	bool RemoveTransform(JEntityHandle entity);
 	bool RemoveCamera(JCameraHandle camera);
@@ -111,10 +114,13 @@ public:
 
 	EntityData* GetEntity(JEntityHandle handle);
 	const EntityData* GetEntity(JEntityHandle handle) const;
+
 	JMaterial* GetMaterial(JMaterialHandle handle);
 	const JMaterial* GetMaterial(JMaterialHandle handle) const;
+
 	TransformData GetTransform(JTransformHandle handle) const;
 	TransformData GetTransform(JEntityHandle entity) const;
+
 	void SetTransform(JTransformHandle handle, const TransformData& data);
 	void SetTransform(JEntityHandle entity, const TransformData& data);
 	void SetTransformTranslation(JTransformHandle handle, const JVec3& value);
@@ -123,36 +129,44 @@ public:
 	void SetTransformRotation(JEntityHandle entity, const JVec3& value);
 	void SetTransformScale(JTransformHandle handle, const JVec3& value);
 	void SetTransformScale(JEntityHandle entity, const JVec3& value);
+
 	std::vector<uint32> ConsumeDirtyTransformIndices();
 	bool HasDirtyTransforms() const;
+
 	const JVec3* GetTransformTranslation(JTransformHandle handle) const;
 	const JVec3* GetTransformTranslation(JEntityHandle entity) const;
 	const JVec3* GetTransformRotation(JTransformHandle handle) const;
 	const JVec3* GetTransformRotation(JEntityHandle entity) const;
 	const JVec3* GetTransformScale(JTransformHandle handle) const;
 	const JVec3* GetTransformScale(JEntityHandle entity) const;
+
 	JTransformHandle GetTransformHandle(JEntityHandle entity) const;
 	JCameraHandle GetCameraHandle(JEntityHandle entity) const;
 	JLightHandle GetLightHandle(JEntityHandle entity) const;
 	JRenderObjectComponentHandle GetRenderObjectComponentHandle(JEntityHandle entity) const;
+
 	CameraData* GetCamera(JCameraHandle handle);
 	const CameraData* GetCamera(JCameraHandle handle) const;
 	CameraData* GetCamera(JEntityHandle entity);
+
 	const CameraData* GetCamera(JEntityHandle entity) const;
 	LightData* GetLight(JLightHandle handle);
 	const LightData* GetLight(JLightHandle handle) const;
 	LightData* GetLight(JEntityHandle entity);
+
 	const LightData* GetLight(JEntityHandle entity) const;
 	RenderObjectComponentData* GetRenderObjectComponent(JRenderObjectComponentHandle handle);
 	const RenderObjectComponentData* GetRenderObjectComponent(JRenderObjectComponentHandle handle) const;
 	RenderObjectComponentData* GetRenderObjectComponent(JEntityHandle entity);
 	const RenderObjectComponentData* GetRenderObjectComponent(JEntityHandle entity) const;
+
 	void SetCameraData(JCameraHandle camera, const CameraData& data);
 	void SetCameraAspectRatio(JCameraHandle camera, float aspectRatio);
 	void SetLightData(JLightHandle light, const LightData& data);
 	void SetRenderObjectComponentData(JRenderObjectComponentHandle handle, const RenderObjectComponentData& data);
 	void SetRenderObjectVisible(JRenderObjectComponentHandle handle, bool visible);
 	void SetRenderObjectVisible(JEntityHandle entity, bool visible);
+
 	void MarkCameraDirty(JCameraHandle camera);
 	void MarkCameraDirty(JEntityHandle entity);
 	std::vector<JCameraHandle> ConsumeDirtyCameras();
@@ -188,11 +202,18 @@ private:
 	std::vector<MaterialSlot> _materials;
 	std::vector<uint32> _freeMaterialIndices;
 	std::vector<uint32> _activeMaterialIndices;
+
+	// Entity ?щ’ index瑜?湲곗??쇰줈 遺媛 ?뺣낫瑜?留욎떠 ?붾떎.
+	// ?ㅼ젣 而댄룷?뚰듃 ?곗씠?곕뒗 媛??꾩슜 pool???덇퀬, ?ш린?쒕뒗 議고쉶/遺꾨쪟???뺣낫留?媛吏꾨떎.
 	std::vector<JEntityMetadata> _entityMetadata;
 	std::vector<JTransformHandle> _entityTransformLookup;
+
+	// ?뚮뜑?ш? Scene 蹂寃쎈텇留?諛섏쁺?????덈룄濡????꾨젅???⑥쐞濡??뚮퉬?섎뒗 ??
 	std::vector<JSceneRenderObjectEvent> _renderObjectEvents;
 	std::vector<JCameraHandle> _dirtyCameras;
 	std::vector<JLightHandle> _dirtyLights;
+
+	// ????뚯씪怨??고????몃뱾???곌껐?섍린 ?꾪븳 stable id lookup.
 	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
 	JCameraHandle _primaryCamera = {};
 	uint32 _nextStableID = 1;

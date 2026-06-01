@@ -6,6 +6,8 @@
 
 J_ENGINE_BEGIN
 
+// 파일에 저장되는 Scene 데이터 구조.
+// 런타임 풀 구조와 분리해서 JSON 로드/저장 포맷을 단순하게 유지한다.
 enum class JSceneMeshType : uint8
 {
 	External,
@@ -91,6 +93,7 @@ struct JSceneEntityData
 	bool active = true;
 	std::vector<std::string> tags;
 
+	// has* 플래그가 true인 컴포넌트만 실제 Scene에 생성한다.
 	bool hasTransform = false;
 	JSceneTransformData transform;
 

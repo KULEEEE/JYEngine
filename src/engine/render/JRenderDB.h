@@ -85,9 +85,12 @@ public:
 	const JLightResource* FindLightResource() const;
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
+	
+	// Vector Access로 빠르게 가져오는 용도
 	const JMaterialResource* GetMaterialResourceByIndex(uint32 index) const;
 	const JTransformResource* GetTransformResourceByIndex(uint32 index) const;
 	const JMeshResource* GetMeshResourceByIndex(uint32 index) const;
+	
 	uint32 GetMaterialResourceIndex(JMaterialHandle material) const;
 	uint32 GetTransformResourceIndex(JTransformHandle transform) const;
 	uint32 GetMeshResourceIndex(const JMesh* mesh) const;
@@ -96,7 +99,9 @@ public:
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
 	void SyncLight(const JLightSnapshot& snapshot);
+	
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
+	
 	void RemoveMaterialResource(JMaterialHandle material);
 	void RemoveCameraResource(JCameraHandle camera);
 	void RemoveTransformResource(JTransformHandle transform);
@@ -115,10 +120,12 @@ private:
 	JCameraResource& getOrCreateCameraResource(JCameraHandle camera);
 	JTransformResource& getOrCreateTransformResource(JTransformHandle transform);
 	JLightResource& getOrCreateLightResource();
+	
 	uint32 findMaterialResourceIndex(JMaterialHandle material) const;
 	uint32 findCameraResourceIndex(JCameraHandle camera) const;
 	uint32 findTransformResourceIndex(JTransformHandle transform) const;
 	uint32 findMeshResourceIndex(const JMesh* mesh) const;
+	
 	static uint64 makeCameraKey(JCameraHandle camera);
 	static uint64 makeTransformKey(JTransformHandle transform);
 	static uint64 makeMaterialKey(JMaterialHandle material);
@@ -131,6 +138,8 @@ private:
 	std::vector<TransformResourceRecord> _transformResources;
 	std::unordered_map<uint64, uint32> _transformIndexMap;
 	JLightResource _lightResource;
+
+	// Caching (중복 데이터 방지)
 	std::vector<MeshResourceRecord> _meshResources;
 	std::unordered_map<const JMesh*, uint32> _meshIndexMap;
 	std::unordered_map<std::string, TextureResourceRecord> _textureCache;

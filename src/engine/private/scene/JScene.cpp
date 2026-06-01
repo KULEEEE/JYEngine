@@ -9,6 +9,8 @@ J_ENGINE_BEGIN
 
 namespace
 {
+	// stableID 문자열을 빠르게 찾기 위한 해시.
+	// 충돌 가능성은 있으므로 최종 반환 전 원문 문자열을 한 번 더 비교한다.
 	uint64 makeStableIDHash(const std::string& stableID)
 	{
 		constexpr uint64 FNV_OFFSET = 14695981039346656037ull;
@@ -48,6 +50,8 @@ JEntityHandle JScene::CreateEntity(const std::string& stableID, const std::strin
 	EntityData data;
 	data.active = true;
 	const JEntityHandle entity = _entities.Add(data);
+
+	// Entity pool 슬롯 수에 맞춰 메타데이터/lookup 배열도 같은 index로 맞춘다.
 	_entityMetadata.resize(_entities.GetSlots().size());
 	_entityTransformLookup.resize(_entities.GetSlots().size());
 
@@ -97,6 +101,8 @@ bool JScene::RemoveMaterial(JMaterialHandle material)
 	MaterialSlot& slot = _materials[material.index];
 	slot.active = false;
 	slot.material.reset();
+
+	// 같은 index가 재사용되더라도 이전 handle이 유효하지 않도록 generation을 올린다.
 	++slot.generation;
 	_freeMaterialIndices.push_back(material.index);
 	for (uint32 i = 0; i < _activeMaterialIndices.size(); ++i)
@@ -118,6 +124,7 @@ bool JScene::RemoveEntity(JEntityHandle entity)
 		return false;
 	}
 
+	// Entity 제거 전에 연결된 컴포넌트를 먼저 제거해서 각 pool의 generation을 갱신한다.
 	RemoveRenderObjectComponent(entity);
 	RemoveLight(entity);
 	RemoveCamera(entity);
@@ -214,6 +221,7 @@ JEntityHandle JScene::FindEntityByStableID(const std::string& stableID) const
 	}
 
 	const JEntityMetadata* metadata = GetEntityMetadata(iter->second);
+	// 해시 충돌 또는 stale handle 방지를 위해 원문 stableID까지 확인한다.
 	return metadata != nullptr && metadata->stableID == stableID ? iter->second : JEntityHandle{};
 }
 
@@ -275,6 +283,8 @@ JTransformHandle JScene::AddTransform(JEntityHandle entity, const TransformData&
 	{
 		_entityTransformLookup.resize(entity.index + 1);
 	}
+
+	// Transform은 entity index와 transform index가 항상 같다고 가정하지 않고 lookup으로 찾는다.
 	_entityTransformLookup[entity.index] = transform;
 	addEntityComponentMask(entity, JSceneComponentMask::Transform);
 	return transform;
@@ -305,6 +315,8 @@ JCameraHandle JScene::AddCamera(JEntityHandle entity, JTransformHandle transform
 		_primaryCamera = handle;
 	}
 	addEntityComponentMask(entity, JSceneComponentMask::Camera);
+
+	// 카메라 추가/수정은 renderer의 view/projection 캐시를 갱신해야 한다.
 	MarkCameraDirty(handle);
 	return handle;
 }
@@ -331,6 +343,8 @@ JLightHandle JScene::AddLight(JEntityHandle entity, const LightData& data)
 	}
 
 	addEntityComponentMask(entity, JSceneComponentMask::Light);
+
+	// 조명 데이터는 렌더 패스에서 별도 버퍼로 모으므로 변경 표시를 남긴다.
 	MarkLightDirty(light);
 	return light;
 }
@@ -368,6 +382,8 @@ JRenderObjectComponentHandle JScene::AddRenderObjectComponent(JEntityHandle enti
 	}
 
 	addEntityComponentMask(entity, JSceneComponentMask::RenderObject);
+
+	// RenderObject 변경은 RenderDB/draw item cache 쪽에서 증분 반영한다.
 	pushRenderObjectEvent(JSceneRenderObjectEventType::Added, renderObject, entity);
 	return renderObject;
 }
@@ -525,6 +541,8 @@ void JScene::SetTransform(JTransformHandle handle, const TransformData& data)
 	if (_transforms.IsValid(handle))
 	{
 		const JEntityHandle entity = _transforms.GetSlots()[handle.index].entity;
+
+		// Transform이 바뀌면 같은 entity의 camera/light 파생 데이터도 다시 계산해야 한다.
 		markCameraDirtyForEntity(entity);
 		markLightDirtyForEntity(entity);
 	}
@@ -796,6 +814,8 @@ void JScene::SetRenderObjectComponentData(JRenderObjectComponentHandle handle, c
 	RenderObjectComponentData resolved = data;
 	resolved.entity = renderObject->entity;
 	*renderObject = resolved;
+
+	// mesh/material/visibility 계열 변경은 draw item 재구성이 필요할 수 있다.
 	pushRenderObjectEvent(JSceneRenderObjectEventType::Modified, handle, resolved.entity);
 }
 
@@ -823,6 +843,7 @@ void JScene::MarkCameraDirty(JCameraHandle camera)
 		return;
 	}
 
+	// 같은 프레임 안에서 중복 갱신 요청이 쌓이지 않도록 한 번만 넣는다.
 	for (JCameraHandle dirtyCamera : _dirtyCameras)
 	{
 		if (dirtyCamera.index == camera.index && dirtyCamera.generation == camera.generation)
@@ -844,6 +865,7 @@ std::vector<JCameraHandle> JScene::ConsumeDirtyCameras()
 	std::vector<JCameraHandle> dirtyCameras = std::move(_dirtyCameras);
 	_dirtyCameras.clear();
 
+	// 소비 시점에 이미 삭제된 카메라는 제외한다.
 	std::vector<JCameraHandle> validCameras;
 	validCameras.reserve(dirtyCameras.size());
 	for (JCameraHandle camera : dirtyCameras)
@@ -863,6 +885,7 @@ void JScene::MarkLightDirty(JLightHandle light)
 		return;
 	}
 
+	// 같은 프레임 안에서 중복 갱신 요청이 쌓이지 않도록 한 번만 넣는다.
 	for (JLightHandle dirtyLight : _dirtyLights)
 	{
 		if (dirtyLight.index == light.index && dirtyLight.generation == light.generation)

@@ -38,6 +38,7 @@ public:
 		ID3D12Resource*& buffer = vBuffer->buffer;
 		D3D12_VERTEX_BUFFER_VIEW& view = vBuffer->view;
 
+		// static draw buffer는 DEFAULT heap에 두고, UPLOAD heap은 staging으로만 사용함.
 		if (!createDefaultBuffer(data.data(), size, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, &buffer))
 		{
 			delete vBuffer;
@@ -65,6 +66,7 @@ public:
 		ID3D12Resource*& buffer = iBuffer->buffer;
 		D3D12_INDEX_BUFFER_VIEW& view = iBuffer->view;
 
+		// index buffer도 draw 중 반복 읽기 대상이라 DEFAULT heap으로 생성함.
 		if (!createDefaultBuffer(data.data(), size, D3D12_RESOURCE_STATE_INDEX_BUFFER, &buffer))
 		{
 			delete iBuffer;
@@ -104,6 +106,7 @@ public:
 	{
 		ComPtr<ID3D12Device> device = _device->GetDevice();
 
+		// D3D12 constant buffer view는 256 byte 정렬이 필요함.
 		size_t bufferSize = (size + 255) & ~255;
 
 		JConstantBuffer* cBuffer = new JConstantBuffer();
@@ -153,6 +156,7 @@ public:
 
 		JTexture* texture = new JTexture();
 
+		// fallback용 1x1 texture. 실제 샘플링은 DEFAULT heap에서 하도록 만듦.
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		textureDesc.Width = 1;
@@ -190,6 +194,7 @@ public:
 		UINT rowCount = 0;
 		UINT64 rowSizeInBytes = 0;
 		UINT64 uploadBufferSize = 0;
+		// texture copy는 row pitch 정렬이 필요하므로 footprint를 device에 물어봄.
 		device->GetCopyableFootprints(&textureDesc, 0, 1, 0, &footprint, &rowCount, &rowSizeInBytes, &uploadBufferSize);
 
 		ComPtr<ID3D12Resource> uploadBuffer;
@@ -338,6 +343,7 @@ public:
 			return nullptr;
 		}
 
+		// WIC로 파일을 RGBA8 픽셀 배열로 디코딩함.
 		ComPtr<IWICImagingFactory> factory;
 		HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
 		if (FAILED(hr) || factory == nullptr)
@@ -430,6 +436,7 @@ public:
 		uint8* uploadBytes = static_cast<uint8*>(mappedData) + footprint.Offset;
 		for (UINT row = 0; row < height; ++row)
 		{
+			// GPU copy footprint의 RowPitch에 맞춰 한 줄씩 복사해야함.
 			memcpy(uploadBytes + static_cast<size_t>(row) * footprint.Footprint.RowPitch, pixels.data() + static_cast<size_t>(row) * srcRowPitch, srcRowPitch);
 		}
 		uploadBuffer->Unmap(0, nullptr);
@@ -552,7 +559,7 @@ public:
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC& pipelineDesc = pipeline->pipelineDesc;
 
-		// ??? ???shader? ?? ???
+		// mesh buffer layout에 맞춰 input layout을 선택함.
 		D3D12_INPUT_ELEMENT_DESC positionDesc[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
@@ -648,14 +655,14 @@ public:
 		std::vector<CD3DX12_DESCRIPTOR_RANGE> descriptorRanges;
 		descriptorRanges.reserve(2);
 
-		// 1. Add Root Parameters for Constant Buffers
+		// shader reflection에서 찾은 cbuffer를 root CBV로 직접 바인딩함.
 		for (const auto& cb : bindingInfo.cBuffers) {
 			CD3DX12_ROOT_PARAMETER rootParam;
-			rootParam.InitAsConstantBufferView(cb.slot); // ?? ?  ???
+			rootParam.InitAsConstantBufferView(cb.slot);
 			rootParameters.push_back(rootParam);
 		}
 
-		// 2. Add Root Parameters for Textures
+		// texture는 descriptor table 하나로 묶어서 바인딩함.
 		if (!bindingInfo.textures.empty()) {
 			uint32 srvDescriptorCount = 0;
 			for (const auto& texture : bindingInfo.textures)
@@ -670,7 +677,7 @@ public:
 			rootParameters.push_back(srvRootParam);
 		}
 
-		// 3. Add static samplers. Dynamic sampler descriptor heaps made this path fragile during MRT debugging.
+		// sampler는 root signature에 static sampler로 박아 둠.
 		std::vector<CD3DX12_STATIC_SAMPLER_DESC> staticSamplers;
 		for (const auto& sampler : bindingInfo.samplers)
 		{
@@ -681,7 +688,7 @@ public:
 			samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 			staticSamplers.push_back(samplerDesc);
 		}
-		// 4.  ? ?
+		// root parameter와 static sampler를 합쳐 root signature 생성함.
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init(static_cast<UINT>(rootParameters.size()), rootParameters.data(), static_cast<UINT>(staticSamplers.size()), staticSamplers.empty() ? nullptr : staticSamplers.data(), D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -723,6 +730,7 @@ private:
 
 		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(size);
 		CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
+		// buffer 생성 시 COPY_DEST 초기 상태는 무시될 수 있어서 COMMON으로 만들고 barrier로 전환함.
 		HRESULT hr = device->CreateCommittedResource(
 			&defaultHeapProps,
 			D3D12_HEAP_FLAG_NONE,
@@ -737,6 +745,7 @@ private:
 
 		ComPtr<ID3D12Resource> uploadBuffer;
 		CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD);
+		// CPU가 쓸 수 있는 staging buffer에 원본 데이터를 먼저 복사함.
 		hr = device->CreateCommittedResource(
 			&uploadHeapProps,
 			D3D12_HEAP_FLAG_NONE,
@@ -780,6 +789,9 @@ private:
 	void destroyImmediateUploadContext();
 
 	JDevice* _device;
+
+	// DEFAULT heap 업로드용 즉시 command context.
+	// batch 중에는 staging buffer를 vector에 잡아 둬서 GPU copy가 끝날 때까지 생존시킴.
 	ComPtr<ID3D12CommandQueue> _uploadCommandQueue;
 	ComPtr<ID3D12CommandAllocator> _uploadCommandAllocator;
 	ComPtr<ID3D12GraphicsCommandList> _uploadCommandList;

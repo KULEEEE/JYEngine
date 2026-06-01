@@ -17,6 +17,7 @@ namespace
 {
 	constexpr size_t FRAME_UPLOAD_BUFFER_SIZE = 16 * 1024 * 1024;
 
+	// D3D12 상수 버퍼/descriptor offset 정렬에 사용함.
 	size_t alignTo(size_t value, size_t alignment)
 	{
 		return (value + alignment - 1) & ~(alignment - 1);
@@ -55,6 +56,7 @@ void JCommandQueue::Initialize(ComPtr<ID3D12Device> device, JSwapChain* swapChai
 
 	_srvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+	// swap chain buffer 수만큼 frame-local allocator/upload/descriptor heap을 따로 둠.
 	for (FrameResource& frameResource : _frameResources)
 	{
 		if (!initializeFrameResource(frameResource))
@@ -123,6 +125,7 @@ bool JCommandQueue::initializeFrameResource(FrameResource& frameResource)
 	frameResource.uploadCapacity = FRAME_UPLOAD_BUFFER_SIZE;
 	frameResource.uploadOffset = 0;
 
+	// frame마다 shader visible descriptor heap을 ring처럼 사용함.
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.NumDescriptors = MAX_DESCRIPTOR_COUNT;
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -154,6 +157,7 @@ void JCommandQueue::RenderBegin(uint32 frameIndex)
 		return;
 	}
 
+	// 이전에 같은 frame resource를 사용한 GPU 작업이 끝난 뒤 재사용해야함.
 	waitForFenceValue(frameResource.fenceValue);
 	frameResource.uploadOffset = 0;
 	frameResource.descriptorOffset = 0;
@@ -182,6 +186,7 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 	vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles = renderTarget->GetRTVHandle();
 
+	// pass 시작 시 render target 상태로 전환함.
 	for (auto& rtvResource : renderTarget->GetRTVResource())
 	{
 		if (rtvResource != nullptr && renderTarget->GetResourceState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
@@ -233,6 +238,7 @@ void JCommandQueue::BeginRenderPass(const std::vector<Engine::JRenderTarget*>& r
 	vector<D3D12_RESOURCE_BARRIER> barriers;
 	vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles;
 
+	// MRT는 여러 render target의 RTV handle을 하나로 모아서 OM에 바인딩함.
 	for (Engine::JRenderTarget* renderTarget : renderTargets)
 	{
 		if (renderTarget == nullptr || !renderTarget->IsValid())
@@ -316,6 +322,7 @@ void JCommandQueue::TransitionRenderTarget(Engine::JRenderTarget* renderTarget, 
 	}
 
 	vector<D3D12_RESOURCE_BARRIER> barriers;
+	// JRenderTarget이 여러 RTV resource를 가질 수 있어서 모두 같은 상태로 맞춤.
 	for (auto& rtvResource : renderTarget->GetRTVResource())
 	{
 		if (rtvResource == nullptr)
@@ -395,6 +402,7 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 	{
 		if (binding.gpuAddress != 0)
 		{
+			// frame upload ring에 올린 상수 버퍼는 GPU address만 직접 바인딩함.
 			_cmdList->SetGraphicsRootConstantBufferView(binding.rootParameterIndex, binding.gpuAddress);
 			continue;
 		}
@@ -409,6 +417,7 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 
 	if (!shader->bindingInfo.textures.empty())
 	{
+		// texture root parameter는 cbuffer 뒤에 descriptor table 하나로 둠.
 		const D3D12_GPU_DESCRIPTOR_HANDLE tableHandle = allocateFrameTextureTable(resource, shader);
 		if (tableHandle.ptr != 0)
 		{
@@ -441,6 +450,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 	const auto cachedIter = frameResource.descriptorTableCache.find(tableKey);
 	if (cachedIter != frameResource.descriptorTableCache.end())
 	{
+		// 같은 resource/shader 조합은 같은 프레임 안에서 descriptor table을 재사용함.
 		return cachedIter->second;
 	}
 
@@ -453,6 +463,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 	const uint32 tableBase = frameResource.descriptorOffset;
 	frameResource.descriptorOffset += srvDescriptorCount;
 
+	// 비어 있는 slot도 안전하게 읽히도록 null SRV로 먼저 채움.
 	D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc = {};
 	nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	nullSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -476,6 +487,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGrap
 			continue;
 		}
 
+		// 실제 texture SRV를 frame descriptor heap의 shader slot 위치로 복사함.
 		D3D12_CPU_DESCRIPTOR_HANDLE dest = frameResource.descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 		dest.ptr += static_cast<SIZE_T>(tableBase + binding.shaderSlot) * _srvDescriptorSize;
 		_device->CopyDescriptorsSimple(1, dest, texture->srvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -564,6 +576,7 @@ D3D12_GPU_VIRTUAL_ADDRESS JCommandQueue::UploadFrameConstantBuffer(const void* d
 		return 0;
 	}
 
+	// frame upload ring에 복사하고 GPU virtual address를 반환함.
 	memcpy(frameResource.uploadMappedData + alignedOffset, data, size);
 	frameResource.uploadOffset = alignedOffset + alignedSize;
 	return frameResource.uploadBuffer->GetGPUVirtualAddress() + alignedOffset;
@@ -591,6 +604,7 @@ void JCommandQueue::EndRenderPass()
 			continue;
 		}
 
+		// swap chain back buffer는 pass 종료 시 present 상태로 돌려둠.
 		for (auto& rtvResource : renderTarget->GetRTVResource())
 		{
 			if (rtvResource != nullptr)
@@ -631,6 +645,7 @@ void JCommandQueue::RenderEnd(uint32 frameIndex)
 	const uint32 resolvedFrameIndex = frameIndex % SWAP_CHAIN_BUFFER_COUNT;
 	const uint64 fenceValue = _nextFenceValue++;
 	_cmdQueue->Signal(_fence.Get(), fenceValue);
+	// 다음에 같은 frame resource를 재사용할 때 이 fence까지 기다리면 됨.
 	_frameResources[resolvedFrameIndex].fenceValue = fenceValue;
 }
 
@@ -669,6 +684,7 @@ void JCommandQueue::destroy()
 {
 	WaitIdle();
 
+	// GPU가 upload buffer를 더 이상 읽지 않는 상태에서 mapped pointer를 해제함.
 	if (_fenceEvent != INVALID_HANDLE_VALUE)
 	{
 		::CloseHandle(_fenceEvent);

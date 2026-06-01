@@ -11,6 +11,7 @@ namespace
 {
 	using json = nlohmann::json;
 
+	// Scene JSON은 벡터를 [x, y, z] 형태로 저장한다.
 	JVec3 readVec3(const json& value)
 	{
 		return { value.at(0).get<float>(), value.at(1).get<float>(), value.at(2).get<float>() };
@@ -189,6 +190,7 @@ namespace
 			}
 			else if (transform.contains("position"))
 			{
+				// 예전 scene 파일의 position 필드도 계속 읽기 위한 호환 처리.
 				data.transform.translation = readVec3(transform.at("position"));
 			}
 
@@ -336,6 +338,7 @@ bool JSceneSerializer::LoadFromString(const std::string& jsonText, JSceneData& o
 		sceneData.name = root.value("name", "");
 		sceneData.version = root.value("version", sceneData.version);
 
+		// 파일 포맷은 resource 목록을 먼저 읽고, entity는 id로 resource를 참조한다.
 		if (root.contains("materials") && root.at("materials").is_array())
 		{
 			for (const json& materialValue : root.at("materials"))
@@ -423,6 +426,8 @@ bool JSceneSerializer::SaveToFile(const std::filesystem::path& filePath, const J
 	if (!directory.empty())
 	{
 		std::error_code errorCode;
+
+		// 저장 경로의 폴더가 없으면 생성한다. 실패 시 파일을 만들지 않는다.
 		std::filesystem::create_directories(directory, errorCode);
 		if (errorCode)
 		{

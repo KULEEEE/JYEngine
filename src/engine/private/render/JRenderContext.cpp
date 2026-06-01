@@ -19,6 +19,7 @@ bool JRenderContext::BeginUploadBatch()
 		return false;
 	}
 
+	// 여러 buffer copy를 하나의 command list에 모으기 시작함.
 	if (!beginUploadCommandList())
 	{
 		return false;
@@ -35,6 +36,7 @@ bool JRenderContext::EndUploadBatch()
 		return true;
 	}
 
+	// batch에 기록된 copy를 한 번만 submit하고 fence 대기함.
 	const bool result = executeUploadCommandList();
 	_uploadBatchActive = false;
 	_batchedUploadBuffers.clear();
@@ -52,6 +54,7 @@ bool JRenderContext::ensureImmediateUploadContext()
 		return true;
 	}
 
+	// upload 전용 queue/list/fence는 필요할 때 한 번 만들고 재사용함.
 	ComPtr<ID3D12Device> device = _device != nullptr ? _device->GetDevice() : nullptr;
 	if (device == nullptr)
 	{
@@ -157,16 +160,19 @@ bool JRenderContext::recordBufferUpload(ID3D12Resource* destination, ComPtr<ID3D
 			finalState)
 	};
 
+	// DEFAULT buffer는 COMMON -> COPY_DEST -> 실제 사용 상태로 명시 전환함.
 	_uploadCommandList->ResourceBarrier(1, &barriers[0]);
 	_uploadCommandList->CopyBufferRegion(destination, 0, uploadBuffer.Get(), 0, size);
 	_uploadCommandList->ResourceBarrier(1, &barriers[1]);
 
 	if (_uploadBatchActive)
 	{
+		// batch가 끝날 때까지 staging buffer가 살아 있어야함.
 		_batchedUploadBuffers.push_back(uploadBuffer);
 		return true;
 	}
 
+	// batch가 아니면 즉시 submit하고 완료까지 기다림.
 	_batchedUploadBuffers.push_back(uploadBuffer);
 	const bool result = executeUploadCommandList();
 	_batchedUploadBuffers.clear();
@@ -189,6 +195,7 @@ bool JRenderContext::executeUploadCommandList()
 	ID3D12CommandList* commandLists[] = { _uploadCommandList.Get() };
 	_uploadCommandQueue->ExecuteCommandLists(1, commandLists);
 
+	// staging buffer 해제 전에 GPU copy 완료를 보장해야함.
 	const uint64 signalValue = _uploadFenceValue++;
 	hr = _uploadCommandQueue->Signal(_uploadFence.Get(), signalValue);
 	if (FAILED(hr))
@@ -224,6 +231,7 @@ void JRenderContext::destroyImmediateUploadContext()
 
 	if (_uploadCommandQueue != nullptr && _uploadFence != nullptr)
 	{
+		// context 해제 전에 남은 upload command가 끝났는지 확인함.
 		const uint64 signalValue = _uploadFenceValue++;
 		if (SUCCEEDED(_uploadCommandQueue->Signal(_uploadFence.Get(), signalValue)))
 		{

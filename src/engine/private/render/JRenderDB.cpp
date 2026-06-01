@@ -13,6 +13,8 @@ namespace
 {
 	constexpr uint32 MAX_RENDER_LIGHTS = 8;
 
+	// RenderContext가 살아 있으면 정식 destroy 경로를 탐.
+	// Clear 중이거나 context가 없으면 리소스 자체 정리만 수행함.
 	void destroyConstantBuffer(Render::JRenderContext* renderContext, Render::JConstantBuffer*& buffer)
 	{
 		if (buffer == nullptr)
@@ -168,6 +170,7 @@ namespace
 			const auto iter = shaderCache.find(resource.shaderPath);
 			if (iter != shaderCache.end() && iter->second.shader == resource.shader)
 			{
+				// 같은 shader를 여러 material이 공유하므로 refCount로 마지막 사용자만 정리함.
 				if (iter->second.refCount > 0)
 				{
 					--iter->second.refCount;
@@ -202,6 +205,7 @@ namespace
 			const auto iter = textureCache.find(entry.path);
 			if (iter != textureCache.end() && iter->second.texture == entry.texture)
 			{
+				// 같은 texture path는 하나만 로드하고 material들이 공유함.
 				if (iter->second.refCount > 0)
 				{
 					--iter->second.refCount;
@@ -293,6 +297,7 @@ JMaterialResource& JRenderDB::getOrCreateMaterialResource(JMaterialHandle materi
 	record.materialKey = materialKey;
 	record.resource.material = material;
 
+	// vector는 실제 저장소, map은 handle key에서 vector index를 찾는 빠른 lookup임.
 	const uint32 newIndex = static_cast<uint32>(_materialResources.size());
 	_materialResources.push_back(record);
 	_materialIndexMap[materialKey] = newIndex;
@@ -462,12 +467,15 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 	}
 
 	JMaterialResource& resource = getOrCreateMaterialResource(handle);
+
+	// material은 shader/texture/cbuffer 구성이 바뀔 수 있으므로 기존 GPU 리소스를 먼저 비움.
 	destroyMaterialResource(_renderContext, _shaderCache, _textureCache, resource);
 	resource.material = handle;
 	resource.shaderPath = material.GetShaderPath();
 	auto shaderIter = _shaderCache.find(resource.shaderPath);
 	if (shaderIter != _shaderCache.end() && shaderIter->second.shader != nullptr)
 	{
+		// 같은 shader path는 컴파일 결과를 재사용함.
 		resource.shader = shaderIter->second.shader;
 		++shaderIter->second.refCount;
 	}
@@ -534,6 +542,7 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 				|| param.name == "RoughnessTexture"
 				|| param.name == "MetallicTexture"))
 		{
+			// shader reflection 이름이 안 잡힌 경우 기본 material texture 이름으로 보정함.
 			isShaderTexture = true;
 		}
 		if (!isShaderTexture)
@@ -548,6 +557,7 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 		auto textureIter = _textureCache.find(param.path);
 		if (textureIter != _textureCache.end() && textureIter->second.texture != nullptr)
 		{
+			// 같은 파일 경로 texture는 중복 생성하지 않음.
 			texture = textureIter->second.texture;
 			++textureIter->second.refCount;
 		}
@@ -626,6 +636,7 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 	}
 
 	JLightResource& resource = getOrCreateLightResource();
+	// 현재 shader 상수 배열 크기에 맞춰 렌더링 가능한 개수만 잘라서 올림.
 	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
 
 	resource.constants = {};
@@ -653,6 +664,7 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	}
 
 	JMeshResource resource;
+	// 한 mesh의 position/normal/uv/index 업로드를 한 번의 submit으로 묶음.
 	const bool uploadBatchStarted = _renderContext->BeginUploadBatch();
 	Render::JVertexBuffer* vertexBuffer = _renderContext->CreateVertexBuffer(mesh->GetPositions(), mesh->GetVertexCount());
 	Render::JVertexBuffer* normalBuffer = nullptr;
@@ -687,6 +699,7 @@ JMeshResource* JRenderDB::GetOrCreateMeshResource(const JMesh* mesh)
 	resource.vertexBuffers.push_back(vertexBuffer);
 	resource.indexBufferResource = indexBuffer;
 	resource.soaBuffers.push_back(vertexBuffer->view);
+	// IASetVertexBuffers에 바로 넘기기 위해 SoA buffer view 배열을 같이 보관함.
 	if (normalBuffer != nullptr)
 	{
 		resource.vertexBuffers.push_back(normalBuffer);
@@ -726,6 +739,7 @@ void JRenderDB::RemoveMaterialResource(JMaterialHandle material)
 	const uint32 lastIndex = static_cast<uint32>(_materialResources.size() - 1);
 	if (index != lastIndex)
 	{
+		// vector 중간 삭제 비용을 줄이려고 마지막 원소를 빈 자리로 이동함.
 		_materialResources[index] = _materialResources[lastIndex];
 		_materialIndexMap[_materialResources[index].materialKey] = index;
 	}
@@ -798,6 +812,7 @@ void JRenderDB::PruneUnusedSceneResources(
 	const std::unordered_set<uint64>& activeTransformKeys,
 	const std::unordered_set<const JMesh*>& activeMeshes)
 {
+	// Scene snapshot에서 사라진 리소스만 제거함. 살아 있는 리소스는 캐시에 유지함.
 	for (uint32 index = 0; index < _cameraResources.size();)
 	{
 		if (activeCameraKeys.find(_cameraResources[index].cameraKey) != activeCameraKeys.end())
@@ -877,6 +892,7 @@ JRenderDB::ResolvedDrawResources JRenderDB::ResolveDrawResources(const JDrawItem
 	resources.mesh = GetMeshResourceByIndex(drawItem.meshResourceIndex);
 	resources.material = GetMaterialResourceByIndex(drawItem.materialResourceIndex);
 	resources.transform = GetTransformResourceByIndex(drawItem.transformResourceIndex);
+	// draw item은 index를 우선 사용하고, 캐시 재배치 등으로 실패하면 handle/pointer lookup으로 보정함.
 	if (resources.mesh == nullptr)
 	{
 		resources.mesh = FindMeshResource(drawItem.mesh);

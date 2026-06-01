@@ -6,6 +6,8 @@
 
 J_ENGINE_BEGIN
 
+// 풀의 슬롯을 가리키는 경량 핸들.
+// index는 슬롯 위치, generation은 삭제 후 재사용된 슬롯을 구분하는 값이다.
 struct JEntityHandle
 {
 	uint32 index = static_cast<uint32>(-1);
