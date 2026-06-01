@@ -261,7 +261,7 @@ JAssetImporter <source.fbx> <projectDir>
 
 ---
 
-## 제3자 코드
+## 외부 코드
 
 - [nlohmann/json](https://github.com/nlohmann/json) — `third_party/nlohmann/`
 - [OpenFBX](https://github.com/nem0/OpenFBX) — `src/client/OpenFBX/`
