@@ -30,25 +30,19 @@ public:
 	JRenderTarget* GetAlbedoTarget() const { return _albedo.get(); }
 	JRenderTarget* GetNormalTarget() const { return _normal.get(); }
 	JRenderTarget* GetMaterialTarget() const { return _material.get(); }
-	ID3D12Resource* GetDepthResource() const { return _depthResource.Get(); }
-	D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const { return _dsvHandle; }
-	D3D12_RESOURCE_STATES GetDepthState() const { return _depthState; }
-	void SetDepthState(D3D12_RESOURCE_STATES state) { _depthState = state; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const { return _depth != nullptr ? _depth->GetDSVHandle() : D3D12_CPU_DESCRIPTOR_HANDLE{}; }
 
 	const Desc& GetDesc() const { return _desc; }
 
 private:
 	static std::unique_ptr<JRenderTarget> createTarget(uint32 width, uint32 height, DXGI_FORMAT format, const JColor& clearColor);
-	bool createDepthTarget();
+	static std::unique_ptr<JRenderTarget> createDepthTarget(uint32 width, uint32 height, DXGI_FORMAT format);
 
 	Desc _desc;
 	std::unique_ptr<JRenderTarget> _albedo;
 	std::unique_ptr<JRenderTarget> _normal;
 	std::unique_ptr<JRenderTarget> _material;
-	ComPtr<ID3D12Resource> _depthResource;
-	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
-	D3D12_CPU_DESCRIPTOR_HANDLE _dsvHandle = {};
-	D3D12_RESOURCE_STATES _depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+	std::unique_ptr<JRenderTarget> _depth;
 };
 
 J_ENGINE_END

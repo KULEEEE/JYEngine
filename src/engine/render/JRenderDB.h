@@ -86,7 +86,7 @@ public:
 	JMeshResource* FindMeshResource(const JMesh* mesh);
 	const JMeshResource* FindMeshResource(const JMesh* mesh) const;
 	
-	// Vector Access로 빠르게 가져오는 용도
+	// Fast indexed access for cached render resources.
 	const JMaterialResource* GetMaterialResourceByIndex(uint32 index) const;
 	const JTransformResource* GetTransformResourceByIndex(uint32 index) const;
 	const JMeshResource* GetMeshResourceByIndex(uint32 index) const;
@@ -139,7 +139,7 @@ private:
 	std::unordered_map<uint64, uint32> _transformIndexMap;
 	JLightResource _lightResource;
 
-	// Caching (중복 데이터 방지)
+	// Caching to avoid duplicate render resources.
 	std::vector<MeshResourceRecord> _meshResources;
 	std::unordered_map<const JMesh*, uint32> _meshIndexMap;
 	std::unordered_map<std::string, TextureResourceRecord> _textureCache;

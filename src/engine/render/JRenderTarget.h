@@ -10,16 +10,30 @@ J_ENGINE_BEGIN
 class JRenderTarget
 {
 public:
+	enum class Type : uint8
+	{
+		Color,
+		Depth,
+		ShadowDepth,
+		SwapChain
+	};
+
 	struct Desc
 	{
 		uint32 width = 1;
 		uint32 height = 1;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT rtvFormat = DXGI_FORMAT_UNKNOWN;
+		DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN;
+		DXGI_FORMAT srvFormat = DXGI_FORMAT_UNKNOWN;
 		JColor clearColor = JColors::DarkGray;
+		float clearDepth = 0.0f;
+		uint16 arraySize = 1;
 		Render::JViewport viewport = {};
 		D3D12_RECT scissorRect = {};
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		bool shaderResource = false;
+		Type type = Type::Color;
 	};
 
 	JRenderTarget();
@@ -28,9 +42,10 @@ public:
 	JRenderTarget(ID3D12Resource* resource);
 	~JRenderTarget();
 
-	bool IsValid() const { return !_rtvResources.empty() && _rtvResources[0] != nullptr; }
+	bool IsValid() const { return !_resources.empty() && _resources[0] != nullptr; }
 	bool IsSwapChainTarget() const { return _isSwapChainTarget; }
 	bool OwnsResource() const { return _ownsResource; }
+	bool HasDSV() const { return !_dsvHandles.empty(); }
 	bool HasShaderResource() const { return _shaderResource && _srvHeap != nullptr; }
 	uint32 GetWidth() const { return _width; }
 	uint32 GetHeight() const { return _height; }
@@ -49,6 +64,7 @@ public:
 	const std::vector<D3D12_CPU_DESCRIPTOR_HANDLE>& GetRTVHandle() const;
 	std::vector<ID3D12Resource*>& GetRTVResource();
 	const std::vector<ID3D12Resource*>& GetRTVResource() const;
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(uint32 slice = 0) const;
 	ID3D12Resource* GetResource(uint32 index = 0) const;
 	Render::JTexture* GetTextureView() { return HasShaderResource() ? &_textureView : nullptr; }
 	const Render::JTexture* GetTextureView() const { return HasShaderResource() ? &_textureView : nullptr; }
@@ -58,11 +74,16 @@ public:
 
 private:
 	bool createOffscreenResource(const Desc& desc);
-	bool createShaderResourceView(ID3D12Resource* resource);
+	bool createRenderTargetView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format);
+	bool createDepthStencilViews(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize);
+	bool createShaderResourceView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize);
 
 	std::vector<ComPtr<ID3D12Resource>> _ownedResources;
+	std::vector<ID3D12Resource*> _resources;
 	std::vector<ID3D12Resource*> _rtvResources;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtvHandles;
+	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> _dsvHandles;
 	ComPtr<ID3D12DescriptorHeap> _srvHeap;
 	D3D12_CPU_DESCRIPTOR_HANDLE _srvCPUHandle = {};
 	D3D12_GPU_DESCRIPTOR_HANDLE _srvGPUHandle = {};

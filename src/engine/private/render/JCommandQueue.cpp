@@ -321,26 +321,18 @@ void JCommandQueue::TransitionRenderTarget(Engine::JRenderTarget* renderTarget, 
 		return;
 	}
 
-	vector<D3D12_RESOURCE_BARRIER> barriers;
-	// JRenderTarget이 여러 RTV resource를 가질 수 있어서 모두 같은 상태로 맞춤.
-	for (auto& rtvResource : renderTarget->GetRTVResource())
+	ID3D12Resource* resource = renderTarget->GetResource();
+	if (resource == nullptr)
 	{
-		if (rtvResource == nullptr)
-		{
-			continue;
-		}
-
-		barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-			rtvResource,
-			renderTarget->GetResourceState(),
-			targetState));
+		return;
 	}
 
-	if (!barriers.empty())
-	{
-		_cmdList->ResourceBarrier(static_cast<uint32>(barriers.size()), barriers.data());
-		renderTarget->SetResourceState(targetState);
-	}
+	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		resource,
+		renderTarget->GetResourceState(),
+		targetState);
+	_cmdList->ResourceBarrier(1, &barrier);
+	renderTarget->SetResourceState(targetState);
 }
 
 void JCommandQueue::SetViewports(const uint32& viewPortCount, const D3D12_VIEWPORT* viewport)
