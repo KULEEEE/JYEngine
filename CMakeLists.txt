@@ -88,6 +88,22 @@ file(GLOB_RECURSE CLIENT_HEADERS
 list(FILTER CLIENT_SOURCES EXCLUDE REGEX ".*OpenFBX.*")
 list(FILTER CLIENT_HEADERS EXCLUDE REGEX ".*OpenFBX.*")
 
+set(IMGUI_SOURCES
+    "third_party/imgui/imgui.cpp"
+    "third_party/imgui/imgui_draw.cpp"
+    "third_party/imgui/imgui_tables.cpp"
+    "third_party/imgui/imgui_widgets.cpp"
+    "third_party/imgui/backends/imgui_impl_win32.cpp"
+    "third_party/imgui/backends/imgui_impl_dx12.cpp"
+)
+
+set(IMGUI_HEADERS
+    "third_party/imgui/imgui.h"
+    "third_party/imgui/imconfig.h"
+    "third_party/imgui/backends/imgui_impl_win32.h"
+    "third_party/imgui/backends/imgui_impl_dx12.h"
+)
+
 file(GLOB CLIENT_RESOURCES
     "Client.rc"
     "small.ico"
@@ -97,12 +113,13 @@ file(GLOB CLIENT_RESOURCES
 # C 파일에 대한 언어 설정을 명시적으로 지정
 set_source_files_properties(src/client/OpenFBX/libdeflate.c PROPERTIES LANGUAGE C)
 
-add_executable(Client WIN32 ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS} ${CLIENT_RESOURCES})
+add_executable(Client WIN32 ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS} ${IMGUI_SOURCES} ${IMGUI_HEADERS} ${CLIENT_RESOURCES})
 
 target_include_directories(Client PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
 )
 
 target_compile_options(Client PRIVATE
@@ -165,22 +182,11 @@ set_target_properties(Engine PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL}
 )
 
-option(BUILD_BENCHMARK "Build the Benchmark target (downloads oneTBB via FetchContent)" OFF)
+option(BUILD_BENCHMARK "Build the Benchmark target" OFF)
 
 if(BUILD_BENCHMARK)
     # oneTBB (Benchmark 전용)
-    include(FetchContent)
-    FetchContent_Declare(
-        TBB
-        GIT_REPOSITORY https://github.com/oneapi-src/oneTBB.git
-        GIT_TAG        v2021.13.0
-        GIT_SHALLOW    TRUE
-    )
-    set(TBB_TEST     OFF CACHE BOOL "" FORCE)
-    set(TBB_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(TBB_STRICT   OFF CACHE BOOL "" FORCE)
-    set(TBB_BUILD    ON  CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(TBB)
+    find_package(TBB CONFIG REQUIRED)
 
     # Benchmark (콘솔 실행 파일 — Engine 의존 없음)
     file(GLOB BENCHMARK_SOURCES "benchmark/*.cpp")
@@ -237,6 +243,7 @@ endforeach()
 
 # IDE에서 소스 그룹 구조 설정
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src FILES ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui PREFIX "third_party\\imgui" FILES ${IMGUI_SOURCES} ${IMGUI_HEADERS})
 source_group("tools" FILES tools/JAssetImporter/main.cpp)
 source_group("Resource Files" FILES ${CLIENT_RESOURCES})
 if(BUILD_BENCHMARK)

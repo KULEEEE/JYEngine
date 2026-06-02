@@ -7,6 +7,8 @@
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
+#include "imgui.h"
+
 #include <iostream>
 #include <algorithm>
 
@@ -70,14 +72,20 @@ namespace
 		}
 		return static_cast<uint32>(std::max<LONG>(rect.bottom - rect.top, 1));
 	}
+
+	bool hasTag(const Engine::JEntityMetadata& metadata, const std::string& tag)
+	{
+		return std::find(metadata.tags.begin(), metadata.tags.end(), tag) != metadata.tags.end();
+	}
+
+	void drawComponentBullet(const char* name)
+	{
+		ImGui::BulletText("%s", name);
+	}
 }
 
 JScenePanel::~JScenePanel()
 {
-#ifdef _DEBUG
-	destroyStatsPopup();
-#endif
-
 }
 
 bool JScenePanel::CanRender() const
@@ -87,10 +95,6 @@ bool JScenePanel::CanRender() const
 
 void JScenePanel::Init()
 {
-#ifdef _DEBUG
-	createStatsPopup();
-#endif
-
 	Engine::JRenderer* renderer = GetEngine()->GetRenderer();
 	if (renderer != nullptr)
 	{
@@ -124,19 +128,17 @@ void JScenePanel::Update(Engine::JScene& scene)
 	scene.SetCameraAspectRatio(sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 
 	const float deltaTime = tickFrameTimer();
-#ifdef _DEBUG
 	_lastDeltaTime = deltaTime;
-#endif
 
 	updateSceneCamera(scene, sceneCamera, deltaTime);
+	if (mainWindow != nullptr && GetForegroundWindow() == mainWindow && (GetAsyncKeyState(VK_F2) & 0x0001))
+	{
+		_showEditorUI = !_showEditorUI;
+	}
 #ifdef _DEBUG
 	if (mainWindow != nullptr && GetForegroundWindow() == mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
 	{
 		_showStatsPopup = !_showStatsPopup;
-		if (_statsPopup != nullptr)
-		{
-			ShowWindow(_statsPopup, _showStatsPopup ? SW_SHOWNOACTIVATE : SW_HIDE);
-		}
 	}
 #endif
 
@@ -147,10 +149,121 @@ void JScenePanel::Update(Engine::JScene& scene)
 	}
 }
 
+void JScenePanel::DrawEditorUI(const Engine::JScene& scene)
+{
+	if (!_showEditorUI)
+	{
+		return;
+	}
+
+	ImGui::SetNextWindowSize(ImVec2(380.0f, 560.0f), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20.0f, 20.0f), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Scene", &_showEditorUI))
+	{
+		ImGui::End();
+		return;
+	}
+
+	ImGui::TextUnformatted("Hierarchy");
+	ImGui::Separator();
+
+	// Scene 공개 API만 읽어서 hierarchy 구성함
+	uint32 visibleEntityCount = 0;
+	const std::vector<Engine::JScene::EntitySlot>& entitySlots = scene.GetEntitySlots();
+	for (uint32 index = 0; index < entitySlots.size(); ++index)
+	{
+		const Engine::JScene::EntitySlot& slot = entitySlots[index];
+		if (!slot.active)
+		{
+			continue;
+		}
+
+		const Engine::JEntityHandle entity = { index, slot.generation };
+		const Engine::JEntityMetadata* metadata = scene.GetEntityMetadata(entity);
+		// 에디터가 만든 grid 같은 내부 entity는 표시 안 함
+		if (metadata != nullptr && hasTag(*metadata, "editor_only"))
+		{
+			continue;
+		}
+
+		++visibleEntityCount;
+		const char* entityName = metadata != nullptr && !metadata->name.empty()
+			? metadata->name.c_str()
+			: "Unnamed Entity";
+		const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+		if (ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(index)), flags, "%s  #%u", entityName, index))
+		{
+			if (metadata != nullptr && !metadata->stableID.empty())
+			{
+				ImGui::TextDisabled("id: %s", metadata->stableID.c_str());
+			}
+
+			ImGui::TextUnformatted("Components");
+			ImGui::Indent();
+			// 현재 Scene이 제공하는 컴포넌트 핸들 유효성으로 보유 여부 판단함
+			bool hasComponent = false;
+			if (scene.GetTransformHandle(entity).IsValid())
+			{
+				drawComponentBullet("Transform");
+				hasComponent = true;
+			}
+			if (scene.GetCameraHandle(entity).IsValid())
+			{
+				drawComponentBullet("Camera");
+				hasComponent = true;
+			}
+			if (scene.GetLightHandle(entity).IsValid())
+			{
+				drawComponentBullet("Light");
+				hasComponent = true;
+			}
+			if (scene.GetRenderObjectComponentHandle(entity).IsValid())
+			{
+				drawComponentBullet("RenderObject");
+				hasComponent = true;
+			}
+			if (!hasComponent)
+			{
+				ImGui::TextDisabled("None");
+			}
+			ImGui::Unindent();
+			ImGui::TreePop();
+		}
+	}
+
+	if (visibleEntityCount == 0)
+	{
+		ImGui::TextDisabled("No scene entities.");
+	}
+
+	ImGui::End();
+}
+
 #ifdef _DEBUG
+void JScenePanel::DrawStatsUI()
+{
+	if (!_showStatsPopup)
+	{
+		return;
+	}
+
+	ImGui::SetNextWindowSize(ImVec2(220.0f, 110.0f), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20.0f, 600.0f), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Frame", &_showStatsPopup, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::End();
+		return;
+	}
+
+	ImGui::Text("FPS: %.1f", _displayFps);
+	ImGui::Text("Frame: %.2f ms", _displayFrameMs);
+	ImGui::Text("DrawCalls: %u", _displayDrawCallCount);
+	ImGui::End();
+}
+
 void JScenePanel::OnSceneRendered(const Engine::JFrameDesc& frameDesc)
 {
-	updateStatsPopup(frameDesc);
+	updateStatsData(frameDesc);
 }
 #endif
 
@@ -368,91 +481,11 @@ void JScenePanel::updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle
 }
 
 #ifdef _DEBUG
-void JScenePanel::createStatsPopup()
-{
-	const HWND mainWindow = GetEngineWindowHandle();
-	if (_statsPopup != nullptr || mainWindow == nullptr)
-	{
-		return;
-	}
-
-	RECT ownerRect{};
-	GetWindowRect(mainWindow, &ownerRect);
-	_statsPopup = CreateWindowExW(
-		WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
-		L"STATIC",
-		L"FPS: 0.0\r\nDrawCalls: 0",
-		WS_POPUP | WS_BORDER | SS_LEFT,
-		ownerRect.left + 20,
-		ownerRect.top + 54,
-		260,
-		96,
-		mainWindow,
-		nullptr,
-		GetModuleHandleW(nullptr),
-		nullptr);
-
-	if (_statsPopup == nullptr)
-	{
-		return;
-	}
-
-	_statsFont = CreateFontW(
-		24,
-		0,
-		0,
-		0,
-		FW_SEMIBOLD,
-		FALSE,
-		FALSE,
-		FALSE,
-		DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS,
-		CLIP_DEFAULT_PRECIS,
-		CLEARTYPE_QUALITY,
-		DEFAULT_PITCH | FF_DONTCARE,
-		L"Consolas");
-	SendMessageW(_statsPopup, WM_SETFONT, reinterpret_cast<WPARAM>(_statsFont), TRUE);
-	ShowWindow(_statsPopup, _showStatsPopup ? SW_SHOWNOACTIVATE : SW_HIDE);
-}
-
-void JScenePanel::destroyStatsPopup()
-{
-	if (_statsPopup != nullptr)
-	{
-		DestroyWindow(_statsPopup);
-		_statsPopup = nullptr;
-	}
-
-	if (_statsFont != nullptr)
-	{
-		DeleteObject(_statsFont);
-		_statsFont = nullptr;
-	}
-}
-
-void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc)
+void JScenePanel::updateStatsData(const Engine::JFrameDesc& frameDesc)
 {
 	constexpr float STATS_UPDATE_INTERVAL = 0.25f;
 	_statsElapsed += _lastDeltaTime;
 	++_statsFrameCount;
-
-	if (_statsPopup == nullptr)
-	{
-		createStatsPopup();
-	}
-
-	if (_statsPopup == nullptr || !_showStatsPopup)
-	{
-		return;
-	}
-
-	RECT ownerRect{};
-	const HWND mainWindow = GetEngineWindowHandle();
-	if (mainWindow != nullptr && GetWindowRect(mainWindow, &ownerRect))
-	{
-		SetWindowPos(_statsPopup, HWND_TOPMOST, ownerRect.left + 20, ownerRect.top + 54, 260, 96, SWP_NOACTIVATE);
-	}
 
 	if (_statsElapsed >= STATS_UPDATE_INTERVAL)
 	{
@@ -462,10 +495,6 @@ void JScenePanel::updateStatsPopup(const Engine::JFrameDesc& frameDesc)
 		_statsElapsed = 0.0f;
 		_statsFrameCount = 0;
 	}
-
-	wchar_t text[128] = {};
-	swprintf_s(text, L"FPS: %.1f\r\nFrame: %.2f ms\r\nDrawCalls: %u", _displayFps, _displayFrameMs, _displayDrawCallCount);
-	SetWindowTextW(_statsPopup, text);
 }
 #endif
 

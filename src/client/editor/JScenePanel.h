@@ -26,6 +26,10 @@ public:
 	void Init() override;
 	void Update() override;
 	void Update(Engine::JScene& scene);
+	void DrawEditorUI(const Engine::JScene& scene);
+#ifdef _DEBUG
+	void DrawStatsUI();
+#endif
 	void OnMouseWheel(short delta) override;
 	void SetRenderTarget(Engine::JRenderTarget* renderTarget) { _renderTarget = renderTarget; }
 	Engine::JRenderTarget* GetRenderTarget() const { return _renderTarget; }
@@ -38,9 +42,7 @@ private:
 	void createEditorGrid(Engine::JScene& scene);
 	void updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle sceneCamera, float deltaTime);
 #ifdef _DEBUG
-	void createStatsPopup();
-	void destroyStatsPopup();
-	void updateStatsPopup(const Engine::JFrameDesc& frameDesc);
+	void updateStatsData(const Engine::JFrameDesc& frameDesc);
 #endif
 	float tickFrameTimer();
 	
@@ -59,16 +61,16 @@ private:
 
 	Engine::JRenderTarget* _renderTarget = nullptr;
 
+	bool _showEditorUI = true;
+	float _lastDeltaTime = 0.0f;
+
 #ifdef _DEBUG
 	bool _showStatsPopup = true;
-	HWND _statsPopup = nullptr;
-	HFONT _statsFont = nullptr;
 	float _statsElapsed = 0.0f;
 	uint32 _statsFrameCount = 0;
 	float _displayFps = 0.0f;
 	float _displayFrameMs = 0.0f;
 	uint32 _displayDrawCallCount = 0;
-	float _lastDeltaTime = 0.0f;
 #endif
 	
 

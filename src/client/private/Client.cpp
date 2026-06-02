@@ -3,6 +3,7 @@
 
 #include "client/editor/JSceneManager.h"
 #include "client/editor/JScenePanel.h"
+#include "client/editor/JImGuiLayer.h"
 #include "client/editor/JFBXLoader.h"
 
 #include "engine/render/JRenderDefinition.h"
@@ -13,6 +14,7 @@
 #include <shellapi.h>
 
 J::Editor::JEditorPanel* s_ActiveEditorPanel = nullptr;
+J::Editor::JImGuiLayer* s_ActiveImGuiLayer = nullptr;
 
 #define MAX_LOADSTRING 100
 
@@ -207,6 +209,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         unique_ptr<J::Editor::JScenePanel> panel = make_unique<J::Editor::JScenePanel>();
         panel->Init();
         s_ActiveEditorPanel = panel.get();
+
+        // 에디터 UI 자원은 client/editor 레이어에서만 관리함
+        J::Editor::JImGuiLayer imguiLayer;
+        imguiLayer.Init(
+            windowInfo.hwnd,
+            GetEngine()->GetDevice()->GetDevice().Get(),
+            cmdQueue->GetCmdQueue().Get(),
+            DXGI_FORMAT_R8G8B8A8_UNORM);
+        s_ActiveImGuiLayer = &imguiLayer;
         uint32 swapChainWidth = static_cast<uint32>(std::max(windowInfo.width, 1));
         uint32 swapChainHeight = static_cast<uint32>(std::max(windowInfo.height, 1));
 
@@ -246,6 +257,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             {
                 panel->Update(*scene);
             }
+            if (imguiLayer.IsInitialized())
+            {
+                // ImGui draw command를 만들기 전 frame 상태부터 열어야 함
+                imguiLayer.BeginFrame();
+                if (scene != nullptr)
+                {
+                    panel->DrawEditorUI(*scene);
+                }
+#ifdef _DEBUG
+                panel->DrawStatsUI();
+#endif
+            }
             if (scene != nullptr && panel->CanRender())
             {
 #ifdef _DEBUG
@@ -269,11 +292,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 #endif
                 }
             }
+            if (imguiLayer.IsInitialized() && panel->CanRender())
+            {
+                // Scene 렌더가 끝난 뒤 같은 back buffer 위에 editor UI를 올림
+                imguiLayer.Render(panel->GetRenderTarget(), cmdQueue.get());
+            }
             cmdQueue->RenderEnd(frameIndex);
             swapChain->Present();
             swapChain->SwapIndex();
         }
 
+        s_ActiveImGuiLayer = nullptr;
+        imguiLayer.Shutdown();
         panel.reset();
         s_ActiveEditorPanel = nullptr;
     }
@@ -343,6 +373,15 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (s_ActiveImGuiLayer != nullptr && s_ActiveImGuiLayer->IsInitialized())
+    {
+        // ImGui가 먹은 입력이면 기본 Win32 처리로 넘기지 않음
+        if (J::Editor::JImGuiLayer::HandleWin32Message(hWnd, message, wParam, lParam))
+        {
+            return TRUE;
+        }
+    }
+
     switch (message)
     {
     case WM_COMMAND:
