@@ -494,7 +494,18 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 	}
 
 	const std::vector<DXGI_FORMAT> rtvFormats = getPipelineRtvFormats(resource.shaderPath);
-	resource.pipeline = _renderContext->CreatePipeline(resource.shader, material.IsAlphaBlendEnabled(), true, true, true, rtvFormats);
+	const D3D12_DEPTH_WRITE_MASK depthWriteMask = material.IsAlphaBlendEnabled()
+		? D3D12_DEPTH_WRITE_MASK_ZERO
+		: D3D12_DEPTH_WRITE_MASK_ALL;
+	resource.pipeline = _renderContext->CreatePipeline(
+		resource.shader,
+		material.IsAlphaBlendEnabled(),
+		true,
+		true,
+		true,
+		rtvFormats,
+		true,
+		depthWriteMask);
 	if (resource.pipeline == nullptr)
 	{
 		destroyMaterialResource(_renderContext, _shaderCache, _textureCache, resource);

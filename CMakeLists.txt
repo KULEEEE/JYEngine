@@ -159,6 +159,30 @@ target_compile_options(JAssetImporter PRIVATE
 target_link_libraries(JAssetImporter PRIVATE Engine)
 add_dependencies(JAssetImporter Engine)
 
+set(GAUSSIAN_SMOKE_SAMPLE_SOURCES
+    "samples/GaussianSmoke/main.cpp"
+)
+
+add_executable(GaussianSmokeSample WIN32 ${GAUSSIAN_SMOKE_SAMPLE_SOURCES})
+
+target_include_directories(GaussianSmokeSample PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+)
+
+target_compile_options(GaussianSmokeSample PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+)
+
+target_compile_definitions(GaussianSmokeSample PRIVATE
+    JY_ENGINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(GaussianSmokeSample PRIVATE Engine)
+target_link_libraries(GaussianSmokeSample PRIVATE shell32.lib)
+add_dependencies(GaussianSmokeSample Engine)
+
 # 리소스 복사
 # 모든 빌드 구성이 동일한 출력 디렉토리를 사용하도록 설정
 set_target_properties(Client PROPERTIES
@@ -169,6 +193,13 @@ set_target_properties(Client PROPERTIES
 )
 
 set_target_properties(JAssetImporter PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${JY_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL}
+)
+
+set_target_properties(GaussianSmokeSample PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${JY_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${JY_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${JY_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO}
@@ -219,6 +250,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET Engine PROPERTY FOLDER "Projects")
 set_property(TARGET Client PROPERTY FOLDER "Projects")
 set_property(TARGET JAssetImporter PROPERTY FOLDER "Projects")
+set_property(TARGET GaussianSmokeSample PROPERTY FOLDER "Projects")
 if(BUILD_BENCHMARK)
     set_property(TARGET Benchmark PROPERTY FOLDER "Projects")
 endif()
@@ -245,6 +277,7 @@ endforeach()
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src FILES ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${OPENFBX_SOURCES} ${OPENFBX_HEADERS})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui PREFIX "third_party\\imgui" FILES ${IMGUI_SOURCES} ${IMGUI_HEADERS})
 source_group("tools" FILES tools/JAssetImporter/main.cpp)
+source_group("samples\\GaussianSmoke" FILES ${GAUSSIAN_SMOKE_SAMPLE_SOURCES})
 source_group("Resource Files" FILES ${CLIENT_RESOURCES})
 if(BUILD_BENCHMARK)
     source_group("benchmark" FILES ${BENCHMARK_SOURCES} ${BENCHMARK_HEADERS})
