@@ -102,6 +102,17 @@ float DistanceAttenuation(float dist, float range)
     return window / (dist * dist + 1.0f);
 }
 
+// ACES filmic 근사 (Narkowicz 2015). Reinhard보다 대비/채도 보존이 좋음.
+float3 ACESFilm(float3 color)
+{
+    const float a = 2.51f;
+    const float b = 0.03f;
+    const float c = 2.43f;
+    const float d = 0.59f;
+    const float e = 0.14f;
+    return saturate((color * (a * color + b)) / (color * (c * color + d) + e));
+}
+
 // directional light의 cascade shadow. 1 = lit, 0 = 그림자.
 float SampleCascadeShadow(float3 worldPos, float viewDistance)
 {
@@ -152,11 +163,13 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
 
     float roughness = saturate(material.r);
     float metallic = saturate(material.g);
+    float occlusion = saturate(material.b);
 
     float3 worldPos = ReconstructWorldPosition(pixel, depth);
     float3 viewDir = normalize(CameraPosition.xyz - worldPos);
     float3 f0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-    float3 ambient = albedo * 0.28f * (1.0f - metallic);
+    // 베이크된 AO는 간접광(ambient)에만 적용함. 직접광은 섀도우맵이 가림을 담당.
+    float3 ambient = albedo * 0.28f * (1.0f - metallic) * occlusion;
     float3 direct = float3(0.0f, 0.0f, 0.0f);
 
     // 모든 directional light가 첫 directional 기준의 cascade shadow를 공유함
@@ -202,7 +215,7 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
 
     float3 color = ambient + direct;
 
-    color = color / (color + 1.0f);
+    color = ACESFilm(color);
     color = pow(saturate(color), 1.0f / 2.2f);
     return float4(color, albedoSample.a);
 }
