@@ -1,0 +1,436 @@
+#include "client/editor/JSceneBuilder.h"
+
+#include "engine/render/JMaterialFactory.h"
+
+#include <iostream>
+
+J_EDITOR_BEGIN
+
+namespace
+{
+	Engine::JScene::TransformData toRuntimeTransform(const Engine::JSceneTransformData& source)
+	{
+		Engine::JScene::TransformData transform{};
+		transform.translation = source.translation;
+		transform.rotation = source.rotation;
+		transform.scale = source.scale;
+		return transform;
+	}
+
+	Engine::JScene::TransformData combineTransforms(const Engine::JScene::TransformData& parent, const Engine::JSceneTransformData&)
+	{
+		return parent;
+	}
+}
+
+void JSceneBuildResult::Release()
+{
+	registeredCameras.clear();
+	renderObjects.clear();
+	lights.clear();
+	cameras.clear();
+	transforms.clear();
+	entities.clear();
+	materialsByID.clear();
+	primaryCamera = {};
+	firstLight = {};
+
+	scene.reset();
+	materials.clear();
+	materialBundles.clear();
+	meshes.clear();
+}
+
+bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuildContext& context, JSceneBuildResult& outResult)
+{
+	outResult.Release();
+
+	if (context.materialFactory == nullptr)
+	{
+		std::cerr << "JSceneBuilder::Build failed: material factory is null." << std::endl;
+		return false;
+	}
+
+	JSceneBuildResult result;
+	result.scene = std::make_unique<Engine::JScene>();
+
+	for (const Engine::JSceneMaterialData& materialData : sceneData.materials)
+	{
+		if (materialData.id.empty())
+		{
+			std::cerr << "JSceneBuilder::Build failed: material id is empty." << std::endl;
+			result.Release();
+			return false;
+		}
+
+		if (result.materialsByID.find(materialData.id) != result.materialsByID.end())
+		{
+			std::cerr << "JSceneBuilder::Build failed: duplicated material id: " << materialData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		if (context.assetManager == nullptr)
+		{
+			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
+			result.Release();
+			return false;
+		}
+
+		std::shared_ptr<JAssetManager::MaterialBundle> materialBundle = context.assetManager->AcquireMaterialBundle(materialData);
+		if (!materialBundle || !materialBundle->material)
+		{
+			std::cerr << "JSceneBuilder::Build failed: material creation failed: " << materialData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		const Engine::JMaterialHandle materialHandle = result.scene->AddMaterial(materialBundle->material);
+		if (!materialHandle.IsValid())
+		{
+			std::cerr << "JSceneBuilder::Build failed: scene material registration failed: " << materialData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		result.materialsByID[materialData.id] = materialHandle;
+		result.materialBundles.emplace_back(materialBundle);
+		result.materials.emplace_back(materialBundle->material);
+	}
+
+	std::unordered_map<std::string, Engine::JMesh*> meshLookup;
+	std::unordered_map<std::string, std::vector<Engine::JMaterialHandle>> importedSubMeshMaterialsByMeshID;
+	for (const Engine::JSceneMeshData& meshData : sceneData.meshes)
+	{
+		if (meshData.id.empty())
+		{
+			std::cerr << "JSceneBuilder::Build failed: mesh id is empty." << std::endl;
+			result.Release();
+			return false;
+		}
+
+		if (meshLookup.find(meshData.id) != meshLookup.end())
+		{
+			std::cerr << "JSceneBuilder::Build failed: duplicated mesh id: " << meshData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		if (context.assetManager == nullptr)
+		{
+			std::cerr << "JSceneBuilder::Build failed: asset manager is null." << std::endl;
+			result.Release();
+			return false;
+		}
+
+		std::shared_ptr<Engine::JMesh> mesh = context.assetManager->AcquireMesh(meshData);
+		if (!mesh)
+		{
+			std::cerr << "JSceneBuilder::Build failed: mesh creation failed: " << meshData.id << std::endl;
+			result.Release();
+			return false;
+		}
+
+		meshLookup[meshData.id] = mesh.get();
+		result.meshes.emplace_back(mesh);
+
+		const std::vector<std::shared_ptr<JAssetManager::MaterialBundle>>* importedMaterialBundles =
+			context.assetManager->GetImportedMaterialBundles(meshData);
+		if (importedMaterialBundles != nullptr && !importedMaterialBundles->empty())
+		{
+			std::vector<Engine::JMaterialHandle> importedMaterialHandles;
+			importedMaterialHandles.reserve(importedMaterialBundles->size());
+			for (const std::shared_ptr<JAssetManager::MaterialBundle>& materialBundle : *importedMaterialBundles)
+			{
+				if (!materialBundle || !materialBundle->material)
+				{
+					importedMaterialHandles.push_back({});
+					continue;
+				}
+
+				const Engine::JMaterialHandle materialHandle = result.scene->AddMaterial(materialBundle->material);
+				if (!materialHandle.IsValid())
+				{
+					std::cerr << "JSceneBuilder::Build failed: imported material registration failed: " << meshData.id << std::endl;
+					result.Release();
+					return false;
+				}
+
+				importedMaterialHandles.push_back(materialHandle);
+				result.materialBundles.emplace_back(materialBundle);
+				result.materials.emplace_back(materialBundle->material);
+			}
+
+			if (!importedMaterialHandles.empty())
+			{
+				importedSubMeshMaterialsByMeshID[meshData.id] = std::move(importedMaterialHandles);
+			}
+		}
+	}
+
+	for (const Engine::JSceneEntityData& entityData : sceneData.entities)
+	{
+		Engine::JEntityHandle entity = result.scene->CreateEntity(entityData.stableID, entityData.name, entityData.tags);
+		if (!entity.IsValid())
+		{
+			std::cerr << "JSceneBuilder::Build failed: entity creation failed: " << entityData.stableID << std::endl;
+			result.Release();
+			return false;
+		}
+
+		if (Engine::JScene::EntityData* runtimeEntity = result.scene->GetEntity(entity))
+		{
+			runtimeEntity->active = entityData.active;
+		}
+
+		const Engine::JEntityMetadata* entityMetadata = result.scene->GetEntityMetadata(entity);
+		const std::string entityKey = entityMetadata != nullptr ? entityMetadata->stableID : entityData.stableID;
+		result.entities[entityKey] = entity;
+
+		Engine::JTransformHandle transform = {};
+		if (entityData.hasTransform)
+		{
+			transform = result.scene->AddTransform(entity, toRuntimeTransform(entityData.transform));
+			if (!transform.IsValid())
+			{
+				std::cerr << "JSceneBuilder::Build failed: transform creation failed: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+			result.transforms[entityKey] = transform;
+		}
+
+		if (entityData.hasCamera)
+		{
+			if (!transform.IsValid())
+			{
+				std::cerr << "JSceneBuilder::Build failed: camera requires transform: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			Engine::JCameraHandle camera = result.scene->AddCamera(
+				entity,
+				transform,
+				context.cameraAspectRatio,
+				entityData.camera.nearP,
+				entityData.camera.farP);
+			Engine::JScene::CameraData* cameraData = result.scene->GetCamera(camera);
+			if (!camera.IsValid() || cameraData == nullptr)
+			{
+				std::cerr << "JSceneBuilder::Build failed: camera creation failed: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			Engine::JScene::CameraData resolvedCameraData = *cameraData;
+			resolvedCameraData.active = entityData.camera.active;
+			resolvedCameraData.nearP = entityData.camera.nearP;
+			resolvedCameraData.farP = entityData.camera.farP;
+			result.scene->SetCameraData(camera, resolvedCameraData);
+		
+			result.cameras[entityKey] = camera;
+			result.registeredCameras.push_back(camera);
+
+			if (entityData.camera.primary || !result.primaryCamera.IsValid())
+			{
+				result.primaryCamera = camera;
+				result.scene->SetPrimaryCamera(camera);
+			}
+		}
+
+		if (entityData.hasLight)
+		{
+			if (!transform.IsValid())
+			{
+				std::cerr << "JSceneBuilder::Build failed: light requires transform: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			Engine::JScene::LightData lightData{};
+			lightData.active = entityData.light.active;
+			lightData.type = entityData.light.type == Engine::JSceneLightType::Directional
+				? Engine::JLightType::Directional
+				: Engine::JLightType::Point;
+			lightData.color = entityData.light.color;
+			lightData.intensity = entityData.light.intensity;
+			lightData.range = entityData.light.range;
+
+			Engine::JLightHandle light = result.scene->AddLight(entity, lightData);
+			if (!light.IsValid())
+			{
+				std::cerr << "JSceneBuilder::Build failed: light creation failed: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			result.lights[entityKey] = light;
+			if (!result.firstLight.IsValid())
+			{
+				result.firstLight = light;
+			}
+		}
+
+		if (entityData.hasRenderObjectComponent)
+		{
+			if (!transform.IsValid())
+			{
+				std::cerr << "JSceneBuilder::Build failed: render object component requires transform: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			const auto meshIter = meshLookup.find(entityData.renderObjectComponent.meshID);
+			if (meshIter == meshLookup.end())
+			{
+				std::cerr << "JSceneBuilder::Build failed: render object component asset reference is invalid: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			std::vector<Engine::JMaterialHandle> subMeshMaterials;
+			if (!entityData.renderObjectComponent.subMeshMaterialIDs.empty())
+			{
+				subMeshMaterials.reserve(entityData.renderObjectComponent.subMeshMaterialIDs.size());
+				for (const std::string& materialID : entityData.renderObjectComponent.subMeshMaterialIDs)
+				{
+					const auto subMeshMaterialIter = result.materialsByID.find(materialID);
+					if (subMeshMaterialIter == result.materialsByID.end())
+					{
+						std::cerr << "JSceneBuilder::Build failed: submesh material reference is invalid: " << entityData.stableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					subMeshMaterials.push_back(subMeshMaterialIter->second);
+				}
+			}
+			else
+			{
+				const auto importedIter = importedSubMeshMaterialsByMeshID.find(entityData.renderObjectComponent.meshID);
+				if (importedIter != importedSubMeshMaterialsByMeshID.end())
+				{
+					subMeshMaterials = importedIter->second;
+				}
+			}
+
+			Engine::JMaterialHandle fallbackMaterial = {};
+			const auto materialIter = result.materialsByID.find(entityData.renderObjectComponent.materialID);
+			if (materialIter != result.materialsByID.end())
+			{
+				fallbackMaterial = materialIter->second;
+			}
+			else if (!subMeshMaterials.empty() && subMeshMaterials.front().IsValid())
+			{
+				fallbackMaterial = subMeshMaterials.front();
+			}
+			else
+			{
+				std::cerr << "JSceneBuilder::Build failed: render object component material reference is invalid: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			const Engine::JSceneMeshData* renderMeshData = nullptr;
+			for (const Engine::JSceneMeshData& meshData : sceneData.meshes)
+			{
+				if (meshData.id == entityData.renderObjectComponent.meshID)
+				{
+					renderMeshData = &meshData;
+					break;
+				}
+			}
+
+			const JAssetManager::ImportedScene* importedScene = renderMeshData != nullptr && context.assetManager != nullptr
+				? context.assetManager->GetImportedScene(*renderMeshData)
+				: nullptr;
+			if (importedScene != nullptr && !importedScene->nodes.empty())
+			{
+				const Engine::JScene::TransformData parentTransform = transform.IsValid()
+					? result.scene->GetTransform(transform)
+					: Engine::JScene::TransformData{};
+
+				for (uint32 nodeIndex = 0; nodeIndex < importedScene->nodes.size(); ++nodeIndex)
+				{
+					const JAssetManager::ImportedSceneNode& node = importedScene->nodes[nodeIndex];
+					if (!node.mesh)
+					{
+						continue;
+					}
+
+					std::string nodeStableID = entityKey + "_fbx_node_" + std::to_string(nodeIndex);
+					std::string nodeName = !node.name.empty() ? node.name : nodeStableID;
+					Engine::JEntityHandle nodeEntity = result.scene->CreateEntity(nodeStableID, nodeName, entityData.tags);
+					if (!nodeEntity.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node entity creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					Engine::JTransformHandle nodeTransform = result.scene->AddTransform(nodeEntity, combineTransforms(parentTransform, node.transform));
+					if (!nodeTransform.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node transform creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					Engine::JRenderObjectComponentHandle nodeRenderObject = result.scene->AddRenderObjectComponent(
+						nodeEntity,
+						fallbackMaterial,
+						subMeshMaterials,
+						node.mesh.get(),
+						entityData.renderObjectComponent.transparent);
+					if (!nodeRenderObject.IsValid())
+					{
+						std::cerr << "JSceneBuilder::Build failed: imported node render object creation failed: " << nodeStableID << std::endl;
+						result.Release();
+						return false;
+					}
+
+					result.entities[nodeStableID] = nodeEntity;
+					result.transforms[nodeStableID] = nodeTransform;
+					result.renderObjects[nodeStableID] = nodeRenderObject;
+					result.meshes.emplace_back(node.mesh);
+				}
+
+				continue;
+			}
+
+			Engine::JRenderObjectComponentHandle renderObject = result.scene->AddRenderObjectComponent(
+				entity,
+				fallbackMaterial,
+				subMeshMaterials,
+				meshIter->second,
+				entityData.renderObjectComponent.transparent);
+
+			Engine::JScene::RenderObjectComponentData* renderObjectData = result.scene->GetRenderObjectComponent(renderObject);
+			if (!renderObject.IsValid() || renderObjectData == nullptr)
+			{
+				std::cerr << "JSceneBuilder::Build failed: render object component creation failed: " << entityData.stableID << std::endl;
+				result.Release();
+				return false;
+			}
+
+			Engine::JScene::RenderObjectComponentData resolvedRenderObjectData = *renderObjectData;
+			resolvedRenderObjectData.active = entityData.renderObjectComponent.active;
+			resolvedRenderObjectData.visible = entityData.renderObjectComponent.visible;
+			result.scene->SetRenderObjectComponentData(renderObject, resolvedRenderObjectData);
+			result.renderObjects[entityKey] = renderObject;
+		}
+	}
+
+	if (!result.primaryCamera.IsValid())
+	{
+		std::cerr << "JSceneBuilder::Build failed: scene has no camera." << std::endl;
+		result.Release();
+		return false;
+	}
+
+	outResult = std::move(result);
+	return true;
+}
+
+J_EDITOR_END

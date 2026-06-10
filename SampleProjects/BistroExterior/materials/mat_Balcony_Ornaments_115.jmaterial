@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Balcony_Ornaments",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Balcony_Ornaments_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Balcony_Ornaments_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Balcony_Ornaments_Specular.jtex"
+    }
+  ]
+}

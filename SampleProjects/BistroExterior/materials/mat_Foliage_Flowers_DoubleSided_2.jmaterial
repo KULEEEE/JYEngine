@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Foliage_Flowers.DoubleSided",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Foliage_Flowers_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Foliage_Flowers_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Foliage_Flowers_Specular.jtex"
+    }
+  ]
+}

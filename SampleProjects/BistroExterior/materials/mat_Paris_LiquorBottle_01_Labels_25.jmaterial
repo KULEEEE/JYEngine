@@ -1,0 +1,26 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 0.0,
+    "roughness": 0.5
+  },
+  "enableAlphaBlend": false,
+  "name": "Paris_LiquorBottle_01_Labels",
+  "shaderPath": "shader/gbuffer_albedo.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Paris_LiquorBottle_01_Labels_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Paris_LiquorBottle_01_Labels_Normal.jtex"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Plaster",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Plaster_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Plaster_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Plaster_Specular.jtex"
+    }
+  ]
+}

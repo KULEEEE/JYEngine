@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "MenuSign_02_Glass",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/MenuSign_02_Glass_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/MenuSign_02_Glass_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/MenuSign_02_Glass_Specular.jtex"
+    }
+  ]
+}

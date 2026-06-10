@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "MenuSign_01",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/MenuSign_01_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/MenuSign_01_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/MenuSign_01_Specular.jtex"
+    }
+  ]
+}

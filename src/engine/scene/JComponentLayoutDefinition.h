@@ -1,0 +1,56 @@
+#pragma once
+#ifndef __J_COMPONENT_LAYOUT_DEFINITION_H__
+#define __J_COMPONENT_LAYOUT_DEFINITION_H__
+
+#include "engine/precompile.h"
+#include "engine/scene/JSceneHandle.h"
+/*#include "engine/asset/JMesh.h"*/ namespace J { namespace Engine { class JMesh; } }
+
+J_ENGINE_BEGIN
+
+struct JTransformComponents
+{
+	JVec3 translation = { 0.0f, 0.0f, 0.0f };
+	JVec3 rotation = { 0.0f, 0.0f, 0.0f };
+	JVec3 scale = { 1.0f, 1.0f, 1.0f };
+};
+
+struct JCameraComponents
+{
+	JEntityHandle entity = {};
+	float aspectRatio = 1.0f;
+	float nearP = 5.0f;
+	float farP = 1000.0f;
+	bool active = true;
+};
+
+enum class JLightType : uint8
+{
+	Point,
+	Directional,
+};
+
+struct JLightComponents
+{
+	JEntityHandle entity = {};
+	JLightType type = JLightType::Point;
+	JVec3 color = { 1.0f, 1.0f, 1.0f };
+	float intensity = 1.0f;
+	float range = 25.0f; // point 전용. directional은 transform rotation의 +Z 방향으로 비춘다.
+	bool active = true;
+};
+
+struct JRenderObjectComponent
+{
+	JEntityHandle entity = {};
+	const JMesh* mesh = nullptr;
+	JMaterialHandle material = {};
+	std::vector<JMaterialHandle> subMeshMaterials;
+	bool visible = true;
+	bool transparent = false;
+	bool active = true;
+};
+
+J_ENGINE_END
+
+#endif

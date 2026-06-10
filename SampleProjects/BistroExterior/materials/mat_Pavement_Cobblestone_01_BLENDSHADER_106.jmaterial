@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Pavement_Cobblestone_01_BLENDSHADER",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Pavement_Cobblestone_01_BLENDSHADER_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Pavement_Cobblestone_01_BLENDSHADER_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Pavement_Cobblestone_01_BLENDSHADER_Specular.jtex"
+    }
+  ]
+}

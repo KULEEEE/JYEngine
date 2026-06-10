@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Paris_StringLights_01_Pink_Color_Emissive",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Paris_StringLights_01_Pink_Color_Emissive_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Paris_StringLights_01_Pink_Color_Emissive_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Paris_StringLights_01_Pink_Color_Emissive_Specular.jtex"
+    }
+  ]
+}

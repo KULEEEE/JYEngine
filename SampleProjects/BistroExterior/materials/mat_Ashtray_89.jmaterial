@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Ashtray",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Ashtray_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Ashtray_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Ashtray_Specular.jtex"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Foliage_Ivy_leaf_a.DoubleSided",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Foliage_Ivy_leaf_a_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Foliage_Ivy_leaf_a_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Foliage_Ivy_leaf_a_Specular.jtex"
+    }
+  ]
+}

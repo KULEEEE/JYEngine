@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "MASTER_Doors",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/MASTER_Doors_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/MASTER_Doors_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/MASTER_Doors_Specular.jtex"
+    }
+  ]
+}

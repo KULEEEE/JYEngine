@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "LanternEmissive",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/LanternEmissive_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/LanternEmissive_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/LanternEmissive_Specular.jtex"
+    }
+  ]
+}

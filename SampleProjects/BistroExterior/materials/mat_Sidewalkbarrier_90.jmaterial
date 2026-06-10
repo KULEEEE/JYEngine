@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Sidewalkbarrier",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Sidewalkbarrier_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Sidewalkbarrier_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Sidewalkbarrier_Specular.jtex"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "constants": {
+    "baseColor": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "enabled": true,
+    "metallic": 1.0,
+    "roughness": 1.0
+  },
+  "enableAlphaBlend": false,
+  "name": "Bistro_Sign_Letters",
+  "shaderPath": "shader/gbuffer_orm.hlsl",
+  "textures": [
+    {
+      "name": "BaseTexture",
+      "path": "textures/Bistro_Sign_Letters_BaseColor.jtex"
+    },
+    {
+      "name": "NormalTexture",
+      "path": "textures/Bistro_Sign_Letters_Normal.jtex"
+    },
+    {
+      "name": "ORMTexture",
+      "path": "textures/Bistro_Sign_Letters_Specular.jtex"
+    }
+  ]
+}
