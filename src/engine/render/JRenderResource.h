@@ -38,6 +38,14 @@ struct JLightConstants
 	JVec4 info;
 };
 
+struct JShadowConstants
+{
+	XMFLOAT4X4 cascadeViewProjections[4];
+	JVec4 cascadeSplits;  // 카메라 거리 기준 cascade 경계
+	JVec4 cascadeBiases;  // reverse-Z depth 단위 bias (cascade별)
+	JVec4 shadowParams;   // x: enabled, y: max shadow distance
+};
+
 struct JMaterialResource
 {
 	struct ConstantBufferEntry

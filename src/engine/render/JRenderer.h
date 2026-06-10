@@ -7,6 +7,7 @@
 #include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderFrame.h"
 #include "engine/render/JRenderPass.h"
+#include "engine/render/JShadowMap.h"
 
 /*#include "engine/render/JCommandQueue.h"*/ namespace J { namespace Render { class JCommandQueue; } }
 /*#include "engine/render/JRenderContext.h"*/ namespace J { namespace Render { class JRenderContext; } }
@@ -43,6 +44,7 @@ private:
 	void initializeForwardPasses();
 	void initializeDeferredPasses();
 	void ensureGBuffer(const FrameDesc& frameDesc);
+	void ensureShadowMap();
 	void prepareFrameResources(const FrameDesc& frameDesc);
 
 	Render::JCommandQueue* _commandQueue = nullptr;
@@ -50,6 +52,7 @@ private:
 	JRenderDB _renderDB;
 	std::vector<std::unique_ptr<JRenderPass>> _passes;
 	std::unique_ptr<JGBuffer> _gBuffer;
+	std::unique_ptr<JShadowMap> _shadowMap;
 	RenderPath _renderPath = RenderPath::Forward;
 };
 

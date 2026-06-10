@@ -7,6 +7,7 @@
 #include "engine/render/JRenderContext.h"
 #include "engine/render/JRenderResource.h"
 #include "engine/render/JRenderTarget.h"
+#include "engine/render/JShadowMap.h"
 #include "engine/asset/JShader.h"
 
 #include <iostream>
@@ -69,7 +70,9 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	Render::JTexture* normalTexture = normalTarget != nullptr ? normalTarget->GetTextureView() : nullptr;
 	Render::JTexture* materialTexture = materialTarget != nullptr ? materialTarget->GetTextureView() : nullptr;
 	Render::JTexture* depthTexture = depthTarget != nullptr ? depthTarget->GetTextureView() : nullptr;
-	if (albedoTexture == nullptr || normalTexture == nullptr || materialTexture == nullptr || depthTexture == nullptr || !ensureResources(context))
+	JRenderTarget* shadowTarget = context.shadowMap != nullptr ? context.shadowMap->GetDepthTarget() : nullptr;
+	Render::JTexture* shadowTexture = shadowTarget != nullptr ? shadowTarget->GetTextureView() : nullptr;
+	if (albedoTexture == nullptr || normalTexture == nullptr || materialTexture == nullptr || depthTexture == nullptr || shadowTexture == nullptr || !ensureResources(context))
 	{
 		return;
 	}
@@ -77,6 +80,8 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	// depth는 prepass/gbuffer가 DEPTH_WRITE 상태로 쓰고 여기서 SRV로 읽는다.
 	// 같은 프레임의 forward overlay가 다시 depth test에 쓰므로 패스가 끝나면 DEPTH_WRITE로 되돌린다.
 	context.commandQueue->TransitionRenderTarget(depthTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	// shadow map도 같은 방식: shadow pass가 DEPTH_WRITE로 쓰고 여기서 SampleCmp로 읽는다.
+	context.commandQueue->TransitionRenderTarget(shadowTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
 	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
@@ -96,10 +101,23 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	const D3D12_GPU_VIRTUAL_ADDRESS viewGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&viewConstants, sizeof(viewConstants));
 	graphicResource.SetConstantBufferAddress("PerView", viewGpuAddress);
 
+	const JShadowMap::CascadeData& cascadeData = context.shadowMap->cascadeData;
+	JShadowConstants shadowConstants{};
+	for (uint32 cascade = 0; cascade < JShadowMap::CASCADE_COUNT; ++cascade)
+	{
+		shadowConstants.cascadeViewProjections[cascade] = cascadeData.viewProjections[cascade];
+	}
+	shadowConstants.cascadeSplits = JVec4(cascadeData.splitDistances[0], cascadeData.splitDistances[1], cascadeData.splitDistances[2], cascadeData.splitDistances[3]);
+	shadowConstants.cascadeBiases = JVec4(cascadeData.depthBiases[0], cascadeData.depthBiases[1], cascadeData.depthBiases[2], cascadeData.depthBiases[3]);
+	shadowConstants.shadowParams = JVec4(cascadeData.hasDirectionalLight ? 1.0f : 0.0f, context.shadowMap->GetDesc().maxShadowDistance, 0.0f, 0.0f);
+	const D3D12_GPU_VIRTUAL_ADDRESS shadowGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&shadowConstants, sizeof(shadowConstants));
+	graphicResource.SetConstantBufferAddress("PerShadow", shadowGpuAddress);
+
 	graphicResource.SetTexture("GBufferAlbedo", albedoTexture);
 	graphicResource.SetTexture("GBufferNormal", normalTexture);
 	graphicResource.SetTexture("GBufferMaterial", materialTexture);
 	graphicResource.SetTexture("DepthBuffer", depthTexture);
+	graphicResource.SetTexture("ShadowMap", shadowTexture);
 
 	context.commandQueue->SetPipeline(_pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);
@@ -108,6 +126,7 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 
 	context.commandQueue->EndRenderPass();
 	context.commandQueue->TransitionRenderTarget(depthTarget, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	context.commandQueue->TransitionRenderTarget(shadowTarget, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 }
 
 J_ENGINE_END

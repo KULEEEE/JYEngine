@@ -577,10 +577,24 @@ public:
 		for (const auto& sampler : bindingInfo.samplers)
 		{
 			CD3DX12_STATIC_SAMPLER_DESC samplerDesc(sampler.slot);
-			samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-			samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-			samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-			samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+			if (sampler.name.find("Shadow") != std::string::npos)
+			{
+				// 이름에 Shadow가 들어가면 SampleCmp용 비교 샘플러로 만듦.
+				// reverse-Z shadow map이라 GREATER_EQUAL, 맵 밖은 border(0)와 비교 → ref >= 0 → 항상 lit.
+				samplerDesc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+				samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+				samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+				samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+				samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+				samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+			}
+			else
+			{
+				samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+				samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+				samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+				samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+			}
 			staticSamplers.push_back(samplerDesc);
 		}
 		// root parameter와 static sampler를 합쳐 root signature 생성함.

@@ -13,10 +13,23 @@ cbuffer PerView : register(b1)
     float4 CameraPosition;
 };
 
+static const int CASCADE_COUNT = 4;
+
+cbuffer PerShadow : register(b2)
+{
+    float4x4 ShadowViewProjections[CASCADE_COUNT];
+    float4 CascadeSplits; // 카메라 거리 기준 cascade 경계
+    float4 CascadeBiases; // reverse-Z depth 단위 bias (cascade별)
+    float4 ShadowParams;  // x: enabled, y: max shadow distance
+};
+
 Texture2D GBufferAlbedo : register(t0);
 Texture2D GBufferNormal : register(t1);
 Texture2D GBufferMaterial : register(t2);
 Texture2D DepthBuffer : register(t3);
+Texture2DArray ShadowMap : register(t4);
+// 이름에 Shadow가 들어가면 엔진이 GREATER_EQUAL 비교 샘플러로 생성함 (reverse-Z 규약)
+SamplerComparisonState ShadowSampler : register(s0);
 
 static const float PI = 3.14159265f;
 
@@ -89,6 +102,38 @@ float DistanceAttenuation(float dist, float range)
     return window / (dist * dist + 1.0f);
 }
 
+// directional light의 cascade shadow. 1 = lit, 0 = 그림자.
+float SampleCascadeShadow(float3 worldPos, float viewDistance)
+{
+    if (ShadowParams.x < 0.5f || viewDistance > ShadowParams.y)
+    {
+        return 1.0f;
+    }
+
+    int cascade = 3;
+    if (viewDistance < CascadeSplits.x)
+    {
+        cascade = 0;
+    }
+    else if (viewDistance < CascadeSplits.y)
+    {
+        cascade = 1;
+    }
+    else if (viewDistance < CascadeSplits.z)
+    {
+        cascade = 2;
+    }
+
+    float4 shadowPos = mul(float4(worldPos, 1.0f), ShadowViewProjections[cascade]);
+    shadowPos.xyz /= max(shadowPos.w, 0.0001f);
+    float2 shadowUV = float2(shadowPos.x * 0.5f + 0.5f, 0.5f - shadowPos.y * 0.5f);
+
+    // reverse-Z: bias를 더해 수신면을 라이트 쪽으로 살짝 당겨 acne를 줄임.
+    // 맵 밖 uv는 border 샘플러가 ref >= 0으로 항상 lit 처리.
+    float referenceDepth = saturate(shadowPos.z + CascadeBiases[cascade]);
+    return ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV, cascade), referenceDepth);
+}
+
 float4 pMain(VS_OUTPUT input) : SV_TARGET
 {
     int2 pixel = int2(input.Pos.xy);
@@ -114,6 +159,9 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
     float3 ambient = albedo * 0.28f * (1.0f - metallic);
     float3 direct = float3(0.0f, 0.0f, 0.0f);
 
+    // 모든 directional light가 첫 directional 기준의 cascade shadow를 공유함
+    float directionalShadow = SampleCascadeShadow(worldPos, distance(CameraPosition.xyz, worldPos));
+
     int lightCount = min((int)LightInfo.x, MAX_RENDER_LIGHTS);
     [loop]
     for (int i = 0; i < lightCount; ++i)
@@ -125,7 +173,7 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
         if (positionRange.w <= 0.0f)
         {
             lightDir = normalize(-positionRange.xyz);
-            attenuation = 1.0f;
+            attenuation = directionalShadow;
         }
         else
         {

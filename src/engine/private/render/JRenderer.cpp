@@ -11,6 +11,8 @@
 #include "engine/render/JGBufferPass.h"
 #include "engine/render/JLightingPass.h"
 #include "engine/render/JForwardOverlayPass.h"
+#include "engine/render/JShadowMap.h"
+#include "engine/render/JShadowPass.h"
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
@@ -40,6 +42,7 @@ void JRenderer::initializeForwardPasses()
 void JRenderer::initializeDeferredPasses()
 {
 	_passes.clear();
+	_passes.push_back(std::make_unique<JShadowPass>());
 	_passes.push_back(std::make_unique<JDepthPass>());
 	_passes.push_back(std::make_unique<JGBufferPass>());
 	_passes.push_back(std::make_unique<JLightingPass>());
@@ -86,6 +89,21 @@ void JRenderer::ensureGBuffer(const FrameDesc& frameDesc)
 	_gBuffer->Initialize(desc);
 }
 
+void JRenderer::ensureShadowMap()
+{
+	if (_renderPath != RenderPath::Deferred || _shadowMap != nullptr)
+	{
+		return;
+	}
+
+	_shadowMap = std::make_unique<JShadowMap>();
+	if (!_shadowMap->Initialize(JShadowMap::Desc{}))
+	{
+		std::cerr << "JRenderer::ensureShadowMap failed: shadow map initialization failed." << std::endl;
+		_shadowMap.reset();
+	}
+}
+
 void JRenderer::Render(const FrameDesc& frameDesc)
 {
 	if (_commandQueue == nullptr || _renderContext == nullptr)
@@ -105,6 +123,7 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 		initializeDefaultPasses();
 	}
 	ensureGBuffer(frameDesc);
+	ensureShadowMap();
 	prepareFrameResources(frameDesc);
 
 	const JCameraResource* cameraResource = _renderDB.FindCameraResource(frameDesc.camera);
@@ -119,6 +138,7 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	context.renderContext = _renderContext;
 	context.renderDB = &_renderDB;
 	context.gBuffer = _gBuffer.get();
+	context.shadowMap = _shadowMap.get();
 
 	for (const std::unique_ptr<JRenderPass>& pass : _passes)
 	{

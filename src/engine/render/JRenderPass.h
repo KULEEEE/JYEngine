@@ -9,6 +9,7 @@
 /*#include "engine/render/JRenderContext.h"*/ namespace J { namespace Render { class JRenderContext; } }
 /*#include "engine/render/JRenderDB.h"*/ namespace J { namespace Engine { class JRenderDB; } }
 /*#include "engine/render/JGBuffer.h"*/ namespace J { namespace Engine { class JGBuffer; } }
+/*#include "engine/render/JShadowMap.h"*/ namespace J { namespace Engine { class JShadowMap; } }
 
 J_ENGINE_BEGIN
 
@@ -18,6 +19,7 @@ struct JRenderPassContext
 	Render::JRenderContext* renderContext = nullptr;
 	JRenderDB* renderDB = nullptr;
 	JGBuffer* gBuffer = nullptr;
+	JShadowMap* shadowMap = nullptr;
 };
 
 struct JRenderPassStats
