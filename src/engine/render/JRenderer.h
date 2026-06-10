@@ -27,6 +27,14 @@ public:
 	using DrawItem = JDrawItem;
 	using FrameDesc = JFrameDesc;
 
+	struct PassTiming
+	{
+		const char* name = "";
+		double cpuMs = 0.0;
+		uint32 drawCalls = 0;
+		uint32 skipped = 0;
+	};
+
 	JRenderer() = default;
 	~JRenderer();
 
@@ -36,6 +44,8 @@ public:
 	void SetRenderPath(RenderPath renderPath);
 	RenderPath GetRenderPath() const { return _renderPath; }
 	JGBuffer* GetGBuffer() const { return _gBuffer.get(); }
+
+	const std::vector<PassTiming>& GetLastFrameTimings() const { return _lastFrameTimings; }
 
 	void Render(const FrameDesc& frameDesc);
 
@@ -54,6 +64,7 @@ private:
 	std::unique_ptr<JGBuffer> _gBuffer;
 	std::unique_ptr<JShadowMap> _shadowMap;
 	RenderPath _renderPath = RenderPath::Forward;
+	std::vector<PassTiming> _lastFrameTimings;
 };
 
 J_ENGINE_END

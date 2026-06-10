@@ -16,6 +16,7 @@
 #include "engine/asset/JMaterial.h"
 #include "engine/asset/JMesh.h"
 
+#include <chrono>
 #include <iostream>
 
 J_ENGINE_BEGIN
@@ -140,11 +141,18 @@ void JRenderer::Render(const FrameDesc& frameDesc)
 	context.gBuffer = _gBuffer.get();
 	context.shadowMap = _shadowMap.get();
 
+	_lastFrameTimings.clear();
 	for (const std::unique_ptr<JRenderPass>& pass : _passes)
 	{
 		if (pass != nullptr)
 		{
+			const auto passBegin = std::chrono::high_resolution_clock::now();
 			pass->Execute(context, frameDesc);
+			const auto passEnd = std::chrono::high_resolution_clock::now();
+
+			const double cpuMs = std::chrono::duration<double, std::milli>(passEnd - passBegin).count();
+			const JRenderPassStats& stats = pass->GetLastStats();
+			_lastFrameTimings.push_back({ pass->GetName(), cpuMs, stats.drawCallCount, stats.skippedDrawCount });
 		}
 	}
 }

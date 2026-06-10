@@ -8,6 +8,9 @@
 
 #include "engine/render/JRenderDefinition.h"
 #include "engine/core/JEngineContext.h"
+#include "engine/render/JRenderer.h"
+
+#include "imgui.h"
 
 #include <iostream>
 #include <algorithm>
@@ -29,6 +32,95 @@ INT_PTR CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 
 namespace
 {
+	void DrawRenderProfiler(J::Engine::JRenderer* renderer)
+	{
+		if (renderer == nullptr)
+		{
+			return;
+		}
+
+		const std::vector<J::Engine::JRenderer::PassTiming>& timings = renderer->GetLastFrameTimings();
+
+		static std::vector<double> accumMs;     // 현재 구간 ms 합
+		static std::vector<double> displayMs;   // 확정된 표시값(1초마다 갱신)
+		static std::vector<uint32> displayDraws;
+		static int   frameCount = 0;            // 현재 구간 프레임 수
+		static int   displayFrameCount = 0;     // 확정된 구간 프레임 수(≈FPS)
+		static double lastUpdateTime = 0.0;
+
+		if (accumMs.size() != timings.size())
+		{
+			accumMs.assign(timings.size(), 0.0);
+			displayMs.assign(timings.size(), 0.0);
+			displayDraws.assign(timings.size(), 0);
+			frameCount = 0;
+		}
+
+		for (size_t i = 0; i < timings.size(); ++i)
+		{
+			accumMs[i] += timings[i].cpuMs;
+		}
+		++frameCount;
+
+		const double now = ImGui::GetTime();
+		if (now - lastUpdateTime >= 1.0 && frameCount > 0)
+		{
+			for (size_t i = 0; i < timings.size(); ++i)
+			{
+				displayMs[i] = accumMs[i] / frameCount;
+				displayDraws[i] = timings[i].drawCalls;
+				accumMs[i] = 0.0;
+			}
+			displayFrameCount = frameCount;
+			frameCount = 0;
+			lastUpdateTime = now;
+		}
+
+		ImGui::Begin("Render Profiler");
+#if defined(NDEBUG)
+		ImGui::TextUnformatted("Build: optimized (Release/RelWithDebInfo)");
+#else
+		ImGui::TextUnformatted("Build: Debug - NOT for perf judgement");
+#endif
+		ImGui::Text("1s avg over %d frames (~%d fps)", displayFrameCount, displayFrameCount);
+		ImGui::Separator();
+
+		if (ImGui::BeginTable("pass_timings", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+		{
+			ImGui::TableSetupColumn("Pass");
+			ImGui::TableSetupColumn("CPU ms");
+			ImGui::TableSetupColumn("Draws");
+			ImGui::TableHeadersRow();
+
+			double totalMs = 0.0;
+			uint32 totalDraws = 0;
+			for (size_t i = 0; i < timings.size(); ++i)
+			{
+				totalMs += displayMs[i];
+				totalDraws += displayDraws[i];
+
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted(timings[i].name);
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3f", displayMs[i]);
+				ImGui::TableNextColumn();
+				ImGui::Text("%u", displayDraws[i]);
+			}
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted("TOTAL");
+			ImGui::TableNextColumn();
+			ImGui::Text("%.3f", totalMs);
+			ImGui::TableNextColumn();
+			ImGui::Text("%u", totalDraws);
+
+			ImGui::EndTable();
+		}
+		ImGui::End();
+	}
+
 	struct SceneLaunchOptions
 	{
 		bool createNew = false;
@@ -268,6 +360,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 #ifdef _DEBUG
                 panel->DrawStatsUI();
 #endif
+                DrawRenderProfiler(GetEngine()->GetRenderer());
             }
             if (scene != nullptr && panel->CanRender())
             {
