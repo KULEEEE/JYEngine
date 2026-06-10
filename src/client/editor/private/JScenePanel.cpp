@@ -82,6 +82,48 @@ namespace
 	{
 		ImGui::BulletText("%s", name);
 	}
+
+	// 첫 번째 active directional light를 전역 라이트로 간주하고 각도/세기를 편집함.
+	// 라이트 스냅샷은 매 프레임 scene에서 다시 읽히므로 값만 바꾸면 즉시 반영됨.
+	void drawGlobalLightControls(Engine::JScene& scene)
+	{
+		const std::vector<Engine::JScene::LightSlot>& lightSlots = scene.GetLightSlots();
+		for (uint32 index = 0; index < static_cast<uint32>(lightSlots.size()); ++index)
+		{
+			const Engine::JScene::LightSlot& slot = lightSlots[index];
+			if (!slot.active || !slot.data.active || slot.data.type != Engine::JLightType::Directional)
+			{
+				continue;
+			}
+
+			const Engine::JLightHandle lightHandle = { index, slot.generation };
+			const JVec3* rotation = scene.GetTransformRotation(slot.data.entity);
+			if (rotation == nullptr)
+			{
+				break;
+			}
+
+			ImGui::TextUnformatted("Global Light");
+			ImGui::Separator();
+
+			constexpr float radToDeg = 180.0f / 3.14159265f;
+			constexpr float degToRad = 3.14159265f / 180.0f;
+			float rotationDegrees[3] = { rotation->x * radToDeg, rotation->y * radToDeg, rotation->z * radToDeg };
+			if (ImGui::DragFloat3("Rotation", rotationDegrees, 0.5f, -360.0f, 360.0f, "%.1f deg"))
+			{
+				scene.SetTransformRotation(slot.data.entity, { rotationDegrees[0] * degToRad, rotationDegrees[1] * degToRad, rotationDegrees[2] * degToRad });
+			}
+
+			Engine::JScene::LightData lightData = slot.data;
+			if (ImGui::DragFloat("Intensity", &lightData.intensity, 0.05f, 0.0f, 100.0f, "%.2f"))
+			{
+				scene.SetLightData(lightHandle, lightData);
+			}
+
+			ImGui::Spacing();
+			break;
+		}
+	}
 }
 
 JScenePanel::~JScenePanel()
@@ -149,7 +191,7 @@ void JScenePanel::Update(Engine::JScene& scene)
 	}
 }
 
-void JScenePanel::DrawEditorUI(const Engine::JScene& scene)
+void JScenePanel::DrawEditorUI(Engine::JScene& scene)
 {
 	if (!_showEditorUI)
 	{
@@ -163,6 +205,8 @@ void JScenePanel::DrawEditorUI(const Engine::JScene& scene)
 		ImGui::End();
 		return;
 	}
+
+	drawGlobalLightControls(scene);
 
 	ImGui::TextUnformatted("Hierarchy");
 	ImGui::Separator();

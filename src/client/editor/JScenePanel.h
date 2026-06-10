@@ -26,7 +26,7 @@ public:
 	void Init() override;
 	void Update() override;
 	void Update(Engine::JScene& scene);
-	void DrawEditorUI(const Engine::JScene& scene);
+	void DrawEditorUI(Engine::JScene& scene);
 #ifdef _DEBUG
 	void DrawStatsUI();
 #endif
