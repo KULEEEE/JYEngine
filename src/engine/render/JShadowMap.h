@@ -18,8 +18,8 @@ public:
 	struct Desc
 	{
 		uint32 resolution = 2048;          // cascade 한 장의 해상도
-		float maxShadowDistance = 150.0f;  // 카메라로부터 그림자를 그릴 최대 거리
-		float depthBiasWorld = 0.15f;      // world 단위 bias. cascade별로 depth 단위로 환산해 사용함
+		float maxShadowDistance = 100.0f;  // 카메라로부터 그림자를 그릴 최대 거리
+		float depthBiasWorld = 0.035f;     // world 단위 bias. cascade별로 depth 단위로 환산해 사용함
 	};
 
 	struct CascadeData

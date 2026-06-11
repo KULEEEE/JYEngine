@@ -17,7 +17,7 @@ J_ENGINE_BEGIN
 namespace
 {
 	// 카메라 프러스텀을 거리 기준으로 나눌 누적 비율. 가까운 cascade일수록 촘촘하게.
-	constexpr float CASCADE_SPLIT_RATIOS[JShadowMap::CASCADE_COUNT] = { 0.08f, 0.22f, 0.5f, 1.0f };
+	constexpr float CASCADE_SPLIT_RATIOS[JShadowMap::CASCADE_COUNT] = { 0.05f, 0.16f, 0.42f, 1.0f };
 
 	struct FrustumCorners
 	{

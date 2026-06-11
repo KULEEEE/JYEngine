@@ -32,6 +32,7 @@ Texture2DArray ShadowMap : register(t4);
 SamplerComparisonState ShadowSampler : register(s0);
 
 static const float PI = 3.14159265f;
+static const float SHADOW_PCF_RADIUS = 1.25f;
 
 struct VS_OUTPUT
 {
@@ -114,6 +115,26 @@ float3 ACESFilm(float3 color)
 }
 
 // directional light의 cascade shadow. 1 = lit, 0 = 그림자.
+float SampleShadowPCF(float2 shadowUV, int cascade, float referenceDepth)
+{
+    uint width;
+    uint height;
+    uint layers;
+    uint levels;
+    ShadowMap.GetDimensions(0, width, height, layers, levels);
+
+    float2 texelSize = 1.0f / float2(width, height);
+    float2 offset = texelSize * SHADOW_PCF_RADIUS;
+    float layer = (float)cascade;
+
+    float shadow = 0.0f;
+    shadow += ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV + float2(-offset.x, -offset.y), layer), referenceDepth);
+    shadow += ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV + float2( offset.x, -offset.y), layer), referenceDepth);
+    shadow += ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV + float2(-offset.x,  offset.y), layer), referenceDepth);
+    shadow += ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV + float2( offset.x,  offset.y), layer), referenceDepth);
+    return shadow * 0.25f;
+}
+
 float SampleCascadeShadow(float3 worldPos, float viewDistance)
 {
     if (ShadowParams.x < 0.5f || viewDistance > ShadowParams.y)
@@ -142,7 +163,7 @@ float SampleCascadeShadow(float3 worldPos, float viewDistance)
     // reverse-Z: bias를 더해 수신면을 라이트 쪽으로 살짝 당겨 acne를 줄임.
     // 맵 밖 uv는 border 샘플러가 ref >= 0으로 항상 lit 처리.
     float referenceDepth = saturate(shadowPos.z + CascadeBiases[cascade]);
-    return ShadowMap.SampleCmpLevelZero(ShadowSampler, float3(shadowUV, cascade), referenceDepth);
+    return SampleShadowPCF(shadowUV, cascade, referenceDepth);
 }
 
 float4 pMain(VS_OUTPUT input) : SV_TARGET
