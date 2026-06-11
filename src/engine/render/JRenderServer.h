@@ -24,7 +24,7 @@ public:
 
 	void SyncScene(JScene& scene);
 
-	bool BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc) const;
+	bool BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc);
 
 private:
 	const JCameraSnapshot* findCameraSnapshot(JCameraHandle camera) const;
@@ -36,6 +36,7 @@ private:
 
 	JJobSystem* _jobSystem = nullptr;
 	JFrameSnapshot _frameSnapshot;
+	std::vector<JFrameMaterialSnapshot> _frameMaterialSnapshots;
 	JDrawItemCache _drawItemCache;
 	JScene* _syncedScene = nullptr;
 	JCameraHandle _primaryCamera = {};

@@ -2,12 +2,12 @@
 
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JDrawItemCache.h"
-#include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderContext.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/render/JRenderResource.h"
 #include "engine/render/JShadowMap.h"
 #include "engine/asset/JShader.h"
+#include "engine/core/JHashFunction.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,9 +39,9 @@ namespace
 	}
 
 	// snapshot builder 규약: position.w <= 0이면 directional, xyz = 빛이 진행하는 방향
-	bool findDirectionalLightDirection(const JFrameLightSnapshot& snapshot, XMVECTOR& outDirection)
+	bool findDirectionalLightDirection(JArrayView<const JFrameLightSnapshot::Item> lightItems, XMVECTOR& outDirection)
 	{
-		for (const JFrameLightSnapshot::Item& item : snapshot.items)
+		for (const JFrameLightSnapshot::Item& item : lightItems)
 		{
 			if (item.position.w > 0.0f)
 			{
@@ -58,26 +58,22 @@ namespace
 		return false;
 	}
 
-	bool buildShadowGraphicResource(const JRenderPassContext& context, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource, D3D12_GPU_VIRTUAL_ADDRESS cascadeGpuAddress)
+	uint32 findCBufferRootParameterIndex(Render::JShader* shader, const char* name)
 	{
-		if (!context.renderDB->BuildGraphicResource(drawItem.material, graphicResource.GetShader(), graphicResource))
+		if (shader == nullptr || name == nullptr)
 		{
-			return false;
+			return static_cast<uint32>(-1);
 		}
 
-		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
-		if (transformResource != nullptr)
+		const uint32 nameHash = JHashFunction::StrCrc32(name);
+		for (uint32 i = 0; i < static_cast<uint32>(shader->bindingInfo.cBuffers.size()); ++i)
 		{
-			const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
-			graphicResource.SetConstantBufferAddress("PerObject", gpuAddress);
+			if (shader->bindingInfo.cBuffers[i].nameHash == nameHash)
+			{
+				return i;
+			}
 		}
-
-		if (cascadeGpuAddress != 0)
-		{
-			graphicResource.SetConstantBufferAddress("PerFrame", cascadeGpuAddress);
-		}
-
-		return true;
+		return static_cast<uint32>(-1);
 	}
 }
 
@@ -104,6 +100,11 @@ bool JShadowPass::ensureResources(const JRenderPassContext& context)
 		// light-space에서도 결국 depth만 쓰면 되므로 depth prepass 셰이더를 그대로 재사용한다.
 		const std::string shaderPath = get_Engine_Shader_Path() + "\\depth_prepass.hlsl";
 		_shader = context.renderContext->CreateShader(shaderPath);
+		if (_shader != nullptr)
+		{
+			_perObjectRootParameterIndex = findCBufferRootParameterIndex(_shader, "PerObject");
+			_perFrameRootParameterIndex = findCBufferRootParameterIndex(_shader, "PerFrame");
+		}
 	}
 
 	if (_shader != nullptr && _pipeline == nullptr)
@@ -140,9 +141,11 @@ void JShadowPass::Execute(const JRenderPassContext& context, const JFrameDesc& f
 	{
 		return;
 	}
+	context.commandQueue->SetPipeline(_pipeline);
+	context.commandQueue->SetGraphicResources(_shader);
 
 	XMVECTOR lightDirection = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
-	const bool hasDirectional = findDirectionalLightDirection(frameDesc.lightSnapshot, lightDirection);
+	const bool hasDirectional = findDirectionalLightDirection(frameDesc.lightItems, lightDirection);
 
 	const JShadowMap::Desc& desc = shadowMap->GetDesc();
 	const D3D12_VIEWPORT viewport = { 0.0f, 0.0f, static_cast<float>(desc.resolution), static_cast<float>(desc.resolution), 0.0f, 1.0f };
@@ -223,6 +226,10 @@ void JShadowPass::Execute(const JRenderPassContext& context, const JFrameDesc& f
 		JPerFrameConstants cascadeConstants{};
 		XMStoreFloat4x4(&cascadeConstants.viewProjection, XMMatrixTranspose(viewProjection));
 		const D3D12_GPU_VIRTUAL_ADDRESS cascadeGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cascadeConstants, sizeof(cascadeConstants));
+		if (_perFrameRootParameterIndex != static_cast<uint32>(-1))
+		{
+			context.commandQueue->SetGraphicsRootConstantBufferView(_perFrameRootParameterIndex, cascadeGpuAddress);
+		}
 
 		for (uint32 drawItemIndex : frameDesc.opaqueDrawItemIndices)
 		{
@@ -239,15 +246,18 @@ void JShadowPass::Execute(const JRenderPassContext& context, const JFrameDesc& f
 				continue;
 			}
 
-			Render::JGraphicResource graphicResource(_shader);
-			if (!buildShadowGraphicResource(context, drawItem, graphicResource, cascadeGpuAddress))
+			const JTransformResource* transformResource = resources.transform;
+			if (transformResource == nullptr)
 			{
 				++_lastStats.skippedDrawCount;
 				continue;
 			}
 
-			context.commandQueue->SetPipeline(_pipeline);
-			context.commandQueue->SetGraphicResources(&graphicResource);
+			if (_perObjectRootParameterIndex != static_cast<uint32>(-1))
+			{
+				const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
+				context.commandQueue->SetGraphicsRootConstantBufferView(_perObjectRootParameterIndex, objectGpuAddress);
+			}
 			context.commandQueue->BindVertexBuffer(resources.mesh);
 			const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(resources.mesh->indexSize);
 			context.commandQueue->DrawIndexed(indexCount, 1, drawItem.startIndex, 0, 0);

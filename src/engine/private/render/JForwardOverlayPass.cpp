@@ -37,7 +37,7 @@ void JForwardOverlayPass::Execute(const JRenderPassContext& context, const JFram
 	context.commandQueue->EndRenderPass();
 }
 
-void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
+void JForwardOverlayPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, JArrayView<const uint32> drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
 {
 	if (frameDesc.drawItemCache == nullptr)
 	{

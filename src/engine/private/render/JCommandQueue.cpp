@@ -419,6 +419,16 @@ void JCommandQueue::SetGraphicResources(const JGraphicResource* resource)
 	}
 }
 
+void JCommandQueue::SetGraphicsRootConstantBufferView(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress)
+{
+	if (_cmdList == nullptr || gpuAddress == 0)
+	{
+		return;
+	}
+
+	_cmdList->SetGraphicsRootConstantBufferView(rootParameterIndex, gpuAddress);
+}
+
 D3D12_GPU_DESCRIPTOR_HANDLE JCommandQueue::allocateFrameTextureTable(const JGraphicResource* resource, JShader* shader)
 {
 	D3D12_GPU_DESCRIPTOR_HANDLE emptyHandle{};

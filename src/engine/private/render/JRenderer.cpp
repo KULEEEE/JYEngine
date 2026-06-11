@@ -170,17 +170,18 @@ void JRenderer::prepareFrameResources(const FrameDesc& frameDesc)
 		_renderDB.SyncCamera(frameDesc.camera, frameDesc.cameraViewProjection);
 	}
 
-	for (const JFrameTransformSnapshot& snapshot : frameDesc.transformSnapshots)
+	for (JFrameTransformSnapshot& snapshot : frameDesc.transformSnapshots)
 	{
+		if (!snapshot.valid || !snapshot.dirty)
+		{
+			continue;
+		}
+
 		_renderDB.SyncTransform(snapshot.transform, snapshot.world);
+		snapshot.dirty = false;
 	}
 
-	JLightSnapshot lightSnapshot;
-	for (const JFrameLightSnapshot::Item& item : frameDesc.lightSnapshot.items)
-	{
-		lightSnapshot.items.push_back({ item.colorIntensity, item.position });
-	}
-	_renderDB.SyncLight(lightSnapshot);
+	_renderDB.SyncLight(frameDesc.lightItems);
 
 	std::unordered_set<const JMesh*> activeMeshes;
 	if (frameDesc.drawItemCache != nullptr)
@@ -197,6 +198,14 @@ void JRenderer::prepareFrameResources(const FrameDesc& frameDesc)
 	for (const JMesh* mesh : activeMeshes)
 	{
 		_renderDB.GetOrCreateMeshResource(mesh);
+	}
+
+	if (frameDesc.drawItemCache != nullptr)
+	{
+		for (JDrawItem& drawItem : frameDesc.drawItemCache->drawItems)
+		{
+			_renderDB.UpdateDrawItemResourceIndices(drawItem);
+		}
 	}
 }
 

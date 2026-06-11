@@ -35,6 +35,7 @@ public:
 	void SetPipeline(const JPipeline* pipeline);
 	void SetGraphicResources(JShader* shader);
 	void SetGraphicResources(const JGraphicResource* resource);
+	void SetGraphicsRootConstantBufferView(uint32 rootParameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress);
 	void BindVertexBuffer(const Engine::JMeshResource* meshResource);
 	void Draw(const uint32& vertexCount, const uint32& instanceCount);
 	void DrawFullscreenTriangle();

@@ -330,13 +330,14 @@ void JRenderServer::SyncScene(JScene& scene)
 
 	JCameraRenderQueueBuilder::Input queueInput;
 	queueInput.drawItemCache = &_drawItemCache;
+	queueInput.transformSnapshots = &_frameSnapshot.transforms;
 	queueInput.renderDB = nullptr;
 	queueInput.scene = &scene;
 	queueInput.jobSystem = _jobSystem;
 	JCameraRenderQueueBuilder::Build(queueInput, _frameSnapshot);
 }
 
-bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc) const
+bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::FrameDesc& outFrameDesc)
 {
 	if (!_primaryCamera.IsValid() || renderTarget == nullptr)
 	{
@@ -359,10 +360,8 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::Frame
 	outFrameDesc.cameraViewProjection = cameraSnapshot->viewProjection;
 	outFrameDesc.cameraInverseViewProjection = cameraSnapshot->inverseViewProjection;
 	outFrameDesc.cameraWorldPosition = cameraSnapshot->worldPosition;
-	for (const JTransformSnapshot& snapshot : _frameSnapshot.transforms)
-	{
-		outFrameDesc.transformSnapshots.push_back({ snapshot.transform, snapshot.world });
-	}
+
+	_frameMaterialSnapshots.clear();
 	if (_syncedScene != nullptr)
 	{
 		const std::vector<JScene::MaterialSlot>& materialSlots = _syncedScene->GetMaterialSlots();
@@ -376,20 +375,19 @@ bool JRenderServer::BuildFrameDesc(JRenderTarget* renderTarget, JRenderer::Frame
 			const JScene::MaterialSlot& slot = materialSlots[materialIndex];
 			if (slot.active && slot.material != nullptr)
 			{
-				outFrameDesc.materialSnapshots.push_back({ { materialIndex, slot.generation }, slot.material.get() });
+				_frameMaterialSnapshots.push_back({ { materialIndex, slot.generation }, slot.material.get() });
 			}
-		}
-	}
-	if (!_frameSnapshot.lights.empty())
-	{
-		for (const JLightSnapshot::Item& item : _frameSnapshot.lights.front().items)
-		{
-			outFrameDesc.lightSnapshot.items.push_back({ item.colorIntensity, item.position });
 		}
 	}
 
 	outFrameDesc.cullingTestedDrawItemCount = cameraSnapshot->cullingTestedDrawItemCount;
 	outFrameDesc.culledDrawItemCount = cameraSnapshot->culledDrawItemCount;
+	outFrameDesc.transformSnapshots = _frameSnapshot.transforms;
+	outFrameDesc.materialSnapshots = _frameMaterialSnapshots;
+	if (!_frameSnapshot.lights.empty())
+	{
+		outFrameDesc.lightItems = _frameSnapshot.lights.front().items;
+	}
 	outFrameDesc.opaqueDrawItemIndices = cameraSnapshot->opaqueDrawItemIndices;
 	outFrameDesc.transparentDrawItemIndices = cameraSnapshot->transparentDrawItemIndices;
 	return true;

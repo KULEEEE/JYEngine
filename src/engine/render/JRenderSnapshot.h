@@ -29,22 +29,8 @@ struct JCameraSnapshot
 	std::vector<uint32> transparentDrawItemIndices;
 };
 
-struct JTransformSnapshot
-{
-	JTransformHandle transform = {};
-	XMMATRIX world = XMMatrixIdentity();
-};
-
-struct JLightSnapshot
-{
-	struct Item
-	{
-		JVec4 colorIntensity = { 1.0f, 1.0f, 1.0f, 0.35f };
-		JVec4 position = { 0.0f, 4.0f, -4.0f, 1.0f };
-	};
-
-	std::vector<Item> items;
-};
+using JTransformSnapshot = JFrameTransformSnapshot;
+using JLightSnapshot = JFrameLightSnapshot;
 
 struct JFrameSnapshot
 {

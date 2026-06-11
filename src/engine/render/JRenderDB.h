@@ -98,7 +98,7 @@ public:
 	void SyncMaterial(JMaterialHandle handle, const JMaterial& material);
 	void SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection);
 	void SyncTransform(JTransformHandle transform, const XMMATRIX& world);
-	void SyncLight(const JLightSnapshot& snapshot);
+	void SyncLight(JArrayView<const JFrameLightSnapshot::Item> lightItems);
 	
 	JMeshResource* GetOrCreateMeshResource(const JMesh* mesh);
 	
@@ -113,6 +113,7 @@ public:
 	void Clear();
 
 	ResolvedDrawResources ResolveDrawResources(const JDrawItem& drawItem) const;
+	void UpdateDrawItemResourceIndices(JDrawItem& drawItem) const;
 	bool BuildGraphicResource(JMaterialHandle material, Render::JShader* shader, Render::JGraphicResource& outResource) const;
 
 private:

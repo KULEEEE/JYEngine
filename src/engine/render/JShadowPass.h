@@ -28,6 +28,8 @@ private:
 
 	Render::JShader* _shader = nullptr;
 	Render::JPipeline* _pipeline = nullptr;
+	uint32 _perObjectRootParameterIndex = static_cast<uint32>(-1);
+	uint32 _perFrameRootParameterIndex = static_cast<uint32>(-1);
 	JRenderPassStats _lastStats = {};
 };
 

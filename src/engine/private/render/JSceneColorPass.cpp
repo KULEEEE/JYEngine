@@ -44,7 +44,7 @@ void JSceneColorPass::Execute(const JRenderPassContext& context, const JFrameDes
 	context.commandQueue->EndRenderPass();
 }
 
-void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, const std::vector<uint32>& drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress, D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress)
+void JSceneColorPass::renderDrawItems(const JRenderPassContext& context, const JFrameDesc& frameDesc, JArrayView<const uint32> drawItemIndices, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress, D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress)
 {
 	if (frameDesc.drawItemCache == nullptr)
 	{

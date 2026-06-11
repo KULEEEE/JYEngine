@@ -63,12 +63,28 @@ struct JMaterialResource
 		std::string path;
 	};
 
+	struct PreparedConstantBufferBinding
+	{
+		uint32 rootParameterIndex = 0;
+		uint32 shaderSlot = 0;
+		Render::JConstantBuffer* buffer = nullptr;
+	};
+
+	struct PreparedTextureBinding
+	{
+		uint32 rootParameterIndex = 0;
+		uint32 shaderSlot = 0;
+		Render::JTexture* texture = nullptr;
+	};
+
 	JMaterialHandle material = {};
 	Render::JShader* shader = nullptr;
 	std::string shaderPath;
 	Render::JPipeline* pipeline = nullptr;
 	std::vector<ConstantBufferEntry> constantBuffers;
 	std::vector<TextureEntry> textures;
+	std::vector<PreparedConstantBufferBinding> preparedConstantBuffers;
+	std::vector<PreparedTextureBinding> preparedTextures;
 };
 
 struct JCameraResource

@@ -169,20 +169,19 @@ void JScenePanel::Update(Engine::JScene& scene)
 	const uint32 clientHeight = getClientHeight(mainWindow);
 	scene.SetCameraAspectRatio(sceneCamera, static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 
-	const float deltaTime = tickFrameTimer();
-	_lastDeltaTime = deltaTime;
+	const float frameTime = tickFrameTimer();
+	_lastFrameTime = frameTime;
+	_lastMovementDeltaTime = std::clamp(frameTime, 0.0f, MAX_FRAME_DELTA_TIME);
 
-	updateSceneCamera(scene, sceneCamera, deltaTime);
+	updateSceneCamera(scene, sceneCamera, _lastMovementDeltaTime);
 	if (mainWindow != nullptr && GetForegroundWindow() == mainWindow && (GetAsyncKeyState(VK_F2) & 0x0001))
 	{
 		_showEditorUI = !_showEditorUI;
 	}
-#ifdef _DEBUG
 	if (mainWindow != nullptr && GetForegroundWindow() == mainWindow && (GetAsyncKeyState(VK_F1) & 0x0001))
 	{
 		_showStatsPopup = !_showStatsPopup;
 	}
-#endif
 
 	if (_renderTarget != nullptr)
 	{
@@ -283,7 +282,6 @@ void JScenePanel::DrawEditorUI(Engine::JScene& scene)
 	ImGui::End();
 }
 
-#ifdef _DEBUG
 void JScenePanel::DrawStatsUI()
 {
 	if (!_showStatsPopup)
@@ -309,7 +307,6 @@ void JScenePanel::OnSceneRendered(const Engine::JFrameDesc& frameDesc)
 {
 	updateStatsData(frameDesc);
 }
-#endif
 
 float JScenePanel::tickFrameTimer()
 {
@@ -324,7 +321,7 @@ float JScenePanel::tickFrameTimer()
 	QueryPerformanceCounter(&now);
 	const double elapsed = static_cast<double>(now.QuadPart - _lastFrameCounter.QuadPart) / static_cast<double>(_timerFrequency.QuadPart);
 	_lastFrameCounter = now;
-	return std::clamp(static_cast<float>(elapsed), 0.0f, MAX_FRAME_DELTA_TIME);
+	return static_cast<float>(elapsed);
 }
 
 void JScenePanel::OnMouseWheel(short delta)
@@ -524,11 +521,10 @@ void JScenePanel::updateSceneCamera(Engine::JScene& scene, Engine::JCameraHandle
 	scene.SetTransformTranslation(transformHandle, { newPosition.x, newPosition.y, newPosition.z });
 }
 
-#ifdef _DEBUG
 void JScenePanel::updateStatsData(const Engine::JFrameDesc& frameDesc)
 {
 	constexpr float STATS_UPDATE_INTERVAL = 0.25f;
-	_statsElapsed += _lastDeltaTime;
+	_statsElapsed += _lastFrameTime;
 	++_statsFrameCount;
 
 	if (_statsElapsed >= STATS_UPDATE_INTERVAL)
@@ -540,6 +536,5 @@ void JScenePanel::updateStatsData(const Engine::JFrameDesc& frameDesc)
 		_statsFrameCount = 0;
 	}
 }
-#endif
 
 J_EDITOR_END

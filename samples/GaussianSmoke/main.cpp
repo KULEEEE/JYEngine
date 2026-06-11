@@ -257,19 +257,19 @@ namespace
 		const uint32 opaqueDraws = static_cast<uint32>(frameDesc.opaqueDrawItemIndices.size());
 		const uint32 transparentDraws = static_cast<uint32>(frameDesc.transparentDrawItemIndices.size());
 		const uint32 drawCalls = opaqueDraws + transparentDraws;
-		const uint32 dirtyTransforms = static_cast<uint32>(frameDesc.transformSnapshots.size());
+		const uint32 transformCacheCount = static_cast<uint32>(frameDesc.transformSnapshots.size());
 
 		wchar_t text[512] = {};
 		swprintf_s(
 			text,
-			L"FPS: %.1f\r\nDrawCalls: %u  (opaque %u / transparent %u)\r\nParticles: %u\r\nUpdated Particles: %u\r\nDirty Transforms: %u",
+			L"FPS: %.1f\r\nDrawCalls: %u  (opaque %u / transparent %u)\r\nParticles: %u\r\nUpdated Particles: %u\r\nTransform Cache: %u",
 			fps,
 			drawCalls,
 			opaqueDraws,
 			transparentDraws,
 			config.particleCount,
 			config.updateCount,
-			dirtyTransforms);
+			transformCacheCount);
 
 		SetWindowTextW(stats.text, text);
 	}

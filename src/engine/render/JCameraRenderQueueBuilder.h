@@ -19,6 +19,7 @@ public:
 	struct Input
 	{
 		const JDrawItemCache* drawItemCache = nullptr;
+		const std::vector<JTransformSnapshot>* transformSnapshots = nullptr;
 		const JRenderDB* renderDB = nullptr;
 		const JScene* scene = nullptr;
 		JJobSystem* jobSystem = nullptr;

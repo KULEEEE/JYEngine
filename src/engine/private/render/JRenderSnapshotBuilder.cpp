@@ -120,7 +120,6 @@ void JRenderSnapshotBuilder::Build(const Input& input, JFrameSnapshot& outSnapsh
 void JRenderSnapshotBuilder::resetOutput(JFrameSnapshot& outSnapshot, Result& outResult)
 {
 	outSnapshot.cameras.clear();
-	outSnapshot.transforms.clear();
 	outSnapshot.lights.clear();
 	outResult.activeCameraKeys.clear();
 	outResult.activeTransformKeys.clear();
@@ -166,6 +165,22 @@ void JRenderSnapshotBuilder::buildCameraSnapshots(const JScene& scene, const std
 void JRenderSnapshotBuilder::buildTransformSnapshots(JScene& scene, JFrameSnapshot& outSnapshot)
 {
 	const std::vector<JTransformPool::SlotType>& transformSlots = scene.GetTransformSlots();
+	if (outSnapshot.transforms.size() < transformSlots.size())
+	{
+		outSnapshot.transforms.resize(transformSlots.size());
+	}
+
+	for (uint32 transformIndex = 0; transformIndex < transformSlots.size(); ++transformIndex)
+	{
+		const JTransformPool::SlotType& slot = transformSlots[transformIndex];
+		JTransformSnapshot& snapshot = outSnapshot.transforms[transformIndex];
+		if (!slot.active)
+		{
+			snapshot.valid = false;
+			snapshot.dirty = false;
+		}
+	}
+
 	const std::vector<uint32> dirtyTransformIndices = scene.ConsumeDirtyTransformIndices();
 	for (uint32 transformIndex : dirtyTransformIndices)
 	{
@@ -182,7 +197,11 @@ void JRenderSnapshotBuilder::buildTransformSnapshots(JScene& scene, JFrameSnapsh
 
 		const JTransformHandle transformHandle = { transformIndex, slot.generation };
 		const XMMATRIX world = makeWorldMatrix(scene.GetTransform(transformHandle));
-		outSnapshot.transforms.push_back({ transformHandle, world });
+		JTransformSnapshot& snapshot = outSnapshot.transforms[transformIndex];
+		snapshot.transform = transformHandle;
+		snapshot.world = world;
+		snapshot.valid = true;
+		snapshot.dirty = true;
 	}
 }
 

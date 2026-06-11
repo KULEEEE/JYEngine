@@ -265,13 +265,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 {
                     panel->DrawEditorUI(*scene);
                 }
-#ifdef _DEBUG
                 panel->DrawStatsUI();
-#endif
             }
             if (scene != nullptr && panel->CanRender())
             {
-#ifdef _DEBUG
                 J::Engine::JRenderer::FrameDesc frameDesc;
                 if (GetEngine()->RenderScene(
                     *scene,
@@ -280,11 +277,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 {
                     panel->OnSceneRendered(frameDesc);
                 }
-#else
-                if (GetEngine()->RenderScene(*scene, panel->GetRenderTarget()))
-                {
-                }
-#endif
                 else
                 {
 #ifdef _DEBUG

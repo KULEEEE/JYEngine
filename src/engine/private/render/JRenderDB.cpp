@@ -115,6 +115,42 @@ namespace
 		return { desc.albedoFormat, desc.normalFormat, desc.materialFormat };
 	}
 
+	void buildPreparedMaterialBindings(JMaterialResource& resource)
+	{
+		resource.preparedConstantBuffers.clear();
+		resource.preparedTextures.clear();
+		if (resource.shader == nullptr)
+		{
+			return;
+		}
+
+		for (const JMaterialResource::ConstantBufferEntry& entry : resource.constantBuffers)
+		{
+			for (uint32 bindingIndex = 0; bindingIndex < static_cast<uint32>(resource.shader->bindingInfo.cBuffers.size()); ++bindingIndex)
+			{
+				const Render::JShader::BindingInfo::Resource& shaderBinding = resource.shader->bindingInfo.cBuffers[bindingIndex];
+				if (shaderBinding.nameHash == entry.nameHash)
+				{
+					resource.preparedConstantBuffers.push_back({ bindingIndex, shaderBinding.slot, entry.buffer });
+					break;
+				}
+			}
+		}
+
+		const uint32 textureRootParameterIndex = static_cast<uint32>(resource.shader->bindingInfo.cBuffers.size());
+		for (const JMaterialResource::TextureEntry& entry : resource.textures)
+		{
+			for (const Render::JShader::BindingInfo::Resource& shaderBinding : resource.shader->bindingInfo.textures)
+			{
+				if (shaderBinding.nameHash == entry.nameHash)
+				{
+					resource.preparedTextures.push_back({ textureRootParameterIndex, shaderBinding.slot, entry.texture });
+					break;
+				}
+			}
+		}
+	}
+
 #ifdef _DEBUG
 	void logMaterialTextureIssue(
 		const char* reason,
@@ -242,8 +278,10 @@ namespace
 
 		releaseShaderResource(renderContext, shaderCache, resource);
 
-		resource.constantBuffers.clear();
-		resource.textures.clear();
+	resource.constantBuffers.clear();
+	resource.textures.clear();
+	resource.preparedConstantBuffers.clear();
+	resource.preparedTextures.clear();
 	}
 }
 
@@ -599,6 +637,8 @@ void JRenderDB::SyncMaterial(JMaterialHandle handle, const JMaterial& material)
 		}
 	}
 #endif
+
+	buildPreparedMaterialBindings(resource);
 }
 
 void JRenderDB::SyncCamera(JCameraHandle camera, const XMMATRIX& viewProjection)
@@ -628,7 +668,7 @@ void JRenderDB::SyncTransform(JTransformHandle transform, const XMMATRIX& world)
 	XMStoreFloat4x4(&resource.constants.world, XMMatrixTranspose(world));
 }
 
-void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
+void JRenderDB::SyncLight(JArrayView<const JFrameLightSnapshot::Item> lightItems)
 {
 	if (_renderContext == nullptr)
 	{
@@ -637,12 +677,12 @@ void JRenderDB::SyncLight(const JLightSnapshot& snapshot)
 
 	JLightResource& resource = getOrCreateLightResource();
 	// 현재 shader 상수 배열 크기에 맞춰 렌더링 가능한 개수만 잘라서 올림.
-	resource.lightCount = static_cast<uint32>(snapshot.items.size() < MAX_RENDER_LIGHTS ? snapshot.items.size() : MAX_RENDER_LIGHTS);
+	resource.lightCount = static_cast<uint32>(lightItems.size() < MAX_RENDER_LIGHTS ? lightItems.size() : MAX_RENDER_LIGHTS);
 
 	resource.constants = {};
 	for (uint32 i = 0; i < resource.lightCount; ++i)
 	{
-		const JLightSnapshot::Item& item = snapshot.items[i];
+		const JFrameLightSnapshot::Item& item = lightItems[i];
 		resource.constants.colorIntensities[i] = item.colorIntensity;
 		resource.constants.positions[i] = item.position;
 	}
@@ -893,19 +933,32 @@ JRenderDB::ResolvedDrawResources JRenderDB::ResolveDrawResources(const JDrawItem
 	resources.material = GetMaterialResourceByIndex(drawItem.materialResourceIndex);
 	resources.transform = GetTransformResourceByIndex(drawItem.transformResourceIndex);
 	// draw item은 index를 우선 사용하고, 캐시 재배치 등으로 실패하면 handle/pointer lookup으로 보정함.
-	if (resources.mesh == nullptr)
+	if (resources.mesh == nullptr
+		|| drawItem.meshResourceIndex >= _meshResources.size()
+		|| _meshResources[drawItem.meshResourceIndex].mesh != drawItem.mesh)
 	{
 		resources.mesh = FindMeshResource(drawItem.mesh);
 	}
-	if (resources.material == nullptr)
+	if (resources.material == nullptr
+		|| drawItem.materialResourceIndex >= _materialResources.size()
+		|| _materialResources[drawItem.materialResourceIndex].materialKey != makeMaterialKey(drawItem.material))
 	{
 		resources.material = FindMaterialResource(drawItem.material);
 	}
-	if (resources.transform == nullptr)
+	if (resources.transform == nullptr
+		|| drawItem.transformResourceIndex >= _transformResources.size()
+		|| _transformResources[drawItem.transformResourceIndex].transformKey != makeTransformKey(drawItem.transform))
 	{
 		resources.transform = FindTransformResource(drawItem.transform);
 	}
 	return resources;
+}
+
+void JRenderDB::UpdateDrawItemResourceIndices(JDrawItem& drawItem) const
+{
+	drawItem.meshResourceIndex = GetMeshResourceIndex(drawItem.mesh);
+	drawItem.materialResourceIndex = GetMaterialResourceIndex(drawItem.material);
+	drawItem.transformResourceIndex = GetTransformResourceIndex(drawItem.transform);
 }
 
 bool JRenderDB::BuildGraphicResource(JMaterialHandle material, Render::JShader* shader, Render::JGraphicResource& outResource) const
@@ -917,6 +970,24 @@ bool JRenderDB::BuildGraphicResource(JMaterialHandle material, Render::JShader* 
 	}
 
 	outResource.SetShader(shader);
+	if (shader == materialResource->shader)
+	{
+		outResource.ReserveBindings(
+			materialResource->preparedConstantBuffers.size(),
+			materialResource->preparedTextures.size());
+
+		for (const JMaterialResource::PreparedConstantBufferBinding& binding : materialResource->preparedConstantBuffers)
+		{
+			outResource.AddConstantBufferBinding(binding.rootParameterIndex, binding.shaderSlot, binding.buffer);
+		}
+
+		for (const JMaterialResource::PreparedTextureBinding& binding : materialResource->preparedTextures)
+		{
+			outResource.AddTextureBinding(binding.rootParameterIndex, binding.shaderSlot, binding.texture);
+		}
+
+		return true;
+	}
 
 	for (const JMaterialResource::ConstantBufferEntry& entry : materialResource->constantBuffers)
 	{

@@ -3,35 +3,31 @@
 #include "engine/render/JCommandQueue.h"
 #include "engine/render/JDrawItemCache.h"
 #include "engine/render/JGBuffer.h"
-#include "engine/render/JGraphicResource.h"
 #include "engine/render/JRenderContext.h"
 #include "engine/render/JRenderDB.h"
 #include "engine/asset/JShader.h"
+#include "engine/core/JHashFunction.h"
 
 J_ENGINE_BEGIN
 
 namespace
 {
-	bool buildDepthGraphicResource(const JRenderPassContext& context, const JDrawItem& drawItem, Render::JGraphicResource& graphicResource, D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress)
+	uint32 findCBufferRootParameterIndex(Render::JShader* shader, const char* name)
 	{
-		if (!context.renderDB->BuildGraphicResource(drawItem.material, graphicResource.GetShader(), graphicResource))
+		if (shader == nullptr || name == nullptr)
 		{
-			return false;
+			return static_cast<uint32>(-1);
 		}
 
-		const JTransformResource* transformResource = context.renderDB->FindTransformResource(drawItem.transform);
-		if (transformResource != nullptr)
+		const uint32 nameHash = JHashFunction::StrCrc32(name);
+		for (uint32 i = 0; i < static_cast<uint32>(shader->bindingInfo.cBuffers.size()); ++i)
 		{
-			const D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
-			graphicResource.SetConstantBufferAddress("PerObject", gpuAddress);
+			if (shader->bindingInfo.cBuffers[i].nameHash == nameHash)
+			{
+				return i;
+			}
 		}
-
-		if (cameraGpuAddress != 0)
-		{
-			graphicResource.SetConstantBufferAddress("PerFrame", cameraGpuAddress);
-		}
-
-		return true;
+		return static_cast<uint32>(-1);
 	}
 }
 
@@ -57,6 +53,11 @@ bool JDepthPass::ensureResources(const JRenderPassContext& context)
 	{
 		const std::string shaderPath = get_Engine_Shader_Path() + "\\depth_prepass.hlsl";
 		_shader = context.renderContext->CreateShader(shaderPath);
+		if (_shader != nullptr)
+		{
+			_perObjectRootParameterIndex = findCBufferRootParameterIndex(_shader, "PerObject");
+			_perFrameRootParameterIndex = findCBufferRootParameterIndex(_shader, "PerFrame");
+		}
 	}
 
 	if (_shader != nullptr && _pipeline == nullptr)
@@ -96,12 +97,18 @@ void JDepthPass::Execute(const JRenderPassContext& context, const JFrameDesc& fr
 	context.commandQueue->BeginDepthPass(&dsvHandle, 0, true);
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
+	context.commandQueue->SetPipeline(_pipeline);
+	context.commandQueue->SetGraphicResources(_shader);
 
 	D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress = 0;
 	const JCameraResource* cameraResource = context.renderDB->FindCameraResource(frameDesc.camera);
 	if (cameraResource != nullptr)
 	{
 		cameraGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cameraResource->constants, sizeof(cameraResource->constants));
+	}
+	if (_perFrameRootParameterIndex != static_cast<uint32>(-1))
+	{
+		context.commandQueue->SetGraphicsRootConstantBufferView(_perFrameRootParameterIndex, cameraGpuAddress);
 	}
 
 	if (frameDesc.drawItemCache == nullptr)
@@ -125,15 +132,18 @@ void JDepthPass::Execute(const JRenderPassContext& context, const JFrameDesc& fr
 			continue;
 		}
 
-		Render::JGraphicResource graphicResource(_shader);
-		if (!buildDepthGraphicResource(context, drawItem, graphicResource, cameraGpuAddress))
+		const JTransformResource* transformResource = resources.transform;
+		if (transformResource == nullptr)
 		{
 			++_lastStats.skippedDrawCount;
 			continue;
 		}
 
-		context.commandQueue->SetPipeline(_pipeline);
-		context.commandQueue->SetGraphicResources(&graphicResource);
+		if (_perObjectRootParameterIndex != static_cast<uint32>(-1))
+		{
+			const D3D12_GPU_VIRTUAL_ADDRESS objectGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&transformResource->constants, sizeof(transformResource->constants));
+			context.commandQueue->SetGraphicsRootConstantBufferView(_perObjectRootParameterIndex, objectGpuAddress);
+		}
 		context.commandQueue->BindVertexBuffer(resources.mesh);
 		const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(resources.mesh->indexSize);
 		context.commandQueue->DrawIndexed(indexCount, 1, drawItem.startIndex, 0, 0);

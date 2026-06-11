@@ -95,6 +95,16 @@ bool JCameraRenderQueueBuilder::isVisible(const JCameraSnapshot& cameraSnapshot,
 		}
 	}
 
+	if (input.transformSnapshots != nullptr && drawItem.transform.index < input.transformSnapshots->size())
+	{
+		const JTransformSnapshot& transformSnapshot = (*input.transformSnapshots)[drawItem.transform.index];
+		if (transformSnapshot.valid
+			&& transformSnapshot.transform.generation == drawItem.transform.generation)
+		{
+			return isAABBVisible(cameraSnapshot.frustum, bounds, transformSnapshot.world);
+		}
+	}
+
 	if (input.scene != nullptr)
 	{
 		return isAABBVisible(cameraSnapshot.frustum, bounds, makeWorldMatrix(input.scene->GetTransform(drawItem.transform)));

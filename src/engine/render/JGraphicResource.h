@@ -41,6 +41,9 @@ public:
 	bool SetConstantBufferAddress(uint32 nameHash, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress, const std::string& debugName = "");
 	bool SetTexture(const std::string& name, JTexture* texture);
 	bool SetTexture(uint32 nameHash, JTexture* texture, const std::string& debugName = "");
+	void AddConstantBufferBinding(uint32 rootParameterIndex, uint32 shaderSlot, JConstantBuffer* buffer);
+	void AddTextureBinding(uint32 rootParameterIndex, uint32 shaderSlot, JTexture* texture);
+	void ReserveBindings(size_t constantBufferCount, size_t textureCount);
 
 	const std::vector<ConstantBufferBinding>& GetConstantBuffers() const { return _constantBuffers; }
 	const std::vector<TextureBinding>& GetTextures() const { return _textures; }

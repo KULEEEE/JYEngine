@@ -102,6 +102,40 @@ bool JGraphicResource::SetTexture(uint32 nameHash, JTexture* texture, const std:
 	return true;
 }
 
+void JGraphicResource::AddConstantBufferBinding(uint32 rootParameterIndex, uint32 shaderSlot, JConstantBuffer* buffer)
+{
+	if (buffer == nullptr)
+	{
+		return;
+	}
+
+	ConstantBufferBinding binding;
+	binding.shaderSlot = shaderSlot;
+	binding.rootParameterIndex = rootParameterIndex;
+	binding.buffer = buffer;
+	_constantBuffers.push_back(binding);
+}
+
+void JGraphicResource::AddTextureBinding(uint32 rootParameterIndex, uint32 shaderSlot, JTexture* texture)
+{
+	if (texture == nullptr)
+	{
+		return;
+	}
+
+	TextureBinding binding;
+	binding.shaderSlot = shaderSlot;
+	binding.rootParameterIndex = rootParameterIndex;
+	binding.texture = texture;
+	_textures.push_back(binding);
+}
+
+void JGraphicResource::ReserveBindings(size_t constantBufferCount, size_t textureCount)
+{
+	_constantBuffers.reserve(constantBufferCount);
+	_textures.reserve(textureCount);
+}
+
 void JGraphicResource::ClearBindings()
 {
 	_constantBuffers.clear();
