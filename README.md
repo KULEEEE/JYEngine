@@ -16,36 +16,30 @@ Windows 10+  ·  Direct3D 12 (FL 11.0+)  ·  C++17  ·  Visual Studio + Win10 SD
 엔진은 한 프레임을 **Authoring → Render Frontend → Render Backend** 세 단계로 처리합니다.
 
 ```
-[Authoring · mutable]            [Render Frontend · CPU]              [Render Backend · GPU]
-
-  JScene  ──events──▶  JRenderServer::SyncScene
-                          │
-                          ├──▶ JRenderSnapshotBuilder
-                          │     · 카메라 view·projection
-                          │     · dirty transform → world matrix
-                          │     · light snapshot
-                          │
-                          ├──▶ JDrawItemCache 증분 갱신
-                          │     · Added / Modified → patch
-                          │     · Removed          → rebuild
-                          │
-                          └──▶ JCameraRenderQueueBuilder
-                                · frustum 6-plane 추출
-                                · ParallelFor 기반 AABB 컬링
-                          ▼
-                  ── JFrameDesc (immutable) ──
-                          ▼
-                JRenderer::Render(frameDesc)
-                          │
-                          ├──▶ prepareFrameResources
-                          │     · Material / Camera / Transform / Light / Mesh
-                          │       리소스를 JRenderDB(GPU mirror)에 동기화
-                          │
-                          └──▶ pass[i].Execute(context, frameDesc)
-                                · Forward  : SceneColorPass
-                                · Deferred : ShadowPass → DepthPass(Pre-Z) → GBufferPass
-                                             → SSAOPass → LightingPass(+IBL)
-                                             → ForwardOverlayPass
+▣ Authoring · mutable
+   JScene
+    · Entity / Component pools
+    · dirty transform / camera / light
+        │  events
+        ▼
+▣ Render Frontend · CPU
+   JRenderServer::SyncScene
+    (consume events · update draw item cache · build snapshot)
+        │
+        ├──▶ JRenderSnapshotBuilder (카메라 view·projection, dirty transform → world, light snapshot)
+        └──▶ JCameraRenderQueueBuilder (frustum 6-plane cull, visible opaque / transparent 인덱스)
+        │
+        ▼
+   ── JFrameDesc (immutable) ──
+        │
+        ▼
+▣ Render Backend · GPU
+   JRenderDB                       material / mesh / camera / transform / light GPU mirror
+        │
+        ▼
+   JRenderer::Render(JFrameDesc)
+    · Forward  : SceneColorPass
+    · Deferred : Shadow → Depth → GBuffer → SSAO → Lighting → ForwardOverlay
 ```
 
 `JScene`의 변경사항은 이벤트(`ConsumeRenderObjectEvents`)와 dirty 인덱스(`ConsumeDirtyTransformIndices`, `ConsumeDirtyCameras`, `ConsumeDirtyLights`)로 누적되며, `JRenderServer::SyncScene`이 이를 소비해 `JFrameDesc`를 만듭니다. 이후 백엔드는 `JFrameDesc`를 `const`로 받아 mutable한 Scene 상태를 직접 참조하지 않고, GPU 리소스는 `JRenderDB`에 캐시된 mirror만 사용합니다.
