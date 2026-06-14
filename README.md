@@ -43,8 +43,8 @@ Windows 10+  ·  Direct3D 12 (FL 11.0+)  ·  C++17  ·  Visual Studio + Win10 SD
                           │
                           └──▶ pass[i].Execute(context, frameDesc)
                                 · Forward  : SceneColorPass
-                                · Deferred : ShadowPass → DepthPass(Pre-Z)
-                                             → GBufferPass → LightingPass
+                                · Deferred : ShadowPass → DepthPass(Pre-Z) → GBufferPass
+                                             → SSAOPass → LightingPass(+IBL)
                                              → ForwardOverlayPass
 ```
 
@@ -184,7 +184,7 @@ if (cached != frameResource.descriptorTableCache.end()) {
 `JRenderer::SetRenderPath(RenderPath::Forward | Deferred)`로 런타임 전환됩니다.
 
 - **Forward**  : `JSceneColorPass`가 opaque → transparent 순으로 draw
-- **Deferred** : `JShadowPass` → `JDepthPass`(reverse-Z pre-pass) → `JGBufferPass` (Albedo / Normal / Material MRT) → `JLightingPass` (full-screen triangle로 G-buffer 샘플링) → `JForwardOverlayPass`
+- **Deferred** : `JShadowPass` → `JDepthPass`(reverse-Z pre-pass) → `JGBufferPass` (Albedo / Normal / Material MRT) → `JSSAOPass` → `JLightingPass` (full-screen triangle로 G-buffer 샘플링 + IBL) → `JForwardOverlayPass`
 
 ### Cascade Shadow Map (CSM)
 
@@ -195,7 +195,22 @@ if (cached != frameResource.descriptorTableCache.end()) {
 - **ORM 패킹 머터리얼** : `R=Occlusion, G=Roughness, B=Metalness` (Bistro/glTF 컨벤션) 텍스처를 G-buffer의 Material MRT에 기록합니다.
 - **ACES filmic tonemapping** (Narkowicz 2015 근사) 으로 lighting 결과를 톤매핑합니다.
 - **derivative 기반 normal mapping** : 화면 미분으로 TBN을 구성해 별도 tangent 입력 없이 노멀 맵을 적용합니다.
-- ambient occlusion을 ambient term에 반영합니다.
+- 간접광(ambient)은 아래 **IBL**로, 차폐는 **SSAO**로 계산해 간접광에만 적용합니다.
+
+### 이미지 기반 조명 (IBL) — 씬 캡처 reflection probe
+
+정적 씬의 간접광을 위해 **씬을 직접 캡처해 split-sum IBL**을 굽습니다. `JReflectionProbe`가 로드 후 1회 수행합니다.
+
+1. **씬 캡처** — probe(주 카메라) 위치에서 6면을 reverse-Z 90° FOV로 HDR 큐브(`R16G16B16A16F`)에 렌더합니다. immutable `JFrameDesc`를 면마다 재구성해 같은 deferred 경로를 재사용하며, 톤매핑 전 **linear HDR**로 기록합니다.
+2. **irradiance 큐브** — 캡처 큐브를 코사인 적분 → diffuse GI
+3. **prefiltered 큐브** — roughness별 GGX 프리필터(밉체인) → specular 반사
+4. **BRDF LUT** — split-sum의 F항 적분 (환경 무관, full-screen 1회 bake)
+
+`JLightingPass`의 ambient를 `kD·irradiance·albedo + prefiltered·(F·brdf.x + brdf.y)`로 계산합니다. compute 파이프라인이 없어 모든 컨볼루션은 **render-to-cube-face 패스**로 처리하고, 결과 큐브는 런타임 내내 상주해 매 프레임 샘플만 합니다(정적 씬 1회 bake). 지오메트리가 없는 픽셀에는 절차적 하늘을 그려 **skybox 배경 겸 IBL 상반구 소스**로 활용합니다. 이름 규약 샘플러에 `LUT`(clamp) 규칙을 추가해 BRDF LUT 가장자리 누수를 막습니다.
+
+### SSAO
+
+`JSSAOPass`가 G-buffer의 depth·normal로 화면 공간 차폐를 단일 채널 타겟에 그리고, `JLightingPass`가 이를 박스 블러로 읽어 **간접광에만** 곱합니다. 샘플 반경은 **월드 공간 기준**으로 화면 픽셀에 환산해, 거리와 무관하게 일정한 차폐 footprint를 유지합니다(원거리 얼룩 방지).
 
 ### JSON 직렬화 / 프로젝트 포맷
 
@@ -238,8 +253,8 @@ src/
 │   │                JCameraRenderQueueBuilder, JDrawItemCache, JMaterialFactory,
 │   │                JCommandQueue, JSwapChain, JRenderContext, JRenderResource,
 │   │                JGraphicResource, JRenderTarget, JGBuffer,
-│   │                패스: SceneColor / Shadow / Depth / GBuffer / Lighting / ForwardOverlay,
-│   │                JShadowMap (CSM)
+│   │                패스: SceneColor / Shadow / Depth / GBuffer / SSAO / Lighting / ForwardOverlay,
+│   │                JShadowMap (CSM), JReflectionProbe (IBL)
 │   ├── asset/       JMaterial, JMesh, JShader, JTextureFile (.jtex)
 │   ├── platform/    JDevice
 │   └── dx12/        JDx12Helper, d3dx12 wrapper
