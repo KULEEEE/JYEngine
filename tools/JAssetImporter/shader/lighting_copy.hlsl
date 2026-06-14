@@ -31,6 +31,18 @@ Texture2DArray ShadowMap : register(t4);
 // 이름에 Shadow가 들어가면 엔진이 GREATER_EQUAL 비교 샘플러로 생성함 (reverse-Z 규약)
 SamplerComparisonState ShadowSampler : register(s0);
 
+// diffuse IBL: 캡처된 씬 환경을 코사인 적분한 irradiance 큐브 (ShadowParams.w로 사용 여부 결정)
+TextureCube IrradianceMap : register(t5);
+SamplerState IBLSampler : register(s1);
+
+// specular IBL: roughness별 prefiltered 큐브 + split-sum BRDF LUT (CameraPosition.w = maxMip, 0이면 비활성)
+TextureCube PrefilteredEnv : register(t6);
+Texture2D BRDFLUT : register(t7);
+SamplerState LUTSampler : register(s2); // 이름에 LUT → 엔진이 clamp 샘플러로 생성
+
+// SSAO 패스 결과(1=차폐없음). 라이팅에서 5x5 박스 블러로 읽어 노이즈를 없앤다.
+Texture2D SSAOTexture : register(t8);
+
 static const float PI = 3.14159265f;
 static const float SHADOW_PCF_RADIUS = 1.25f;
 
@@ -82,6 +94,13 @@ float3 FresnelSchlick(float cosTheta, float3 f0)
     return f0 + (1.0f - f0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
+// roughness를 반영한 Fresnel (IBL ambient specular용).
+float3 FresnelSchlickRoughness(float cosTheta, float3 f0, float roughness)
+{
+    float3 fMax = max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), f0);
+    return f0 + (fMax - f0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
 // reverse-Z depth로부터 world position 복원
 float3 ReconstructWorldPosition(int2 pixel, float depth)
 {
@@ -93,6 +112,23 @@ float3 ReconstructWorldPosition(int2 pixel, float depth)
     float2 ndcXY = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
     float4 worldPos = mul(float4(ndcXY, depth, 1.0f), InverseViewProjection);
     return worldPos.xyz / max(worldPos.w, 0.0001f);
+}
+
+// SSAO 패스 결과를 5x5 박스 블러로 읽어 노이즈를 제거한다. (1 = 차폐 없음)
+float SampleBlurredAO(int2 pixel)
+{
+    const int R = 2;
+    float sum = 0.0f;
+    [unroll]
+    for (int dy = -R; dy <= R; ++dy)
+    {
+        [unroll]
+        for (int dx = -R; dx <= R; ++dx)
+        {
+            sum += SSAOTexture.Load(int3(pixel + int2(dx, dy), 0)).r;
+        }
+    }
+    return sum / float((2 * R + 1) * (2 * R + 1));
 }
 
 // inverse-square 감쇠 + range 윈도잉 (UE/Frostbite 스타일)
@@ -112,6 +148,21 @@ float3 ACESFilm(float3 color)
     const float d = 0.59f;
     const float e = 0.14f;
     return saturate((color * (a * color + b)) / (color * (c * color + d) + e));
+}
+
+// 간단한 절차적 하늘. 지오메트리가 없는 픽셀(far plane)에 그려져 배경 겸 IBL 상반구 소스가 된다.
+// HDR 값이라 캡처 시 irradiance에 실제 에너지를 준다.
+float3 SkyColor(float3 dir)
+{
+    float h = dir.y;
+    float3 zenith  = float3(0.25f, 0.45f, 0.85f);
+    float3 horizon = float3(0.70f, 0.78f, 0.90f);
+    float3 ground  = float3(0.25f, 0.24f, 0.22f);
+    if (h > 0.0f)
+    {
+        return lerp(horizon, zenith, saturate(sqrt(h))) * 1.6f;
+    }
+    return lerp(horizon, ground, saturate(-h * 2.0f));
 }
 
 // directional light의 cascade shadow. 1 = lit, 0 = 그림자.
@@ -171,26 +222,62 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
     int2 pixel = int2(input.Pos.xy);
     float4 albedoSample = GBufferAlbedo.Load(int3(pixel, 0));
 
-    // reverse-Z: depth 0 == far plane. 아무것도 그려지지 않은 픽셀은 라이팅을 건너뛴다.
+    // reverse-Z: depth 0 == far plane. 지오메트리 없는 픽셀은 하늘을 그린다(배경 + IBL 상반구 소스).
     float depth = DepthBuffer.Load(int3(pixel, 0)).r;
     if (depth <= 0.0f)
     {
-        return float4(albedoSample.rgb, albedoSample.a);
+        float3 viewRay = normalize(ReconstructWorldPosition(pixel, 0.0001f) - CameraPosition.xyz);
+        float3 sky = SkyColor(viewRay);
+        // 캡처(ShadowParams.z>=0.5)는 linear HDR 그대로, 메인 화면은 톤매핑+감마.
+        if (ShadowParams.z < 0.5f)
+        {
+            sky = ACESFilm(sky);
+            sky = pow(saturate(sky), 1.0f / 2.2f);
+        }
+        return float4(sky, 1.0f);
     }
 
     float3 albedo = pow(saturate(albedoSample.rgb), 2.2f);
     float3 normal = normalize(GBufferNormal.Load(int3(pixel, 0)).xyz * 2.0f - 1.0f);
+
     float4 material = GBufferMaterial.Load(int3(pixel, 0));
 
     float roughness = saturate(material.r);
     float metallic = saturate(material.g);
-    float occlusion = saturate(material.b);
 
     float3 worldPos = ReconstructWorldPosition(pixel, depth);
     float3 viewDir = normalize(CameraPosition.xyz - worldPos);
+    float NdotV = max(dot(normal, viewDir), 1e-4f);
+
+    // 이 자산의 baked AO("ORM".r)는 신뢰 불가(스펙 맵)라, SSAO 패스 결과를 블러해서 차폐로 쓴다.
+    // 캡처(ShadowParams.z>=0.5)에서는 SSAO가 없으므로 1.0.
+    float occlusion = (ShadowParams.z >= 0.5f) ? 1.0f : SampleBlurredAO(pixel);
     float3 f0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
-    // 베이크된 AO는 간접광(ambient)에만 적용함. 직접광은 섀도우맵이 가림을 담당.
-    float3 ambient = albedo * 0.28f * (1.0f - metallic) * occlusion;
+
+    // 간접광(IBL). ShadowParams.w = useIBL(diffuse 사용), CameraPosition.w = specular maxMip(0이면 specular off).
+    // occlusion은 간접광에만 곱한다(직접광 가림은 섀도우맵 담당).
+    float3 ambient;
+    if (ShadowParams.w > 0.5f)
+    {
+        float3 F = FresnelSchlickRoughness(NdotV, f0, roughness);
+        float3 kd = (1.0f - F) * (1.0f - metallic);
+        float3 diffuseIBL = IrradianceMap.Sample(IBLSampler, normal).rgb * albedo;
+
+        float3 specularIBL = float3(0.0f, 0.0f, 0.0f);
+        if (CameraPosition.w > 0.5f)
+        {
+            float3 reflectDir = reflect(-viewDir, normal);
+            float3 prefiltered = PrefilteredEnv.SampleLevel(IBLSampler, reflectDir, roughness * CameraPosition.w).rgb;
+            float2 brdf = BRDFLUT.Sample(LUTSampler, float2(NdotV, roughness)).rg;
+            specularIBL = prefiltered * (F * brdf.x + brdf.y);
+        }
+
+        ambient = (kd * diffuseIBL + specularIBL) * occlusion;
+    }
+    else
+    {
+        ambient = albedo * 0.28f * (1.0f - metallic) * occlusion;
+    }
     float3 direct = float3(0.0f, 0.0f, 0.0f);
 
     // 모든 directional light가 첫 directional 기준의 cascade shadow를 공유함
@@ -236,7 +323,12 @@ float4 pMain(VS_OUTPUT input) : SV_TARGET
 
     float3 color = ambient + direct;
 
-    color = ACESFilm(color);
-    color = pow(saturate(color), 1.0f / 2.2f);
+    // ShadowParams.z = outputLinear. reflection probe 캡처 시 1 → linear HDR 그대로 기록(톤매핑/감마 skip).
+    // IBL 소스는 linear HDR이어야 하므로 캡처 경로에서는 톤매핑하지 않는다.
+    if (ShadowParams.z < 0.5f)
+    {
+        color = ACESFilm(color);
+        color = pow(saturate(color), 1.0f / 2.2f);
+    }
     return float4(color, albedoSample.a);
 }

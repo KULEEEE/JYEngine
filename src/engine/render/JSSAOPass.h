@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __J_LIGHTING_PASS_H__
-#define __J_LIGHTING_PASS_H__
+#ifndef __J_SSAO_PASS_H__
+#define __J_SSAO_PASS_H__
 
 #include "engine/render/JRenderPass.h"
 
@@ -8,24 +8,23 @@
 
 J_ENGINE_BEGIN
 
-class JLightingPass final : public JRenderPass
+// 화면 공간 AO를 단일 채널 타겟(context.ssaoTarget)에 렌더한다.
+// LightingPass가 이 결과를 블러해서 occlusion으로 사용한다.
+class JSSAOPass final : public JRenderPass
 {
 public:
-	~JLightingPass() override;
+	~JSSAOPass() override;
 
-	const char* GetName() const override { return "LightingPass"; }
+	const char* GetName() const override { return "SSAOPass"; }
 	void Execute(const JRenderPassContext& context, const JFrameDesc& frameDesc) override;
 	const JRenderPassStats& GetLastStats() const override { return _lastStats; }
 
 private:
 	bool ensureResources(const JRenderPassContext& context);
-	bool ensureHdrPipeline(const JRenderPassContext& context);
 
 	JRenderPassStats _lastStats = {};
 	Render::JShader* _shader = nullptr;
 	Render::JPipeline* _pipeline = nullptr;
-	// reflection probe 캡처용 HDR(R16G16B16A16F) 파이프라인. shader는 _shader를 공유한다.
-	Render::JPipeline* _hdrPipeline = nullptr;
 };
 
 J_ENGINE_END

@@ -134,7 +134,11 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 	_shaderResource = desc.shaderResource;
 	_resourceState = desc.initialState;
 	const Type type = desc.type;
-	const uint16 arraySize = std::max<uint16>(desc.arraySize, 1);
+	const uint16 arraySize = desc.cube ? 6 : std::max<uint16>(desc.arraySize, 1);
+	const uint16 mipLevels = std::max<uint16>(desc.mipLevels, 1);
+	_arraySize = arraySize;
+	_mipLevels = mipLevels;
+	_isCube = desc.cube;
 	const DXGI_FORMAT rtvFormat = resolveFormat(desc.rtvFormat, desc.format);
 	const DXGI_FORMAT dsvFormat = resolveFormat(desc.dsvFormat, desc.format);
 	const DXGI_FORMAT srvFormat = resolveFormat(desc.srvFormat, desc.format);
@@ -159,7 +163,7 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 	resourceDesc.Width = _width;
 	resourceDesc.Height = _height;
 	resourceDesc.DepthOrArraySize = arraySize;
-	resourceDesc.MipLevels = 1;
+	resourceDesc.MipLevels = mipLevels;
 	resourceDesc.Format = _format;
 	resourceDesc.SampleDesc.Count = 1;
 	resourceDesc.SampleDesc.Quality = 0;
@@ -207,7 +211,7 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 			_ownedResources.clear();
 		};
 
-	if (isColorType(type) && !createRenderTargetView(device.Get(), rawResource, rtvFormat))
+	if (isColorType(type) && !createRenderTargetView(device.Get(), rawResource, rtvFormat, arraySize, mipLevels))
 	{
 		clearCreatedResources();
 		return false;
@@ -219,7 +223,7 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 		return false;
 	}
 
-	if (_shaderResource && !createShaderResourceView(device.Get(), rawResource, srvFormat, arraySize))
+	if (_shaderResource && !createShaderResourceView(device.Get(), rawResource, srvFormat, arraySize, mipLevels, desc.cube))
 	{
 		clearCreatedResources();
 		return false;
@@ -228,18 +232,40 @@ bool JRenderTarget::createOffscreenResource(const Desc& desc)
 	return true;
 }
 
-bool JRenderTarget::createRenderTargetView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format)
+bool JRenderTarget::createRenderTargetView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize, uint16 mipLevels)
 {
 	if (device == nullptr || resource == nullptr)
 	{
 		return false;
 	}
 
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-	rtvDesc.Format = format;
-	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-	_rtvResources.push_back(resource);
-	_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource, &rtvDesc));
+	// 큐브/배열/밉 타겟은 (slice, mip)마다 RTV를 만든다. slice-major 순서로 _rtvHandles에 저장한다.
+	// 일반 2D(arraySize=1, mipLevels=1)는 기존과 동일하게 RTV 한 개만 생긴다.
+	const bool useArray = arraySize > 1;
+	for (uint16 slice = 0; slice < arraySize; ++slice)
+	{
+		for (uint16 mip = 0; mip < mipLevels; ++mip)
+		{
+			D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+			rtvDesc.Format = format;
+			if (useArray)
+			{
+				rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+				rtvDesc.Texture2DArray.MipSlice = mip;
+				rtvDesc.Texture2DArray.FirstArraySlice = slice;
+				rtvDesc.Texture2DArray.ArraySize = 1;
+				rtvDesc.Texture2DArray.PlaneSlice = 0;
+			}
+			else
+			{
+				rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+				rtvDesc.Texture2D.MipSlice = mip;
+				rtvDesc.Texture2D.PlaneSlice = 0;
+			}
+			_rtvResources.push_back(resource);
+			_rtvHandles.push_back(GetEngine()->GetDx12Helper()->CreateCPUDescriptorHandle(resource, &rtvDesc));
+		}
+	}
 	return true;
 }
 
@@ -289,7 +315,7 @@ bool JRenderTarget::createDepthStencilViews(ID3D12Device* device, ID3D12Resource
 	return true;
 }
 
-bool JRenderTarget::createShaderResourceView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize)
+bool JRenderTarget::createShaderResourceView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize, uint16 mipLevels, bool cube)
 {
 	if (device == nullptr || resource == nullptr)
 	{
@@ -313,18 +339,27 @@ bool JRenderTarget::createShaderResourceView(ID3D12Device* device, ID3D12Resourc
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.Format = format;
-	srvDesc.ViewDimension = arraySize > 1 ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D;
-	if (arraySize > 1)
+	if (cube)
 	{
+		// 큐브맵 전체 밉을 한 SRV로 샘플(prefiltered는 roughness→mip).
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		srvDesc.TextureCube.MostDetailedMip = 0;
+		srvDesc.TextureCube.MipLevels = mipLevels;
+		srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+	}
+	else if (arraySize > 1)
+	{
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		srvDesc.Texture2DArray.MostDetailedMip = 0;
-		srvDesc.Texture2DArray.MipLevels = 1;
+		srvDesc.Texture2DArray.MipLevels = mipLevels;
 		srvDesc.Texture2DArray.FirstArraySlice = 0;
 		srvDesc.Texture2DArray.ArraySize = arraySize;
 	}
 	else
 	{
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MostDetailedMip = 0;
-		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Texture2D.MipLevels = mipLevels;
 	}
 	device->CreateShaderResourceView(resource, &srvDesc, _srvCPUHandle);
 
@@ -359,6 +394,13 @@ std::vector<ID3D12Resource*>& JRenderTarget::GetRTVResource()
 const std::vector<ID3D12Resource*>& JRenderTarget::GetRTVResource() const
 {
 	return _rtvResources;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE JRenderTarget::GetColorRTV(uint32 slice, uint32 mip) const
+{
+	// RTV는 createRenderTargetView에서 slice-major(=slice * mipLevels + mip)로 저장된다.
+	const uint32 index = slice * _mipLevels + mip;
+	return index < _rtvHandles.size() ? _rtvHandles[index] : D3D12_CPU_DESCRIPTOR_HANDLE{};
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE JRenderTarget::GetDSVHandle(uint32 slice) const

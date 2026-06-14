@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <sstream>
 
@@ -10,6 +11,17 @@ J_ENGINE_BEGIN
 namespace
 {
 	using json = nlohmann::json;
+
+	// 레거시 호환: 예전 scene 파일은 directional light 방향을 transform rotation(+Z forward)으로 저장했다.
+	// "direction" 필드가 없는 파일을 로드할 때 같은 forward 벡터를 계산해 마이그레이션한다.
+	// XMMatrixRotationRollPitchYaw(x,y,z)를 (0,0,1)에 적용한 결과와 동일하다(roll은 forward에 영향 없음).
+	JVec3 directionFromEulerForward(const JVec3& euler)
+	{
+		const float pitch = euler.x;
+		const float yaw = euler.y;
+		const float cp = std::cos(pitch);
+		return { cp * std::sin(yaw), -std::sin(pitch), cp * std::cos(yaw) };
+	}
 
 	// Scene JSON은 벡터를 [x, y, z] 형태로 저장한다.
 	JVec3 readVec3(const json& value)
@@ -235,6 +247,15 @@ namespace
 			}
 			data.light.intensity = light.value("intensity", data.light.intensity);
 			data.light.range = light.value("range", data.light.range);
+			if (light.contains("direction"))
+			{
+				data.light.direction = readVec3(light.at("direction"));
+			}
+			else if (data.light.type == JSceneLightType::Directional && data.hasTransform)
+			{
+				// 예전 포맷: rotation으로부터 방향을 복원해 기존 씬의 조명을 유지한다.
+				data.light.direction = directionFromEulerForward(data.transform.rotation);
+			}
 		}
 
 		const json* renderObjectComponent = nullptr;
@@ -306,6 +327,7 @@ namespace
 				{ "color", vec3ToJson(data.light.color) },
 				{ "intensity", data.light.intensity },
 				{ "range", data.light.range },
+				{ "direction", vec3ToJson(data.light.direction) },
 			};
 		}
 

@@ -219,6 +219,36 @@ void JCommandQueue::BeginRenderPass(Engine::JRenderTarget* renderTarget, const J
 	_cmdList->OMSetRenderTargets(static_cast<uint32>(rtvHandles.size()), rtvHandles.data(), FALSE, dsvHandle);
 }
 
+void JCommandQueue::BeginRenderPassFace(Engine::JRenderTarget* renderTarget, uint32 slice, uint32 mip, const JColor& clearColor, uint32 rectCount, bool clearRenderTarget)
+{
+	if (_cmdList == nullptr || renderTarget == nullptr)
+	{
+		std::cerr << "BeginRenderPassFace skipped: command list or render target is null." << std::endl;
+		return;
+	}
+
+	_currentRenderTarget = renderTarget;
+	_currentRenderTargets.clear();
+	_currentRenderTargets.push_back(renderTarget);
+
+	// 큐브는 모든 면이 한 리소스를 공유한다. 리소스를 RENDER_TARGET 상태로 전환 후 해당 면 RTV만 바인딩한다.
+	ID3D12Resource* resource = renderTarget->GetResource(0);
+	if (resource != nullptr && renderTarget->GetResourceState() != D3D12_RESOURCE_STATE_RENDER_TARGET)
+	{
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			resource, renderTarget->GetResourceState(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+		_cmdList->ResourceBarrier(1, &barrier);
+	}
+	renderTarget->SetResourceState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderTarget->GetColorRTV(slice, mip);
+	if (clearRenderTarget)
+	{
+		_cmdList->ClearRenderTargetView(rtvHandle, clearColor, rectCount, nullptr);
+	}
+	_cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+}
+
 void JCommandQueue::BeginRenderPass(const std::vector<Engine::JRenderTarget*>& renderTargets, uint32 rectCount, bool clearRenderTarget)
 {
 	BeginRenderPass(renderTargets, rectCount, nullptr, clearRenderTarget, false);

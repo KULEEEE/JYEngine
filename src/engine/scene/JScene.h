@@ -203,17 +203,16 @@ private:
 	std::vector<uint32> _freeMaterialIndices;
 	std::vector<uint32> _activeMaterialIndices;
 
-	// Entity ?щ’ index瑜?湲곗??쇰줈 遺媛 ?뺣낫瑜?留욎떠 ?붾떎.
-	// ?ㅼ젣 而댄룷?뚰듃 ?곗씠?곕뒗 媛??꾩슜 pool???덇퀬, ?ш린?쒕뒗 議고쉶/遺꾨쪟???뺣낫留?媛吏꾨떎.
+	
 	std::vector<JEntityMetadata> _entityMetadata;
 	std::vector<JTransformHandle> _entityTransformLookup;
 
-	// ?뚮뜑?ш? Scene 蹂寃쎈텇留?諛섏쁺?????덈룄濡????꾨젅???⑥쐞濡??뚮퉬?섎뒗 ??
+	
 	std::vector<JSceneRenderObjectEvent> _renderObjectEvents;
 	std::vector<JCameraHandle> _dirtyCameras;
 	std::vector<JLightHandle> _dirtyLights;
 
-	// ????뚯씪怨??고????몃뱾???곌껐?섍린 ?꾪븳 stable id lookup.
+	
 	std::unordered_map<uint64, JEntityHandle> _stableIDLookup;
 	JCameraHandle _primaryCamera = {};
 	uint32 _nextStableID = 1;

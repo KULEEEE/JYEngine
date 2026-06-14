@@ -8,6 +8,7 @@
 #include "engine/render/JRenderResource.h"
 #include "engine/render/JRenderTarget.h"
 #include "engine/render/JShadowMap.h"
+#include "engine/render/JReflectionProbe.h"
 #include "engine/asset/JShader.h"
 
 #include <iostream>
@@ -16,10 +17,36 @@ J_ENGINE_BEGIN
 
 JLightingPass::~JLightingPass()
 {
+	delete _hdrPipeline;
 	delete _pipeline;
 	delete _shader;
+	_hdrPipeline = nullptr;
 	_pipeline = nullptr;
 	_shader = nullptr;
+}
+
+bool JLightingPass::ensureHdrPipeline(const JRenderPassContext& context)
+{
+	if (_hdrPipeline != nullptr)
+	{
+		return true;
+	}
+	if (context.renderContext == nullptr || _shader == nullptr)
+	{
+		return false;
+	}
+
+	// 캡처는 linear HDR 큐브 면(R16G16B16A16F)에 그린다. shader는 메인과 동일하게 공유한다.
+	_hdrPipeline = context.renderContext->CreatePipeline(
+		_shader, false, false, false, false,
+		{ DXGI_FORMAT_R16G16B16A16_FLOAT }, false,
+		D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER, false);
+	if (_hdrPipeline == nullptr)
+	{
+		std::cerr << "JLightingPass failed: HDR pipeline creation failed." << std::endl;
+		return false;
+	}
+	return true;
 }
 
 bool JLightingPass::ensureResources(const JRenderPassContext& context)
@@ -77,13 +104,27 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 		return;
 	}
 
+	// 캡처 모드: 큐브 면에 linear HDR 출력(톤매핑 skip). 전용 HDR 파이프라인 필요.
+	if (frameDesc.captureMode && !ensureHdrPipeline(context))
+	{
+		return;
+	}
+
 	// depth는 prepass/gbuffer가 DEPTH_WRITE 상태로 쓰고 여기서 SRV로 읽는다.
 	// 같은 프레임의 forward overlay가 다시 depth test에 쓰므로 패스가 끝나면 DEPTH_WRITE로 되돌린다.
 	context.commandQueue->TransitionRenderTarget(depthTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	// shadow map도 같은 방식: shadow pass가 DEPTH_WRITE로 쓰고 여기서 SampleCmp로 읽는다.
 	context.commandQueue->TransitionRenderTarget(shadowTarget, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-	context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0);
+	if (frameDesc.captureMode)
+	{
+		// 캡처: 큐브의 특정 면(renderTargetSlice)에만 바인딩.
+		context.commandQueue->BeginRenderPassFace(frameDesc.renderTarget, frameDesc.renderTargetSlice, 0, frameDesc.clearColor, 0);
+	}
+	else
+	{
+		context.commandQueue->BeginRenderPass(frameDesc.renderTarget, frameDesc.clearColor, 0);
+	}
 	context.commandQueue->SetViewports(1, &frameDesc.viewport);
 	context.commandQueue->SetScissorRects(1, &frameDesc.scissorRect);
 
@@ -95,9 +136,23 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 		graphicResource.SetConstantBufferAddress("PerLights", gpuAddress);
 	}
 
+	// diffuse/specular IBL: 캡처가 아니고 맵이 준비됐을 때만 사용.
+	const Render::JTexture* irradianceTexture = (!frameDesc.captureMode && context.reflectionProbe != nullptr)
+		? context.reflectionProbe->GetIrradiance() : nullptr;
+	const Render::JTexture* prefilteredTexture = (!frameDesc.captureMode && context.reflectionProbe != nullptr)
+		? context.reflectionProbe->GetPrefiltered() : nullptr;
+	const Render::JTexture* brdfLutTexture = (!frameDesc.captureMode && context.reflectionProbe != nullptr)
+		? context.reflectionProbe->GetBRDFLUT() : nullptr;
+	const float useIBL = irradianceTexture != nullptr ? 1.0f : 0.0f;
+	const bool useSpecularIBL = prefilteredTexture != nullptr && brdfLutTexture != nullptr;
+	const float prefilteredMaxMip = (useSpecularIBL && context.reflectionProbe != nullptr)
+		? static_cast<float>(context.reflectionProbe->GetPrefilteredMipCount() - 1) : 0.0f;
+
 	JPerViewConstants viewConstants{};
 	XMStoreFloat4x4(&viewConstants.inverseViewProjection, XMMatrixTranspose(frameDesc.cameraInverseViewProjection));
 	viewConstants.cameraPosition = frameDesc.cameraWorldPosition;
+	// cameraPosition.w로 specular IBL의 최대 mip을 전달(0이면 specular 비활성).
+	viewConstants.cameraPosition.w = prefilteredMaxMip;
 	const D3D12_GPU_VIRTUAL_ADDRESS viewGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&viewConstants, sizeof(viewConstants));
 	graphicResource.SetConstantBufferAddress("PerView", viewGpuAddress);
 
@@ -109,7 +164,8 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	}
 	shadowConstants.cascadeSplits = JVec4(cascadeData.splitDistances[0], cascadeData.splitDistances[1], cascadeData.splitDistances[2], cascadeData.splitDistances[3]);
 	shadowConstants.cascadeBiases = JVec4(cascadeData.depthBiases[0], cascadeData.depthBiases[1], cascadeData.depthBiases[2], cascadeData.depthBiases[3]);
-	shadowConstants.shadowParams = JVec4(cascadeData.hasDirectionalLight ? 1.0f : 0.0f, context.shadowMap->GetDesc().maxShadowDistance, 0.0f, 0.0f);
+	// shadowParams.z = outputLinear(캡처 시 1 → 톤매핑/감마 skip), w = useIBL(1 → ambient를 irradiance로).
+	shadowConstants.shadowParams = JVec4(cascadeData.hasDirectionalLight ? 1.0f : 0.0f, context.shadowMap->GetDesc().maxShadowDistance, frameDesc.captureMode ? 1.0f : 0.0f, useIBL);
 	const D3D12_GPU_VIRTUAL_ADDRESS shadowGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&shadowConstants, sizeof(shadowConstants));
 	graphicResource.SetConstantBufferAddress("PerShadow", shadowGpuAddress);
 
@@ -118,8 +174,26 @@ void JLightingPass::Execute(const JRenderPassContext& context, const JFrameDesc&
 	graphicResource.SetTexture("GBufferMaterial", materialTexture);
 	graphicResource.SetTexture("DepthBuffer", depthTexture);
 	graphicResource.SetTexture("ShadowMap", shadowTexture);
+	if (irradianceTexture != nullptr)
+	{
+		graphicResource.SetTexture("IrradianceMap", const_cast<Render::JTexture*>(irradianceTexture));
+	}
+	if (useSpecularIBL)
+	{
+		graphicResource.SetTexture("PrefilteredEnv", const_cast<Render::JTexture*>(prefilteredTexture));
+		graphicResource.SetTexture("BRDFLUT", const_cast<Render::JTexture*>(brdfLutTexture));
+	}
+	// SSAO 결과(없으면 셰이더가 occlusion=1로 처리). 캡처 모드에서는 바인딩 안 함.
+	if (!frameDesc.captureMode && context.ssaoTarget != nullptr)
+	{
+		Render::JTexture* ssaoTexture = context.ssaoTarget->GetTextureView();
+		if (ssaoTexture != nullptr)
+		{
+			graphicResource.SetTexture("SSAOTexture", ssaoTexture);
+		}
+	}
 
-	context.commandQueue->SetPipeline(_pipeline);
+	context.commandQueue->SetPipeline(frameDesc.captureMode ? _hdrPipeline : _pipeline);
 	context.commandQueue->SetGraphicResources(&graphicResource);
 	context.commandQueue->DrawFullscreenTriangle();
 	++_lastStats.drawCallCount;

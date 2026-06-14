@@ -81,7 +81,8 @@ struct JSceneLightData
 	JSceneLightType type = JSceneLightType::Point;
 	JVec3 color = { 1.0f, 1.0f, 1.0f };
 	float intensity = 1.0f;
-	float range = 25.0f; // point 전용. directional은 transform rotation의 +Z 방향으로 비춘다.
+	float range = 25.0f;                       // point 전용.
+	JVec3 direction = { 0.0f, -1.0f, 0.0f };   // directional 전용. 빛이 진행하는 방향 벡터.
 };
 
 struct JSceneRenderObjectComponentData

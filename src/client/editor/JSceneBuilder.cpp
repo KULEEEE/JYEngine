@@ -256,6 +256,7 @@ bool JSceneBuilder::Build(const Engine::JSceneData& sceneData, const JSceneBuild
 			lightData.color = entityData.light.color;
 			lightData.intensity = entityData.light.intensity;
 			lightData.range = entityData.light.range;
+			lightData.direction = entityData.light.direction;
 
 			Engine::JLightHandle light = result.scene->AddLight(entity, lightData);
 			if (!light.IsValid())

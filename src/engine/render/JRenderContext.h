@@ -588,6 +588,14 @@ public:
 				samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 				samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
 			}
+			else if (sampler.name.find("LUT") != std::string::npos || sampler.name.find("Clamp") != std::string::npos)
+			{
+				// 이름에 LUT/Clamp가 들어가면 가장자리 누수를 막는 clamp 샘플러로 만듦. (BRDF LUT 등)
+				samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+				samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+				samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+				samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+			}
 			else
 			{
 				samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;

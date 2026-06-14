@@ -83,7 +83,7 @@ namespace
 		ImGui::BulletText("%s", name);
 	}
 
-	// 첫 번째 active directional light를 전역 라이트로 간주하고 각도/세기를 편집함.
+	// 첫 번째 active directional light를 전역 라이트로 간주하고 방향/세기를 편집함.
 	// 라이트 스냅샷은 매 프레임 scene에서 다시 읽히므로 값만 바꾸면 즉시 반영됨.
 	void drawGlobalLightControls(Engine::JScene& scene)
 	{
@@ -97,24 +97,20 @@ namespace
 			}
 
 			const Engine::JLightHandle lightHandle = { index, slot.generation };
-			const JVec3* rotation = scene.GetTransformRotation(slot.data.entity);
-			if (rotation == nullptr)
-			{
-				break;
-			}
 
 			ImGui::TextUnformatted("Global Light");
 			ImGui::Separator();
 
-			constexpr float radToDeg = 180.0f / 3.14159265f;
-			constexpr float degToRad = 3.14159265f / 180.0f;
-			float rotationDegrees[3] = { rotation->x * radToDeg, rotation->y * radToDeg, rotation->z * radToDeg };
-			if (ImGui::DragFloat3("Rotation", rotationDegrees, 0.5f, -360.0f, 360.0f, "%.1f deg"))
+			Engine::JScene::LightData lightData = slot.data;
+
+			// directional light 방향을 벡터로 직접 편집한다. (Euler 각이 아니라서 짐벌락 없음)
+			float direction[3] = { lightData.direction.x, lightData.direction.y, lightData.direction.z };
+			if (ImGui::DragFloat3("Direction", direction, 0.01f, -1.0f, 1.0f, "%.3f"))
 			{
-				scene.SetTransformRotation(slot.data.entity, { rotationDegrees[0] * degToRad, rotationDegrees[1] * degToRad, rotationDegrees[2] * degToRad });
+				lightData.direction = { direction[0], direction[1], direction[2] };
+				scene.SetLightData(lightHandle, lightData);
 			}
 
-			Engine::JScene::LightData lightData = slot.data;
 			if (ImGui::DragFloat("Intensity", &lightData.intensity, 0.05f, 0.0f, 100.0f, "%.2f"))
 			{
 				scene.SetLightData(lightHandle, lightData);

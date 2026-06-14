@@ -8,6 +8,48 @@
 
 J_EDITOR_BEGIN
 
+namespace
+{
+	// 입력이 폴더면 그 안의 project.json, 파일이면 그 파일 자체를 가리킨다.
+	std::filesystem::path toProjectFile(const std::filesystem::path& path)
+	{
+		std::error_code ec;
+		if (std::filesystem::is_directory(path, ec))
+		{
+			return path / "project.json";
+		}
+		return path;
+	}
+
+	// 프로젝트 경로를 실존하는 project.json 절대경로로 해석한다.
+	// 절대경로는 그대로 쓰고, 상대경로는 (1) 현재 작업 디렉터리, (2) 실행파일 폴더 순으로 찾는다.
+	// 어디서 실행하든(VS, build 폴더, 더블클릭) 상대경로가 동작하도록 하기 위함.
+	std::filesystem::path resolveProjectFile(const std::filesystem::path& input)
+	{
+		std::error_code ec;
+
+		// 1) 입력 그대로 — 절대경로거나 CWD 기준 상대경로
+		const std::filesystem::path fromCwd = toProjectFile(std::filesystem::absolute(input));
+		if (std::filesystem::exists(fromCwd, ec))
+		{
+			return fromCwd;
+		}
+
+		// 2) 상대경로면 실행파일 폴더 기준으로 재시도
+		if (!input.is_absolute())
+		{
+			const std::filesystem::path fromExe = toProjectFile(get_Engine_Executable_Path() / input);
+			if (std::filesystem::exists(fromExe, ec))
+			{
+				return fromExe;
+			}
+		}
+
+		// 못 찾으면 CWD 기준 경로를 반환 — 호출부의 에러 메시지에 사용된다.
+		return fromCwd;
+	}
+}
+
 JSceneManager::JSceneManager(Engine::JRenderer* renderer, Engine::JMaterialFactory* materialFactory, float cameraAspectRatio)
 	: _assetManager(materialFactory)
 	, _renderer(renderer)
@@ -94,10 +136,7 @@ bool JSceneManager::Open(const std::filesystem::path& filePath)
 
 bool JSceneManager::OpenProject(const std::filesystem::path& projectPath)
 {
-	const std::filesystem::path absoluteProjectPath = std::filesystem::absolute(projectPath);
-	const std::filesystem::path projectFilePath = std::filesystem::is_directory(absoluteProjectPath)
-		? absoluteProjectPath / "project.json"
-		: absoluteProjectPath;
+	const std::filesystem::path projectFilePath = resolveProjectFile(projectPath);
 
 	std::ifstream stream(projectFilePath);
 	if (!stream)

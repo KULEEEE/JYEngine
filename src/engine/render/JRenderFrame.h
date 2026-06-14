@@ -103,6 +103,11 @@ struct JFrameDesc
 	JArrayView<const uint32> transparentDrawItemIndices;
 	uint32 cullingTestedDrawItemCount = 0;
 	uint32 culledDrawItemCount = 0;
+
+	// Reflection probe 캡처용. captureMode=true면 LightingPass가 톤매핑을 건너뛰고
+	// renderTarget의 renderTargetSlice 면(큐브 face)에 linear HDR을 출력한다.
+	bool captureMode = false;
+	uint32 renderTargetSlice = 0;
 };
 
 J_ENGINE_END

@@ -10,6 +10,7 @@
 /*#include "engine/render/JRenderDB.h"*/ namespace J { namespace Engine { class JRenderDB; } }
 /*#include "engine/render/JGBuffer.h"*/ namespace J { namespace Engine { class JGBuffer; } }
 /*#include "engine/render/JShadowMap.h"*/ namespace J { namespace Engine { class JShadowMap; } }
+/*#include "engine/render/JReflectionProbe.h"*/ namespace J { namespace Engine { class JReflectionProbe; } }
 
 J_ENGINE_BEGIN
 
@@ -20,6 +21,8 @@ struct JRenderPassContext
 	JRenderDB* renderDB = nullptr;
 	JGBuffer* gBuffer = nullptr;
 	JShadowMap* shadowMap = nullptr;
+	JReflectionProbe* reflectionProbe = nullptr;
+	JRenderTarget* ssaoTarget = nullptr; // SSAOPass가 렌더, LightingPass가 occlusion으로 읽음
 };
 
 struct JRenderPassStats

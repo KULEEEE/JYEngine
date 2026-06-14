@@ -15,6 +15,8 @@
 
 J_ENGINE_BEGIN
 
+class JReflectionProbe;
+
 class JRenderer
 {
 public:
@@ -27,7 +29,7 @@ public:
 	using DrawItem = JDrawItem;
 	using FrameDesc = JFrameDesc;
 
-	JRenderer() = default;
+	JRenderer();
 	~JRenderer();
 
 	void Initialize(Render::JCommandQueue* commandQueue, Render::JRenderContext* renderContext);
@@ -45,6 +47,9 @@ private:
 	void initializeDeferredPasses();
 	void ensureGBuffer(const FrameDesc& frameDesc);
 	void ensureShadowMap();
+	void ensureSSAOTarget(const FrameDesc& frameDesc);
+	void ensureReflectionProbe();
+	void captureReflectionProbe(const FrameDesc& frameDesc);
 	void prepareFrameResources(const FrameDesc& frameDesc);
 
 	Render::JCommandQueue* _commandQueue = nullptr;
@@ -53,6 +58,13 @@ private:
 	std::vector<std::unique_ptr<JRenderPass>> _passes;
 	std::unique_ptr<JGBuffer> _gBuffer;
 	std::unique_ptr<JShadowMap> _shadowMap;
+	std::unique_ptr<JRenderTarget> _ssaoTarget;
+	std::unique_ptr<JReflectionProbe> _reflectionProbe;
+	// reflection probe 캡처 전용(face 해상도) 리소스/패스. 메인 경로와 분리해 둔다.
+	std::unique_ptr<JGBuffer> _captureGBuffer;
+	std::unique_ptr<JRenderPass> _captureDepthPass;
+	std::unique_ptr<JRenderPass> _captureGBufferPass;
+	std::unique_ptr<JRenderPass> _captureLightingPass;
 	RenderPath _renderPath = RenderPath::Forward;
 };
 

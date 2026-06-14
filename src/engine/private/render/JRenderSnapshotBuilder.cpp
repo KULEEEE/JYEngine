@@ -226,10 +226,15 @@ void JRenderSnapshotBuilder::buildLightSnapshots(const JScene& scene, JFrameSnap
 		item.colorIntensity = JVec4(slot.data.color.x, slot.data.color.y, slot.data.color.z, slot.data.intensity);
 		if (slot.data.type == JLightType::Directional)
 		{
-			// directional: transform rotation의 +Z(forward)가 빛이 진행하는 방향.
+			// directional: light 컴포넌트의 direction 벡터가 빛이 진행하는 방향이다.
+			// 방향을 벡터로 직접 받으므로 Euler 각의 짐벌락(예: pitch=90°)에서 자유롭다.
 			// position.xyz에 방향을 싣고 w=0을 directional 마커로 쓴다. (point는 w=range>0)
-			const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(transform.rotation.x, transform.rotation.y, transform.rotation.z);
-			const XMVECTOR direction = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rotation));
+			XMVECTOR direction = XMVectorSet(slot.data.direction.x, slot.data.direction.y, slot.data.direction.z, 0.0f);
+			if (XMVectorGetX(XMVector3LengthSq(direction)) < 1e-8f)
+			{
+				direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f); // 0벡터 방어: 기본값은 아래 방향.
+			}
+			direction = XMVector3Normalize(direction);
 			XMFLOAT3 directionValue;
 			XMStoreFloat3(&directionValue, direction);
 			item.position = JVec4(directionValue.x, directionValue.y, directionValue.z, 0.0f);

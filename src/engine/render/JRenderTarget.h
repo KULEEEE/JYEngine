@@ -29,6 +29,8 @@ public:
 		JColor clearColor = JColors::DarkGray;
 		float clearDepth = 0.0f;
 		uint16 arraySize = 1;
+		uint16 mipLevels = 1;   // prefiltered env용 밉체인. 컬러 타겟은 (slice, mip)마다 RTV가 생긴다.
+		bool cube = false;      // true면 6면 큐브(arraySize=6 강제), SRV는 TEXTURECUBE로 만든다.
 		Render::JViewport viewport = {};
 		D3D12_RECT scissorRect = {};
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -49,6 +51,11 @@ public:
 	bool HasShaderResource() const { return _shaderResource && _srvHeap != nullptr; }
 	uint32 GetWidth() const { return _width; }
 	uint32 GetHeight() const { return _height; }
+	uint32 GetArraySize() const { return _arraySize; }
+	uint32 GetMipLevels() const { return _mipLevels; }
+	bool IsCube() const { return _isCube; }
+	// 큐브/배열/밉 컬러 타겟에서 (slice, mip)별 RTV를 얻는다. 일반 2D는 (0, 0).
+	D3D12_CPU_DESCRIPTOR_HANDLE GetColorRTV(uint32 slice = 0, uint32 mip = 0) const;
 	DXGI_FORMAT GetFormat() const { return _format; }
 	const JColor& GetClearColor() const { return _clearColor; }
 	const Render::JViewport& GetViewport() const { return _viewport; }
@@ -74,9 +81,9 @@ public:
 
 private:
 	bool createOffscreenResource(const Desc& desc);
-	bool createRenderTargetView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format);
+	bool createRenderTargetView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize, uint16 mipLevels);
 	bool createDepthStencilViews(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize);
-	bool createShaderResourceView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize);
+	bool createShaderResourceView(ID3D12Device* device, ID3D12Resource* resource, DXGI_FORMAT format, uint16 arraySize, uint16 mipLevels, bool cube);
 
 	std::vector<ComPtr<ID3D12Resource>> _ownedResources;
 	std::vector<ID3D12Resource*> _resources;
@@ -91,6 +98,9 @@ private:
 
 	uint32 _width = 0;
 	uint32 _height = 0;
+	uint16 _arraySize = 1;
+	uint16 _mipLevels = 1;
+	bool _isCube = false;
 	DXGI_FORMAT _format = DXGI_FORMAT_UNKNOWN;
 	JColor _clearColor = JColors::DarkGray;
 	Render::JViewport _viewport = {};
