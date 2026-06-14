@@ -1,5 +1,5 @@
 # JYEngine
-<img width="1920" height="1077" alt="image" src="https://github.com/user-attachments/assets/e5506b14-6134-4233-a22c-8c94fa82b642" />
+<img width="2551" height="1367" alt="image" src="https://github.com/user-attachments/assets/91c430fd-7e6a-4080-a908-efbb584b1e93" />
 
 Data-Oriented Design을 기반으로 구현한 DirectX 12 커스텀 렌더링 엔진입니다. Scene/Component 데이터를 렌더링 전용 **Frame Snapshot**과 **Draw Item Cache**로 변환하고, 렌더러는 원본 Scene이 아닌 캐시된 **불변(immutable) 프레임 데이터(`JFrameDesc`) + `JRenderDB`** 만 참조하는 단방향 데이터 흐름 위에서 동작합니다. ECS-lite 컴포넌트 풀과 SoA 기반 Transform, 병렬 frustum culling, 셰이더 리플렉션 기반 root signature, Forward/Deferred 양쪽 경로(Cascade Shadow + Depth Prepass 포함)를 결합한 구조입니다.
 
