@@ -167,6 +167,49 @@ void JShadowPass::Execute(const JRenderPassContext& context, const JFrameDesc& f
 	const float frustumDepth = std::max(farDistance - nearDistance, 0.001f);
 	const float shadowDistance = std::min(desc.maxShadowDistance, farDistance);
 
+	struct PreparedShadowDraw
+	{
+		Render::JGraphicResource graphicResource;
+		const JMeshResource* mesh = nullptr;
+		uint32 indexCount = 0;
+		uint32 startIndex = 0;
+	};
+
+	std::vector<PreparedShadowDraw> preparedDraws;
+	if (hasDirectional && frameDesc.drawItemCache != nullptr)
+	{
+		preparedDraws.reserve(frameDesc.opaqueDrawItemIndices.size());
+		for (uint32 drawItemIndex : frameDesc.opaqueDrawItemIndices)
+		{
+			if (drawItemIndex >= frameDesc.drawItemCache->drawItems.size())
+			{
+				continue;
+			}
+
+			const JDrawItem& drawItem = frameDesc.drawItemCache->drawItems[drawItemIndex];
+			const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
+			if (!resources.IsValid())
+			{
+				++_lastStats.skippedDrawCount;
+				continue;
+			}
+
+			PreparedShadowDraw prepared;
+			prepared.graphicResource.SetShader(_shader);
+			// cascadeGpuAddress=0 → material + PerObject만 채우고 PerFrame은 건너뜀
+			if (!buildShadowGraphicResource(context, drawItem, prepared.graphicResource, 0))
+			{
+				++_lastStats.skippedDrawCount;
+				continue;
+			}
+
+			prepared.mesh = resources.mesh;
+			prepared.indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(resources.mesh->indexSize);
+			prepared.startIndex = drawItem.startIndex;
+			preparedDraws.push_back(std::move(prepared));
+		}
+	}
+
 	for (uint32 cascade = 0; cascade < JShadowMap::CASCADE_COUNT; ++cascade)
 	{
 		// directional light가 없어도 슬라이스는 clear해 둔다. (lighting pass가 SRV로 바인딩하므로)
@@ -224,33 +267,15 @@ void JShadowPass::Execute(const JRenderPassContext& context, const JFrameDesc& f
 		XMStoreFloat4x4(&cascadeConstants.viewProjection, XMMatrixTranspose(viewProjection));
 		const D3D12_GPU_VIRTUAL_ADDRESS cascadeGpuAddress = context.commandQueue->UploadFrameConstantBuffer(&cascadeConstants, sizeof(cascadeConstants));
 
-		for (uint32 drawItemIndex : frameDesc.opaqueDrawItemIndices)
+		for (PreparedShadowDraw& prepared : preparedDraws)
 		{
-			if (drawItemIndex >= frameDesc.drawItemCache->drawItems.size())
-			{
-				continue;
-			}
-
-			const JDrawItem& drawItem = frameDesc.drawItemCache->drawItems[drawItemIndex];
-			const JRenderDB::ResolvedDrawResources resources = context.renderDB->ResolveDrawResources(drawItem);
-			if (!resources.IsValid())
-			{
-				++_lastStats.skippedDrawCount;
-				continue;
-			}
-
-			Render::JGraphicResource graphicResource(_shader);
-			if (!buildShadowGraphicResource(context, drawItem, graphicResource, cascadeGpuAddress))
-			{
-				++_lastStats.skippedDrawCount;
-				continue;
-			}
-
+			// 미리 빌드한 GraphicResource(material + PerObject)에 이번 cascade의 PerFrame 주소만 더한다.
+			// 같은 root parameter는 마지막 set이 적용되므로, cascade마다 누적돼도 현재 cascade 값이 바인딩된다.
+			prepared.graphicResource.SetConstantBufferAddress("PerFrame", cascadeGpuAddress);
 			context.commandQueue->SetPipeline(_pipeline);
-			context.commandQueue->SetGraphicResources(&graphicResource);
-			context.commandQueue->BindVertexBuffer(resources.mesh);
-			const uint32 indexCount = drawItem.indexCount != 0 ? drawItem.indexCount : static_cast<uint32>(resources.mesh->indexSize);
-			context.commandQueue->DrawIndexed(indexCount, 1, drawItem.startIndex, 0, 0);
+			context.commandQueue->SetGraphicResources(&prepared.graphicResource);
+			context.commandQueue->BindVertexBuffer(prepared.mesh);
+			context.commandQueue->DrawIndexed(prepared.indexCount, 1, prepared.startIndex, 0, 0);
 			++_lastStats.drawCallCount;
 		}
 
